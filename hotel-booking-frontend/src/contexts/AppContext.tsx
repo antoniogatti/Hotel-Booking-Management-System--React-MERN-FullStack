@@ -16,6 +16,8 @@ type ToastMessage = {
 export type AppContext = {
   showToast: (toastMessage: ToastMessage) => void;
   isLoggedIn: boolean;
+  userRole: "user" | "hotel_owner" | "admin" | null;
+  isOwnerOrAdmin: boolean;
   stripePromise: Promise<Stripe | null>;
   showGlobalLoading: (message?: string) => void;
   hideGlobalLoading: () => void;
@@ -121,6 +123,23 @@ export const AppContextProvider = ({
 
   const finalIsLoggedIn = isLoggedIn || justLoggedIn || isJWTFallback();
 
+  const resolvedRole =
+    (data as { role?: "user" | "hotel_owner" | "admin" } | undefined)
+      ?.role ||
+    (localStorage.getItem("user_role") as
+      | "user"
+      | "hotel_owner"
+      | "admin"
+      | null);
+
+  const userRole = finalIsLoggedIn ? resolvedRole || "user" : null;
+  const isOwnerOrAdmin =
+    userRole === "hotel_owner" || userRole === "admin";
+
+  if (userRole) {
+    localStorage.setItem("user_role", userRole);
+  }
+
   console.log(
     "Final isLoggedIn:",
     finalIsLoggedIn,
@@ -159,6 +178,8 @@ export const AppContextProvider = ({
       value={{
         showToast,
         isLoggedIn: finalIsLoggedIn,
+        userRole,
+        isOwnerOrAdmin,
         stripePromise,
         showGlobalLoading,
         hideGlobalLoading,

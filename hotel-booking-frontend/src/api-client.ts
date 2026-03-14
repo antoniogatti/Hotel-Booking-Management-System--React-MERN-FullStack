@@ -40,10 +40,11 @@ export const signIn = async (formData: SignInFormData) => {
     console.log("User ID stored for incognito mode fallback");
   }
   if (response.data?.user) {
-    const { email, firstName, lastName } = response.data.user;
+    const { email, firstName, lastName, role } = response.data.user;
     if (email) localStorage.setItem("user_email", email);
     const name = [firstName, lastName].filter(Boolean).join(" ") || email;
     if (name) localStorage.setItem("user_name", name);
+    if (role) localStorage.setItem("user_role", role);
   }
 
   // Force validate token after successful login to update React Query cache
@@ -91,6 +92,7 @@ export const signOut = async () => {
   localStorage.removeItem("user_email");
   localStorage.removeItem("user_name");
   localStorage.removeItem("user_image");
+  localStorage.removeItem("user_role");
 
   return response.data;
 };

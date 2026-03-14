@@ -10,8 +10,10 @@ import HotelTypesFilter from "../components/HotelTypesFilter";
 import FacilitiesFilter from "../components/FacilitiesFilter";
 import PriceFilter from "../components/PriceFilter";
 import SearchBar from "../components/SearchBar";
+import { siteConfig } from "../config/siteConfig";
 
 const Search = () => {
+  const isSinglePropertyMode = siteConfig.singlePropertyMode;
   const [urlSearchParams] = useSearchParams();
   const search = useSearchContext();
   const [page, setPage] = useState<number>(1);
@@ -25,14 +27,14 @@ const Search = () => {
     const childCount = urlSearchParams.get("childCount");
     if (checkIn && checkOut) {
       search.saveSearchValues(
-        destination || "",
+        isSinglePropertyMode ? "" : destination || "",
         new Date(checkIn),
         new Date(checkOut),
         parseInt(adultCount || "1", 10),
         parseInt(childCount || "1", 10)
       );
     }
-  }, [urlSearchParams.toString()]);
+  }, [isSinglePropertyMode, urlSearchParams.toString()]);
   const [selectedStars, setSelectedStars] = useState<string[]>([]);
   const [selectedHotelTypes, setSelectedHotelTypes] = useState<string[]>([]);
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
@@ -46,11 +48,11 @@ const Search = () => {
     adultCount: search.adultCount.toString(),
     childCount: search.childCount.toString(),
     page: page.toString(),
-    stars: selectedStars,
-    types: selectedHotelTypes,
-    facilities: selectedFacilities,
-    maxPrice: selectedPrice?.toString(),
-    sortOption,
+    stars: isSinglePropertyMode ? [] : selectedStars,
+    types: isSinglePropertyMode ? [] : selectedHotelTypes,
+    facilities: isSinglePropertyMode ? [] : selectedFacilities,
+    maxPrice: isSinglePropertyMode ? undefined : selectedPrice?.toString(),
+    sortOption: isSinglePropertyMode ? "" : sortOption,
   };
 
   const { data: hotelData } = useQueryWithLoading(
@@ -104,50 +106,60 @@ const Search = () => {
       </div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-[250px_1fr] gap-5">
-        <div className="rounded-lg border border-slate-300 p-5 h-fit lg:sticky lg:top-10 order-2 lg:order-1">
-          <div className="space-y-5">
-            <h3 className="text-lg font-semibold border-b border-slate-300 pb-5">
-              Filter by:
-            </h3>
-            <StarRatingFilter
-              selectedStars={selectedStars}
-              onChange={handleStarsChange}
-            />
-            <HotelTypesFilter
-              selectedHotelTypes={selectedHotelTypes}
-              onChange={handleHotelTypeChange}
-            />
-            <FacilitiesFilter
-              selectedFacilities={selectedFacilities}
-              onChange={handleFacilityChange}
-            />
-            <PriceFilter
-              selectedPrice={selectedPrice}
-              onChange={(value?: number) => setSelectedPrice(value)}
-            />
+      <div
+        className={`grid grid-cols-1 ${
+          isSinglePropertyMode ? "" : "lg:grid-cols-[250px_1fr]"
+        } gap-5`}
+      >
+        {!isSinglePropertyMode && (
+          <div className="rounded-lg border border-slate-300 p-5 h-fit lg:sticky lg:top-10 order-2 lg:order-1">
+            <div className="space-y-5">
+              <h3 className="text-lg font-semibold border-b border-slate-300 pb-5">
+                Filter by:
+              </h3>
+              <StarRatingFilter
+                selectedStars={selectedStars}
+                onChange={handleStarsChange}
+              />
+              <HotelTypesFilter
+                selectedHotelTypes={selectedHotelTypes}
+                onChange={handleHotelTypeChange}
+              />
+              <FacilitiesFilter
+                selectedFacilities={selectedFacilities}
+                onChange={handleFacilityChange}
+              />
+              <PriceFilter
+                selectedPrice={selectedPrice}
+                onChange={(value?: number) => setSelectedPrice(value)}
+              />
+            </div>
           </div>
-        </div>
+        )}
         <div className="flex flex-col gap-5 order-1 lg:order-2">
           <div className="flex justify-between items-center">
             <span className="text-xl font-bold">
-              {hotelData?.pagination.total} Hotels found
-              {search.destination ? ` in ${search.destination}` : ""}
+              {hotelData?.pagination.total} {isSinglePropertyMode ? "Rooms" : "Hotels"} found
+              {!isSinglePropertyMode && search.destination
+                ? ` in ${search.destination}`
+                : ""}
             </span>
-            <select
-              value={sortOption}
-              onChange={(event) => setSortOption(event.target.value)}
-              className="p-2 border rounded-md"
-            >
-              <option value="">Sort By</option>
-              <option value="starRating">Star Rating</option>
-              <option value="pricePerNightAsc">
-                Price Per Night (low to high)
-              </option>
-              <option value="pricePerNightDesc">
-                Price Per Night (high to low)
-              </option>
-            </select>
+            {!isSinglePropertyMode && (
+              <select
+                value={sortOption}
+                onChange={(event) => setSortOption(event.target.value)}
+                className="p-2 border rounded-md"
+              >
+                <option value="">Sort By</option>
+                <option value="starRating">Star Rating</option>
+                <option value="pricePerNightAsc">
+                  Price Per Night (low to high)
+                </option>
+                <option value="pricePerNightDesc">
+                  Price Per Night (high to low)
+                </option>
+              </select>
+            )}
           </div>
           {hotelData?.data.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
@@ -168,10 +180,10 @@ const Search = () => {
                 </svg>
               </div>
               <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                No hotels found
+                No {isSinglePropertyMode ? "rooms" : "hotels"} found
               </h3>
               <p className="text-gray-500 max-w-md">
-                {search.destination ? (
+                {!isSinglePropertyMode && search.destination ? (
                   <>
                     We couldn't find any hotels in{" "}
                     <span className="font-medium">{search.destination}</span>
@@ -186,7 +198,7 @@ const Search = () => {
                   </>
                 ) : (
                   <>
-                    We couldn't find any hotels matching your criteria
+                    We couldn't find any {isSinglePropertyMode ? "rooms" : "hotels"} matching your criteria
                     {selectedStars.length > 0 && (
                       <>
                         {" "}
@@ -200,13 +212,15 @@ const Search = () => {
               </p>
               <div className="mt-6 space-y-2 text-sm text-gray-400">
                 <p>
-                  Try adjusting your filters or search for a different
-                  destination.
+                  {isSinglePropertyMode
+                    ? "Try changing dates or guest count."
+                    : "Try adjusting your filters or search for a different destination."}
                 </p>
-                {selectedStars.length > 0 ||
+                {!isSinglePropertyMode &&
+                (selectedStars.length > 0 ||
                 selectedHotelTypes.length > 0 ||
                 selectedFacilities.length > 0 ||
-                selectedPrice ? (
+                selectedPrice) ? (
                   <button
                     onClick={() => {
                       setSelectedStars([]);

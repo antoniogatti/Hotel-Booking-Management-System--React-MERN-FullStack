@@ -10,7 +10,6 @@ import {
   Eye,
   EyeOff,
   User,
-  UserPlus,
   Sparkles,
   CheckCircle,
 } from "lucide-react";
@@ -27,6 +26,7 @@ import {
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { Badge } from "../components/ui/badge";
+import { siteConfig } from "../config/siteConfig";
 
 export type RegisterFormData = {
   firstName: string;
@@ -55,7 +55,7 @@ const Register = () => {
     onSuccess: async () => {
       showToast({ 
         title: "Registration Successful", 
-        description: "Your account has been created successfully! Welcome to MernHolidays.",
+        description: `Your account has been created successfully! Welcome to ${siteConfig.brand.shortName}.`,
         type: "SUCCESS" 
       });
       await queryClient.invalidateQueries("validateToken");
@@ -92,14 +92,16 @@ const Register = () => {
 
           {/* Header */}
           <CardHeader className="text-center relative z-10 pb-8">
-            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg">
-              <UserPlus className="w-8 h-8 text-white" />
-            </div>
+            <img
+              src={siteConfig.brand.logoPath}
+              alt={siteConfig.brand.fullName}
+              className="mx-auto h-16 w-auto object-contain rounded-md bg-white px-2 py-1 shadow-soft mb-4"
+            />
             <CardTitle className="text-3xl font-bold text-gray-900 mb-2">
-              Join MernHolidays
+              Join {siteConfig.brand.shortName}
             </CardTitle>
             <CardDescription className="text-gray-600">
-              Create your account to start booking
+              Create your account to start booking your room
             </CardDescription>
 
             {/* Development Notice */}
@@ -353,7 +355,7 @@ const Register = () => {
                   </div>
                 ) : (
                   <div className="flex items-center">
-                    <UserPlus className="w-5 h-5 mr-2" />
+                    <User className="w-5 h-5 mr-2" />
                     Create Account
                   </div>
                 )}

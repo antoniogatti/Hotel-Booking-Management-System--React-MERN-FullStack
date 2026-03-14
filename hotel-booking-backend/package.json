@@ -7,7 +7,9 @@
     "dev": "nodemon",
     "build": "tsc --skipLibCheck",
     "start": "node dist/hotel-booking-backend/src/index.js",
-    "e2e": "cross-env DOTENV_CONFIG_PATH=.env.e2e nodemon"
+    "e2e": "cross-env DOTENV_CONFIG_PATH=.env.e2e nodemon",
+    "seed:fuocorosa": "ts-node src/scripts/seed-fuocorosa.ts",
+    "seed:palazzo-rooms": "ts-node src/scripts/seed-palazzopinto-rooms.ts"
   },
   "author": "Arnob Mahmud",
   "license": "ISC",

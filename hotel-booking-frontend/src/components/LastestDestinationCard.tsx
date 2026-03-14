@@ -37,7 +37,7 @@ const LatestDestinationCard = ({ hotel }: Props) => {
         {/* Price Badge */}
         <div className="absolute top-4 left-4">
           <div className="bg-primary-600 text-white rounded-full px-3 py-1">
-            <span className="text-sm font-bold">£{hotel.pricePerNight}</span>
+            <span className="text-sm font-bold">EUR {hotel.pricePerNight}</span>
           </div>
         </div>
       </div>
@@ -98,7 +98,7 @@ const LatestDestinationCard = ({ hotel }: Props) => {
 
             <div className="bg-white/20 backdrop-blur-sm rounded-lg px-3 py-1 hover:bg-white/30 transition-colors">
               <span className="text-sm font-semibold text-white">
-                View Details
+                View Room
               </span>
             </div>
           </div>

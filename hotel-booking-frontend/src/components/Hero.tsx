@@ -1,9 +1,10 @@
 import { Search, MapPin, Calendar, Users, Star } from "lucide-react";
 import AdvancedSearch from "./AdvancedSearch";
+import { siteConfig } from "../config/siteConfig";
 
 const Hero = ({ onSearch }: { onSearch: (searchData: any) => void }) => {
   return (
-    <section className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-800 overflow-hidden">
+    <section className="relative bg-gradient-to-br from-primary-700 via-primary-800 to-primary-900 overflow-hidden">
       {/* Background Pattern */}
       <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:60px_60px]" />
       <div className="absolute inset-0 bg-gradient-to-r from-primary-600/20 to-transparent" />
@@ -20,40 +21,40 @@ const Hero = ({ onSearch }: { onSearch: (searchData: any) => void }) => {
           <div className="inline-flex items-center bg-white/10 backdrop-blur-sm rounded-full px-6 py-2 mb-8">
             <Star className="w-5 h-5 text-yellow-400 mr-2" />
             <span className="text-white/90 font-medium">
-              Trusted by 10,000+ travelers
+              Boutique stay in the heart of {siteConfig.property.city}
             </span>
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight">
-            Find Your Perfect
-            <span className="block bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
-              Dream Stay
+          <h1 className="text-5xl md:text-7xl font-bold text-white mb-6 leading-tight font-serif">
+            {siteConfig.brand.shortName}
+            <span className="block bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">
+              Bed and Breakfast
             </span>
           </h1>
 
           <p className="text-xl md:text-2xl text-white/90 mb-12 leading-relaxed">
-            Discover amazing hotels, resorts, and accommodations worldwide.
+            {siteConfig.brand.tagline}.
             <br className="hidden md:block" />
-            Book with confidence and enjoy unforgettable experiences.
+            A refined historic residence designed for relaxed stays in Puglia.
           </p>
 
           {/* Feature Icons */}
           <div className="flex justify-center items-center space-x-8 mb-12">
             <div className="flex items-center text-white/80">
               <Search className="w-5 h-5 mr-2" />
-              <span className="text-sm font-medium">Smart Search</span>
+              <span className="text-sm font-medium">Direct Booking</span>
             </div>
             <div className="flex items-center text-white/80">
               <MapPin className="w-5 h-5 mr-2" />
-              <span className="text-sm font-medium">Global Destinations</span>
+              <span className="text-sm font-medium">Historic Center</span>
             </div>
             <div className="flex items-center text-white/80">
               <Calendar className="w-5 h-5 mr-2" />
-              <span className="text-sm font-medium">Flexible Booking</span>
+              <span className="text-sm font-medium">Flexible Dates</span>
             </div>
             <div className="flex items-center text-white/80">
               <Users className="w-5 h-5 mr-2" />
-              <span className="text-sm font-medium">24/7 Support</span>
+              <span className="text-sm font-medium">Family Hospitality</span>
             </div>
           </div>
         </div>

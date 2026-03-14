@@ -5,11 +5,19 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import verifyToken from "../middleware/auth";
+import {
+  normalizeEmail,
+  resolveRoleForEmail,
+  AppRole,
+} from "../lib/user-role";
 
 const router = express.Router();
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_SECRET;
+const MICROSOFT_CLIENT_ID = process.env.MS_ENTRA_CLIENT_ID;
+const MICROSOFT_CLIENT_SECRET = process.env.MS_ENTRA_CLIENT_SECRET;
+const MICROSOFT_TENANT_ID = process.env.MS_ENTRA_TENANT_ID || "common";
 const FRONTEND_URL = (process.env.FRONTEND_URL || "http://localhost:5174").replace(
   /\/$/,
   ""
@@ -18,6 +26,25 @@ const BACKEND_URL = (
   process.env.BACKEND_URL ||
   `http://localhost:${process.env.PORT || 5000}`
 ).replace(/\/$/, "");
+
+const microsoftBaseUrl = `https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/oauth2/v2.0`;
+
+const issueToken = (userId: string, role: AppRole) => {
+  return jwt.sign({ userId, role }, process.env.JWT_SECRET_KEY as string, {
+    expiresIn: "1d",
+  });
+};
+
+const upsertRoleByEmailPolicy = async (user: any, email: string) => {
+  const computedRole = resolveRoleForEmail(email);
+
+  if (!user.role || user.role !== computedRole) {
+    user.role = computedRole;
+    await user.save();
+  }
+
+  return computedRole;
+};
 
 /**
  * @swagger
@@ -28,13 +55,21 @@ const BACKEND_URL = (
  *     tags: [Authentication]
  */
 router.get("/google", (req: Request, res: Response) => {
-  if (!GOOGLE_CLIENT_ID) {
-    return res.status(500).json({ message: "Google OAuth not configured" });
+  return res.status(410).json({
+    message: "Google OAuth is disabled. Use Microsoft sign-in.",
+  });
+});
+
+router.get("/microsoft", (req: Request, res: Response) => {
+  if (!MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET) {
+    return res.status(500).json({ message: "Microsoft OAuth not configured" });
   }
+
   const state = crypto.randomBytes(32).toString("hex");
-  const redirectUri = `${BACKEND_URL}/api/auth/callback/google`;
-  const scope = "openid email profile";
-  const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}&access_type=offline&prompt=consent`;
+  const redirectUri = `${BACKEND_URL}/api/auth/callback/microsoft`;
+  const scope = "openid profile email User.Read";
+  const url = `${microsoftBaseUrl}/authorize?client_id=${MICROSOFT_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent(scope)}&state=${state}`;
+
   res.redirect(url);
 });
 
@@ -47,6 +82,10 @@ router.get("/google", (req: Request, res: Response) => {
  *     tags: [Authentication]
  */
 router.get("/callback/google", async (req: Request, res: Response) => {
+  return res.status(410).json({
+    message: "Google OAuth callback disabled. Use Microsoft sign-in.",
+  });
+
   const { code, error } = req.query;
 
   if (error) {
@@ -91,7 +130,11 @@ router.get("/callback/google", async (req: Request, res: Response) => {
     );
     const googleUser = await userRes.json();
 
-    const email = googleUser.email;
+    const email = normalizeEmail(googleUser.email || "");
+    if (!email) {
+      return res.redirect(`${FRONTEND_URL}/sign-in?error=oauth_email_missing`);
+    }
+
     const name = googleUser.name || "";
     const [firstName, ...lastParts] = name.split(" ");
     const lastName = lastParts.join(" ") || firstName;
@@ -107,27 +150,30 @@ router.get("/callback/google", async (req: Request, res: Response) => {
         password: randomPassword,
         image,
         emailVerified: true,
+        role: resolveRoleForEmail(email),
       });
       await user.save();
     } else {
+      const role = await upsertRoleByEmailPolicy(user, email);
       await User.findByIdAndUpdate(user._id, {
         image,
         emailVerified: true,
+        role,
       });
     }
 
-    const token = jwt.sign(
-      { userId: user.id },
-      process.env.JWT_SECRET_KEY as string,
-      { expiresIn: "1d" }
-    );
+    const computedRole = await upsertRoleByEmailPolicy(user, email);
+
+    const token = issueToken(user.id, computedRole);
 
     const redirectUrl = new URL(`${FRONTEND_URL}/auth/callback`);
     redirectUrl.searchParams.set("token", token);
+    redirectUrl.searchParams.set("provider", "google");
     redirectUrl.searchParams.set("userId", String(user._id));
     redirectUrl.searchParams.set("email", user.email);
     redirectUrl.searchParams.set("firstName", user.firstName);
     redirectUrl.searchParams.set("lastName", user.lastName);
+    redirectUrl.searchParams.set("role", computedRole);
     if (image) redirectUrl.searchParams.set("image", image);
 
     res.redirect(redirectUrl.toString());
@@ -136,6 +182,94 @@ router.get("/callback/google", async (req: Request, res: Response) => {
     res.redirect(
       `${FRONTEND_URL}/sign-in?error=server_error`
     );
+  }
+});
+
+router.get("/callback/microsoft", async (req: Request, res: Response) => {
+  const { code, error } = req.query;
+
+  if (error) {
+    return res.redirect(
+      `${FRONTEND_URL}/sign-in?error=${encodeURIComponent(String(error))}`
+    );
+  }
+
+  if (!code || !MICROSOFT_CLIENT_ID || !MICROSOFT_CLIENT_SECRET) {
+    return res.redirect(`${FRONTEND_URL}/sign-in?error=oauth_config`);
+  }
+
+  try {
+    const redirectUri = `${BACKEND_URL}/api/auth/callback/microsoft`;
+    const tokenRes = await fetch(`${microsoftBaseUrl}/token`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: MICROSOFT_CLIENT_ID,
+        client_secret: MICROSOFT_CLIENT_SECRET,
+        code: String(code),
+        redirect_uri: redirectUri,
+        grant_type: "authorization_code",
+      }),
+    });
+
+    const tokenData = await tokenRes.json();
+    if (tokenData.error || !tokenData.access_token) {
+      console.error("Microsoft token error:", tokenData);
+      return res.redirect(`${FRONTEND_URL}/sign-in?error=token_exchange`);
+    }
+
+    const profileRes = await fetch(
+      "https://graph.microsoft.com/v1.0/me?$select=givenName,surname,displayName,mail,userPrincipalName",
+      {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` },
+      }
+    );
+    const profile = await profileRes.json();
+
+    if (profile.error) {
+      console.error("Microsoft profile error:", profile);
+      return res.redirect(`${FRONTEND_URL}/sign-in?error=profile_fetch`);
+    }
+
+    const email = normalizeEmail(profile.mail || profile.userPrincipalName || "");
+    if (!email) {
+      return res.redirect(`${FRONTEND_URL}/sign-in?error=oauth_email_missing`);
+    }
+
+    const firstName = profile.givenName || "User";
+    const lastName = profile.surname || profile.displayName || "Microsoft";
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      const randomPassword = crypto.randomBytes(32).toString("hex");
+      user = new User({
+        email,
+        firstName,
+        lastName,
+        password: randomPassword,
+        emailVerified: true,
+        role: resolveRoleForEmail(email),
+      });
+      await user.save();
+    }
+
+    const computedRole = await upsertRoleByEmailPolicy(user, email);
+
+    const token = issueToken(user.id, computedRole);
+
+    const redirectUrl = new URL(`${FRONTEND_URL}/auth/callback`);
+    redirectUrl.searchParams.set("token", token);
+    redirectUrl.searchParams.set("provider", "microsoft");
+    redirectUrl.searchParams.set("userId", String(user._id));
+    redirectUrl.searchParams.set("email", user.email);
+    redirectUrl.searchParams.set("firstName", user.firstName);
+    redirectUrl.searchParams.set("lastName", user.lastName);
+    redirectUrl.searchParams.set("role", computedRole);
+
+    res.redirect(redirectUrl.toString());
+  } catch (err) {
+    console.error("Microsoft OAuth error:", err);
+    res.redirect(`${FRONTEND_URL}/sign-in?error=server_error`);
   }
 });
 
@@ -189,12 +323,17 @@ router.post(
     }),
   ],
   async (req: Request, res: Response) => {
+    return res.status(410).json({
+      message: "Email/password login disabled. Use Microsoft sign-in.",
+    });
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ message: errors.array() });
     }
 
-    const { email, password } = req.body;
+    const email = normalizeEmail(req.body.email || "");
+    const { password } = req.body;
 
     try {
       const user = await User.findOne({ email });
@@ -207,13 +346,8 @@ router.post(
         return res.status(400).json({ message: "Invalid Credentials" });
       }
 
-      const token = jwt.sign(
-        { userId: user.id },
-        process.env.JWT_SECRET_KEY as string,
-        {
-          expiresIn: "1d",
-        }
-      );
+      const computedRole = await upsertRoleByEmailPolicy(user, email);
+      const token = issueToken(user.id, computedRole);
 
       // Return JWT token in response body for localStorage storage
       res.status(200).json({
@@ -225,6 +359,7 @@ router.post(
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
+          role: computedRole,
         },
       });
     } catch (error) {
@@ -257,8 +392,18 @@ router.post(
  *       401:
  *         description: Token is invalid or expired
  */
-router.get("/validate-token", verifyToken, (req: Request, res: Response) => {
-  res.status(200).send({ userId: req.userId });
+router.get("/validate-token", verifyToken, async (req: Request, res: Response) => {
+  const user = await User.findById(req.userId).select("role email");
+  if (!user) {
+    return res.status(401).json({ message: "unauthorized" });
+  }
+
+  const role = resolveRoleForEmail(user.email || "");
+  if (!user.role || user.role !== role) {
+    await User.findByIdAndUpdate(user._id, { role });
+  }
+
+  res.status(200).send({ userId: req.userId, role });
 });
 
 /**

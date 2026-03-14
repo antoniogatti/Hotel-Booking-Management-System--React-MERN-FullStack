@@ -8,7 +8,6 @@ import Layout from "./layouts/Layout";
 import AuthLayout from "./layouts/AuthLayout";
 import ScrollToTop from "./components/ScrollToTop";
 import { Toaster } from "./components/ui/toaster";
-import Register from "./pages/Register";
 import SignIn from "./pages/SignIn";
 import AddHotel from "./pages/AddHotel";
 import useAppContext from "./hooks/useAppContext";
@@ -23,9 +22,10 @@ import ApiDocs from "./pages/ApiDocs";
 import ApiStatus from "./pages/ApiStatus";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import AuthCallback from "./pages/AuthCallback";
+import { siteConfig } from "./config/siteConfig";
 
 const App = () => {
-  const { isLoggedIn } = useAppContext();
+  const { isLoggedIn, isOwnerOrAdmin } = useAppContext();
   return (
     <Router>
       <ScrollToTop />
@@ -46,6 +46,16 @@ const App = () => {
             </Layout>
           }
         />
+        {siteConfig.singlePropertyMode && (
+          <Route
+            path="/rooms"
+            element={
+              <Layout>
+                <Search />
+              </Layout>
+            }
+          />
+        )}
         <Route
           path="/detail/:hotelId"
           element={
@@ -80,11 +90,7 @@ const App = () => {
         />
         <Route
           path="/register"
-          element={
-            <AuthLayout>
-              <Register />
-            </AuthLayout>
-          }
+          element={<Navigate to="/sign-in" />}
         />
         <Route
           path="/sign-in"
@@ -106,9 +112,13 @@ const App = () => {
         <Route
           path="/my-hotels"
           element={
-            <Layout>
-              <MyHotels />
-            </Layout>
+            isOwnerOrAdmin ? (
+              <Layout>
+                <MyHotels />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
           }
         />
         <Route
@@ -130,22 +140,26 @@ const App = () => {
                 </Layout>
               }
             />
-            <Route
-              path="/add-hotel"
-              element={
-                <Layout>
-                  <AddHotel />
-                </Layout>
-              }
-            />
-            <Route
-              path="/edit-hotel/:hotelId"
-              element={
-                <Layout>
-                  <EditHotel />
-                </Layout>
-              }
-            />
+            {isOwnerOrAdmin && (
+              <>
+                <Route
+                  path="/add-hotel"
+                  element={
+                    <Layout>
+                      <AddHotel />
+                    </Layout>
+                  }
+                />
+                <Route
+                  path="/edit-hotel/:hotelId"
+                  element={
+                    <Layout>
+                      <EditHotel />
+                    </Layout>
+                  }
+                />
+              </>
+            )}
           </>
         )}
         <Route path="*" element={<Navigate to="/" />} />

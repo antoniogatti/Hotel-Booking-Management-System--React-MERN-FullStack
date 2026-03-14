@@ -150,7 +150,7 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
               <span>Booking Summary</span>
             </div>
             <Badge variant="outline" className="text-sm">
-              £{pricePerNight}/night
+              EUR {pricePerNight}/night
             </Badge>
           </CardTitle>
         </CardHeader>
@@ -160,13 +160,13 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
           <div className="flex justify-between items-center p-4 bg-white rounded-lg border border-gray-100 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="text-gray-600">
-                £{pricePerNight} × {numberOfNights} night
+                EUR {pricePerNight} × {numberOfNights} night
                 {numberOfNights > 1 ? "s" : ""}
               </span>
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold text-blue-600">
-                £{totalPrice}
+                EUR {totalPrice}
               </div>
               <div className="text-xs text-gray-500">Total Price</div>
             </div>

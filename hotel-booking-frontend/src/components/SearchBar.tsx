@@ -7,8 +7,10 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent } from "./ui/card";
+import { siteConfig } from "../config/siteConfig";
 
 const SearchBar = () => {
+  const isSinglePropertyMode = siteConfig.singlePropertyMode;
   const navigate = useNavigate();
   const search = useSearchContext();
 
@@ -29,6 +31,7 @@ const SearchBar = () => {
   // You can replace this fetch with context if you already have hotel data
 
   useEffect(() => {
+    if (isSinglePropertyMode) return;
     // Prevent multiple API calls - use a ref to track if we've already fetched
     if (isLoadingPlaces || hasFetchedRef.current) return;
 
@@ -87,7 +90,7 @@ const SearchBar = () => {
     };
 
     fetchPlaces();
-  }, []); // Remove all dependencies to run only once on mount
+  }, [isSinglePropertyMode]); // Remove all dependencies to run only once on mount
 
   // Clear dropdown state when component mounts (for search page)
   useEffect(() => {
@@ -101,6 +104,7 @@ const SearchBar = () => {
 
   // Prevent dropdown from opening when destination is pre-filled from search context
   useEffect(() => {
+    if (isSinglePropertyMode) return;
     if (destination && places.length > 0) {
       const filtered = places.filter((place) =>
         place.toLowerCase().includes(destination.toLowerCase())
@@ -115,10 +119,11 @@ const SearchBar = () => {
         setShowDropdown(false);
       }
     }
-  }, [destination, places, isInitialMount]);
+  }, [isSinglePropertyMode, destination, places, isInitialMount]);
 
   // Filter places as user types
   useEffect(() => {
+    if (isSinglePropertyMode) return;
     if (destination.length > 0) {
       const filtered = places.filter((place) =>
         place.toLowerCase().includes(destination.toLowerCase())
@@ -128,10 +133,16 @@ const SearchBar = () => {
     } else {
       setShowDropdown(false);
     }
-  }, [destination, places]);
+  }, [isSinglePropertyMode, destination, places]);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
+
+    if (isSinglePropertyMode) {
+      search.saveSearchValues("", checkIn, checkOut, adultCount, childCount);
+      navigate("/rooms");
+      return;
+    }
 
     // Allow empty destination to show all hotels
     // Only proceed if destination is not empty
@@ -211,53 +222,59 @@ const SearchBar = () => {
       <CardContent className="p-0">
         <form
           onSubmit={handleSubmit}
-          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5 items-center gap-4"
+          className={`grid grid-cols-1 sm:grid-cols-2 ${
+            isSinglePropertyMode
+              ? "lg:grid-cols-3 2xl:grid-cols-4"
+              : "lg:grid-cols-3 2xl:grid-cols-5"
+          } items-center gap-4`}
           autoComplete="off"
         >
-          <div className="flex flex-row items-center flex-1 relative sm:col-span-2 lg:col-span-1">
-            <MdTravelExplore
-              size={20}
-              className="mr-2 text-gray-500 absolute left-3 z-10"
-            />
-            <Input
-              placeholder="Where are you going?"
-              className="pl-10"
-              value={destination}
-              onChange={(event) => {
-                setDestination(event.target.value);
-                setHasUserInteracted(true);
-              }}
-              onFocus={() => {
-                // Only show dropdown if user manually focuses and there are filtered places
-                // AND we're not in initial mount state
-                if (
-                  filteredPlaces.length > 0 &&
-                  destination.length > 0 &&
-                  hasUserInteracted &&
-                  !isInitialMount
-                ) {
-                  setShowDropdown(true);
-                }
-              }}
-              onBlur={() => setShowDropdown(false)}
-            />
-            {showDropdown && !isInitialMount && (
-              <ul className="absolute top-full left-0 w-full bg-white p-2 border border-input rounded-md shadow-lg z-10 max-h-40 overflow-y-auto">
-                {filteredPlaces.map((place) => (
-                  <li
-                    key={place}
-                    className="px-3 py-2 cursor-pointer hover:bg-accent text-sm"
-                    onMouseDown={() => {
-                      setDestination(place);
-                      setShowDropdown(false);
-                    }}
-                  >
-                    {place}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {!isSinglePropertyMode && (
+            <div className="flex flex-row items-center flex-1 relative sm:col-span-2 lg:col-span-1">
+              <MdTravelExplore
+                size={20}
+                className="mr-2 text-gray-500 absolute left-3 z-10"
+              />
+              <Input
+                placeholder="Where are you going?"
+                className="pl-10"
+                value={destination}
+                onChange={(event) => {
+                  setDestination(event.target.value);
+                  setHasUserInteracted(true);
+                }}
+                onFocus={() => {
+                  // Only show dropdown if user manually focuses and there are filtered places
+                  // AND we're not in initial mount state
+                  if (
+                    filteredPlaces.length > 0 &&
+                    destination.length > 0 &&
+                    hasUserInteracted &&
+                    !isInitialMount
+                  ) {
+                    setShowDropdown(true);
+                  }
+                }}
+                onBlur={() => setShowDropdown(false)}
+              />
+              {showDropdown && !isInitialMount && (
+                <ul className="absolute top-full left-0 w-full bg-white p-2 border border-input rounded-md shadow-lg z-10 max-h-40 overflow-y-auto">
+                  {filteredPlaces.map((place) => (
+                    <li
+                      key={place}
+                      className="px-3 py-2 cursor-pointer hover:bg-accent text-sm"
+                      onMouseDown={() => {
+                        setDestination(place);
+                        setShowDropdown(false);
+                      }}
+                    >
+                      {place}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
 
           <div className="sm:col-span-1">
             <DatePicker
@@ -325,7 +342,7 @@ const SearchBar = () => {
               type="submit"
               className="flex-1 items-center text-white bg-primary-600 px-6 py-2 rounded-md font-semibold hover:bg-primary-500 hover:shadow-medium transition-all duration-200 group"
             >
-              Search
+              Search Rooms
             </Button>
             <Button
               type="button"

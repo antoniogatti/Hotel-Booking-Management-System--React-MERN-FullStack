@@ -10,6 +10,7 @@ import { Button } from "./ui/button";
 import { useState } from "react";
 import * as apiClient from "../api-client";
 import { Plus, LogOut, Building2 } from "lucide-react";
+import useAppContext from "../hooks/useAppContext";
 
 const getAvatarUrl = () => {
   const image = localStorage.getItem("user_image");
@@ -21,6 +22,7 @@ const getAvatarUrl = () => {
 };
 
 const UsernameMenu = () => {
+  const { isOwnerOrAdmin } = useAppContext();
   const [isOpen, setIsOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -58,33 +60,37 @@ const UsernameMenu = () => {
           <p className="text-xs text-muted-foreground truncate">{email}</p>
         </div>
         <Separator className="my-2 bg-gray-200" />
-        <DropdownMenuItem
-          onClick={handleMenuClick}
-          asChild
-          className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
-        >
-          <Link
-            to="/add-hotel"
-            className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
-          >
-            <Plus className="h-4 w-4" />
-            Add Hotel
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={handleMenuClick}
-          asChild
-          className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
-        >
-          <Link
-            to="/my-hotels"
-            className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
-          >
-            <Building2 className="h-4 w-4" />
-            My Hotels
-          </Link>
-        </DropdownMenuItem>
-        <Separator className="my-2 bg-gray-200" />
+        {isOwnerOrAdmin && (
+          <>
+            <DropdownMenuItem
+              onClick={handleMenuClick}
+              asChild
+              className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
+            >
+              <Link
+                to="/add-hotel"
+                className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
+              >
+                <Plus className="h-4 w-4" />
+                Add Room
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={handleMenuClick}
+              asChild
+              className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
+            >
+              <Link
+                to="/my-hotels"
+                className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
+              >
+                <Building2 className="h-4 w-4" />
+                Manage Rooms
+              </Link>
+            </DropdownMenuItem>
+            <Separator className="my-2 bg-gray-200" />
+          </>
+        )}
         <DropdownMenuItem className="py-1.5 rounded-md cursor-pointer">
           <Button
             onClick={handleLogout}

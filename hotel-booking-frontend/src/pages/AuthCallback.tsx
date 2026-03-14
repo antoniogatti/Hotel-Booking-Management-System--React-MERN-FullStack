@@ -14,19 +14,21 @@ const AuthCallback = () => {
     const token = searchParams.get("token");
     const userId = searchParams.get("userId");
     const error = searchParams.get("error");
+    const provider = searchParams.get("provider");
     const email = searchParams.get("email");
     const firstName = searchParams.get("firstName");
     const lastName = searchParams.get("lastName");
     const image = searchParams.get("image");
+    const role = searchParams.get("role");
 
     if (error) {
       showToast({
         title: "Sign-in failed",
         description:
           error === "oauth_config"
-            ? "Google sign-in is not configured."
+            ? "Social sign-in is not configured."
             : error === "token_exchange"
-            ? "Could not complete Google sign-in."
+            ? "Could not complete social sign-in."
             : "Something went wrong. Please try again.",
         type: "ERROR",
       });
@@ -41,11 +43,12 @@ const AuthCallback = () => {
       const name = [firstName, lastName].filter(Boolean).join(" ") || email;
       if (name) localStorage.setItem("user_name", name);
       if (image) localStorage.setItem("user_image", image);
+      if (role) localStorage.setItem("user_role", role);
 
       queryClient.invalidateQueries("validateToken");
       showToast({
         title: "Signed in successfully",
-        description: "Welcome! You have been signed in with Google.",
+        description: `Welcome! You have been signed in with ${provider === "microsoft" ? "Microsoft" : "Google"}.`,
         type: "SUCCESS",
       });
       navigate("/");

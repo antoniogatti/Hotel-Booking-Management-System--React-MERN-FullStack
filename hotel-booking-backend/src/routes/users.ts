@@ -3,6 +3,7 @@ import User from "../models/user";
 import jwt from "jsonwebtoken";
 import { check, validationResult } from "express-validator";
 import verifyToken from "../middleware/auth";
+import { normalizeEmail, resolveRoleForEmail } from "../lib/user-role";
 
 const router = express.Router();
 
@@ -32,21 +33,32 @@ router.post(
     }),
   ],
   async (req: Request, res: Response) => {
+    return res.status(410).json({
+      message: "Email registration disabled. Use Microsoft sign-in.",
+    });
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(400).json({ message: errors.array() });
     }
 
     try {
+      const normalizedEmail = normalizeEmail(req.body.email);
+      const computedRole = resolveRoleForEmail(normalizedEmail);
+
       let user = await User.findOne({
-        email: req.body.email,
+        email: normalizedEmail,
       });
 
       if (user) {
         return res.status(400).json({ message: "User already exists" });
       }
 
-      user = new User(req.body);
+      user = new User({
+        ...req.body,
+        email: normalizedEmail,
+        role: computedRole,
+      });
       await user.save();
 
       const token = jwt.sign(

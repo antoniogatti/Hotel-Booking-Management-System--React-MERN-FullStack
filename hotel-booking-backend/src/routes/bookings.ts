@@ -3,12 +3,13 @@ import Booking from "../models/booking";
 import Hotel from "../models/hotel";
 import User from "../models/user";
 import verifyToken from "../middleware/auth";
+import requireRole from "../middleware/requireRole";
 import { body, param, validationResult } from "express-validator";
 
 const router = express.Router();
 
 // Get all bookings (admin only)
-router.get("/", verifyToken, async (req: Request, res: Response) => {
+router.get("/", verifyToken, requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const bookings = await Booking.find()
       .sort({ createdAt: -1 })
@@ -25,6 +26,7 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
 router.get(
   "/hotel/:hotelId",
   verifyToken,
+  requireRole("hotel_owner", "admin"),
   async (req: Request, res: Response) => {
     try {
       const { hotelId } = req.params;
@@ -35,7 +37,7 @@ router.get(
         return res.status(404).json({ message: "Hotel not found" });
       }
 
-      if (hotel.userId !== req.userId) {
+      if (req.userRole !== "admin" && hotel.userId !== req.userId) {
         return res.status(403).json({ message: "Access denied" });
       }
 
@@ -52,7 +54,7 @@ router.get(
 );
 
 // Get booking by ID
-router.get("/:id", verifyToken, async (req: Request, res: Response) => {
+router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req: Request, res: Response) => {
   try {
     const booking = await Booking.findById(req.params.id).populate(
       "hotelId",
@@ -61,6 +63,15 @@ router.get("/:id", verifyToken, async (req: Request, res: Response) => {
 
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
+    }
+
+    const hotel = await Hotel.findById(booking.hotelId);
+    if (!hotel) {
+      return res.status(404).json({ message: "Hotel not found" });
+    }
+
+    if (req.userRole !== "admin" && hotel.userId !== req.userId) {
+      return res.status(403).json({ message: "Access denied" });
     }
 
     res.status(200).json(booking);
@@ -74,6 +85,7 @@ router.get("/:id", verifyToken, async (req: Request, res: Response) => {
 router.patch(
   "/:id/status",
   verifyToken,
+  requireRole("hotel_owner", "admin"),
   [
     body("status")
       .isIn(["pending", "confirmed", "cancelled", "completed", "refunded"])
@@ -88,6 +100,20 @@ router.patch(
     try {
       const { status, cancellationReason } = req.body;
 
+      const existingBooking = await Booking.findById(req.params.id);
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const hotel = await Hotel.findById(existingBooking.hotelId);
+      if (!hotel) {
+        return res.status(404).json({ message: "Hotel not found" });
+      }
+
+      if (req.userRole !== "admin" && hotel.userId !== req.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const updateData: any = { status };
       if (status === "cancelled" && cancellationReason) {
         updateData.cancellationReason = cancellationReason;
@@ -96,15 +122,9 @@ router.patch(
         updateData.refundAmount = req.body.refundAmount || 0;
       }
 
-      const booking = await Booking.findByIdAndUpdate(
-        req.params.id,
-        updateData,
-        { new: true }
-      );
-
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
+      const booking = await Booking.findByIdAndUpdate(req.params.id, updateData, {
+        new: true,
+      });
 
       res.status(200).json(booking);
     } catch (error) {
@@ -118,6 +138,7 @@ router.patch(
 router.patch(
   "/:id/payment",
   verifyToken,
+  requireRole("hotel_owner", "admin"),
   [
     body("paymentStatus")
       .isIn(["pending", "paid", "failed", "refunded"])
@@ -132,20 +153,28 @@ router.patch(
     try {
       const { paymentStatus, paymentMethod } = req.body;
 
+      const existingBooking = await Booking.findById(req.params.id);
+      if (!existingBooking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const hotel = await Hotel.findById(existingBooking.hotelId);
+      if (!hotel) {
+        return res.status(404).json({ message: "Hotel not found" });
+      }
+
+      if (req.userRole !== "admin" && hotel.userId !== req.userId) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
       const updateData: any = { paymentStatus };
       if (paymentMethod) {
         updateData.paymentMethod = paymentMethod;
       }
 
-      const booking = await Booking.findByIdAndUpdate(
-        req.params.id,
-        updateData,
-        { new: true }
-      );
-
-      if (!booking) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
+      const booking = await Booking.findByIdAndUpdate(req.params.id, updateData, {
+        new: true,
+      });
 
       res.status(200).json(booking);
     } catch (error) {
@@ -156,7 +185,7 @@ router.patch(
 );
 
 // Delete booking (admin only)
-router.delete("/:id", verifyToken, async (req: Request, res: Response) => {
+router.delete("/:id", verifyToken, requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const booking = await Booking.findByIdAndDelete(req.params.id);
 

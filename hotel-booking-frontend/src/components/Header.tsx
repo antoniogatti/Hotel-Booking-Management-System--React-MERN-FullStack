@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import useSearchContext from "../hooks/useSearchContext";
 import MobileNav from "./MobileNav";
 import MainNav from "./MainNav";
-import { Building2 } from "lucide-react";
+import { siteConfig } from "../config/siteConfig";
 
 const Header = () => {
   const search = useSearchContext();
@@ -20,13 +20,13 @@ const Header = () => {
           <button
             onClick={handleLogoClick}
             className="flex items-center space-x-2 group"
+            aria-label={`${siteConfig.brand.shortName} home`}
           >
-            <div className="bg-white p-2 rounded-lg shadow-soft group-hover:shadow-medium transition-all duration-300">
-              <Building2 className="w-6 h-6 text-primary-600" />
-            </div>
-            <span className="text-2xl font-bold text-white tracking-tight group-hover:text-primary-100 transition-colors">
-              MernHolidays
-            </span>
+            <img
+              src={siteConfig.brand.logoPath}
+              alt={siteConfig.brand.fullName}
+              className="h-12 w-auto object-contain rounded-md bg-white/95 px-2 py-1 shadow-soft group-hover:shadow-medium transition-all duration-300"
+            />
           </button>
           <div className="md:hidden">
             <MobileNav />

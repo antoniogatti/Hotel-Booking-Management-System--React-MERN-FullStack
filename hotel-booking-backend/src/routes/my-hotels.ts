@@ -3,6 +3,7 @@ import multer from "multer";
 import cloudinary from "cloudinary";
 import Hotel from "../models/hotel";
 import verifyToken from "../middleware/auth";
+import requireRole from "../middleware/requireRole";
 import { body } from "express-validator";
 import { HotelType } from "../../../shared/types";
 
@@ -19,6 +20,7 @@ const upload = multer({
 router.post(
   "/",
   verifyToken,
+  requireRole("hotel_owner", "admin"),
   [
     body("name").notEmpty().withMessage("Name is required"),
     body("city").notEmpty().withMessage("City is required"),
@@ -40,6 +42,20 @@ router.post(
   upload.array("imageFiles", 6),
   async (req: Request, res: Response) => {
     try {
+      const singlePropertyMode =
+        String(process.env.SINGLE_PROPERTY_MODE || "false").toLowerCase() ===
+        "true";
+
+      if (singlePropertyMode) {
+        const existingHotelsCount = await Hotel.countDocuments();
+        if (existingHotelsCount >= 1) {
+          return res.status(409).json({
+            message:
+              "Single-property mode enabled: only one property can be configured.",
+          });
+        }
+      }
+
       const imageFiles = (req as any).files as any[];
       const newHotel: HotelType = req.body;
 
@@ -80,16 +96,25 @@ router.post(
   }
 );
 
-router.get("/", verifyToken, async (req: Request, res: Response) => {
+router.get(
+  "/",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  async (req: Request, res: Response) => {
   try {
     const hotels = await Hotel.find({ userId: req.userId });
     res.json(hotels);
   } catch (error) {
     res.status(500).json({ message: "Error fetching hotels" });
   }
-});
+  }
+);
 
-router.get("/:id", verifyToken, async (req: Request, res: Response) => {
+router.get(
+  "/:id",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  async (req: Request, res: Response) => {
   const id = req.params.id.toString();
   try {
     const hotel = await Hotel.findOne({
@@ -100,11 +125,13 @@ router.get("/:id", verifyToken, async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({ message: "Error fetching hotels" });
   }
-});
+  }
+);
 
 router.put(
   "/:hotelId",
   verifyToken,
+  requireRole("hotel_owner", "admin"),
   upload.array("imageFiles"),
   async (req: Request, res: Response) => {
     try {

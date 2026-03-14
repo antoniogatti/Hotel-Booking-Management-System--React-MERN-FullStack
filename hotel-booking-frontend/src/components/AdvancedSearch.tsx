@@ -8,6 +8,7 @@ import {
   Users,
 } from "lucide-react";
 import useSearchContext from "../hooks/useSearchContext";
+import { siteConfig } from "../config/siteConfig";
 
 interface AdvancedSearchProps {
   onSearch: (searchData: any) => void;
@@ -18,6 +19,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   onSearch,
   isExpanded = false,
 }) => {
+  const isSinglePropertyMode = siteConfig.singlePropertyMode;
   const navigate = useNavigate();
   const search = useSearchContext();
   const [showAdvanced, setShowAdvanced] = useState(isExpanded);
@@ -54,6 +56,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
   // Fetch hotel places on mount
   useEffect(() => {
+    if (isSinglePropertyMode) return;
     // Prevent multiple API calls - use a ref to track if we've already fetched
     if (isLoadingPlaces || hasFetchedRef.current) return;
 
@@ -112,7 +115,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     };
 
     fetchPlaces();
-  }, []); // Remove all dependencies to run only once on mount
+  }, [isSinglePropertyMode]); // Remove all dependencies to run only once on mount
 
   // Clear dropdown state when component mounts
   useEffect(() => {
@@ -122,6 +125,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
   // Filter places as user types
   useEffect(() => {
+    if (isSinglePropertyMode) return;
     if (searchData.destination.length > 0) {
       const filtered = places.filter((place) =>
         place.toLowerCase().includes(searchData.destination.toLowerCase())
@@ -131,7 +135,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     } else {
       setShowDropdown(false);
     }
-  }, [searchData.destination, places]);
+  }, [isSinglePropertyMode, searchData.destination, places]);
 
   const hotelTypes = [
     "Hotel",
@@ -172,6 +176,26 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   };
 
   const handleSearch = () => {
+    if (isSinglePropertyMode) {
+      search.saveSearchValues(
+        "",
+        searchData.checkIn,
+        searchData.checkOut,
+        searchData.adultCount,
+        searchData.childCount
+      );
+
+      const searchParams = new URLSearchParams();
+      searchParams.append("checkIn", searchData.checkIn.toISOString());
+      searchParams.append("checkOut", searchData.checkOut.toISOString());
+      searchParams.append("adultCount", searchData.adultCount.toString());
+      searchParams.append("childCount", searchData.childCount.toString());
+
+      navigate(`/rooms?${searchParams.toString()}`);
+      onSearch(searchData);
+      return;
+    }
+
     // Only proceed if destination is not empty
     if (!searchData.destination || searchData.destination.trim() === "") {
       // Show all hotels when destination is empty
@@ -363,42 +387,48 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   return (
     <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-large p-8 max-w-6xl mx-auto border border-white/20">
       {/* Basic Search */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div
+        className={`grid grid-cols-1 md:grid-cols-2 ${
+          isSinglePropertyMode ? "lg:grid-cols-3" : "lg:grid-cols-4"
+        } gap-6 mb-8`}
+      >
         {/* Destination */}
-        <div className="space-y-2">
-          <label className="text-sm font-semibold text-gray-700 flex items-center">
-            <MapPin className="w-4 h-4 mr-2 text-primary-600" />
-            Destination
-          </label>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Where are you going?"
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
-              value={searchData.destination}
-              onChange={(e) => handleInputChange("destination", e.target.value)}
-              onFocus={() => setShowDropdown(filteredPlaces.length > 0)}
-              onBlur={() => setShowDropdown(false)}
-            />
-            <MapPin className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-            {showDropdown && (
-              <ul className="absolute top-full left-0 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
-                {filteredPlaces.map((place) => (
-                  <li
-                    key={place}
-                    className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b border-gray-100 last:border-b-0"
-                    onMouseDown={() => {
-                      handleInputChange("destination", place);
-                      setShowDropdown(false);
-                    }}
-                  >
-                    {place}
-                  </li>
-                ))}
-              </ul>
-            )}
+        {!isSinglePropertyMode && (
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700 flex items-center">
+              <MapPin className="w-4 h-4 mr-2 text-primary-600" />
+              Destination
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Where are you going?"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all duration-200"
+                value={searchData.destination}
+                onChange={(e) => handleInputChange("destination", e.target.value)}
+                onFocus={() => setShowDropdown(filteredPlaces.length > 0)}
+                onBlur={() => setShowDropdown(false)}
+              />
+              <MapPin className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
+              {showDropdown && (
+                <ul className="absolute top-full left-0 w-full bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-40 overflow-y-auto">
+                  {filteredPlaces.map((place) => (
+                    <li
+                      key={place}
+                      className="px-4 py-2 cursor-pointer hover:bg-gray-100 text-sm border-b border-gray-100 last:border-b-0"
+                      onMouseDown={() => {
+                        handleInputChange("destination", place);
+                        setShowDropdown(false);
+                      }}
+                    >
+                      {place}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Check-in Date */}
         <div className="space-y-2">
@@ -469,25 +499,29 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
       {/* Advanced Search Toggle */}
       <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={() => setShowAdvanced(!showAdvanced)}
-          className="flex items-center text-primary-600 hover:text-primary-700 font-medium transition-colors"
-        >
-          <Filter className="w-4 h-4 mr-2" />
-          Advanced Filters
-        </button>
+        {!isSinglePropertyMode ? (
+          <button
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="flex items-center text-primary-600 hover:text-primary-700 font-medium transition-colors"
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Advanced Filters
+          </button>
+        ) : (
+          <div />
+        )}
 
         <button
           onClick={handleSearch}
           className="flex items-center bg-gradient-to-r from-primary-600 to-primary-700 text-white px-8 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-primary-800 transform hover:scale-105 transition-all duration-200 shadow-medium hover:shadow-large"
         >
           <SearchIcon className="w-4 h-4 mr-2" />
-          Search Hotels
+          Search Rooms
         </button>
       </div>
 
       {/* Advanced Filters */}
-      {showAdvanced && (
+      {!isSinglePropertyMode && showAdvanced && (
         <div className="border-t border-gray-200 pt-6 space-y-6">
           {/* Price Range */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -622,7 +656,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       )}
 
       {/* Quick Search Destinations */}
-      <div className="border-t border-gray-200 pt-6">
+      {!isSinglePropertyMode && <div className="border-t border-gray-200 pt-6">
         <h3 className="text-sm font-medium text-gray-700 mb-3">
           Popular Destinations
         </h3>
@@ -637,7 +671,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
             </button>
           ))}
         </div>
-      </div>
+      </div>}
     </div>
   );
 };
