@@ -24,6 +24,8 @@ dist-ssr
 *.sw?
 
 .env
+.env.development
+.env.production
 .env.e2e
 node_modules
 .cursorignore

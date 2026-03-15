@@ -7,20 +7,13 @@ const getBaseURL = () => {
     return import.meta.env.VITE_API_BASE_URL;
   }
 
-  // Fallback URLs (production domains)
-  if (
-    window.location.hostname === "mern-booking-hotel.netlify.app" ||
-    window.location.hostname.includes("vercel.app")
-  ) {
-    return "https://hotel-booking-backend.duckdns.org";
-  }
-
+  // Local fallback for development.
   if (window.location.hostname === "localhost") {
     return "http://localhost:5000";
   }
 
-  // Default to production (VPS backend)
-  return "https://hotel-booking-backend.duckdns.org";
+  // Safe production fallback. Set VITE_API_BASE_URL in production builds.
+  return `${window.location.protocol}//${window.location.hostname}`;
 };
 
 export const getApiBaseUrl = getBaseURL;

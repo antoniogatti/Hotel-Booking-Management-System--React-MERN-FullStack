@@ -1,0 +1,79 @@
+name: Deploy To Azure Web Apps
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: true
+
+env:
+  BACKEND_APP_NAME: palazzopinto-api-2603151048
+  FRONTEND_APP_NAME: palazzopinto-web-2603151048
+
+jobs:
+  deploy-backend:
+    name: Deploy Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hotel-booking-backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: hotel-booking-backend
+        run: npm ci
+
+      - name: Build backend
+        working-directory: hotel-booking-backend
+        run: npm run build
+
+      - name: Deploy backend to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.BACKEND_APP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_BACKEND }}
+          package: hotel-booking-backend
+
+  deploy-frontend:
+    name: Deploy Frontend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: hotel-booking-frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: hotel-booking-frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: hotel-booking-frontend
+        run: npm run build:prod
+
+      - name: Deploy frontend to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.FRONTEND_APP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_FRONTEND }}
+          package: hotel-booking-frontend

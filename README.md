@@ -243,6 +243,7 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 - [Project Structure](#-project-structure)
 - [Installation & Setup](#-installation--setup)
 - [Environment Variables](#-environment-variables)
+- [Deployment Configuration](DEPLOYMENT_CONFIGURATION.md)
 - [API Documentation](#-api-documentation)
 - [Key Components](#-key-components)
 - [Database Schema](#-database-schema)
@@ -462,6 +463,8 @@ npm run dev
 ---
 
 ## 🔧 Environment Variables
+
+For complete local vs production setup (including Azure Web App settings), see `DEPLOYMENT_CONFIGURATION.md`.
 
 ### Backend (.env)
 

@@ -5,8 +5,11 @@
   "main": "./src/index.ts",
   "scripts": {
     "dev": "nodemon",
+    "dev:local": "cross-env DOTENV_CONFIG_PATH=.env.development nodemon",
     "build": "tsc --skipLibCheck",
     "start": "node dist/hotel-booking-backend/src/index.js",
+    "start:prod": "cross-env NODE_ENV=production node dist/hotel-booking-backend/src/index.js",
+    "start:prod:local": "cross-env DOTENV_CONFIG_PATH=.env.production NODE_ENV=production node dist/hotel-booking-backend/src/index.js",
     "e2e": "cross-env DOTENV_CONFIG_PATH=.env.e2e nodemon",
     "seed:fuocorosa": "ts-node src/scripts/seed-fuocorosa.ts",
     "seed:palazzo-rooms": "ts-node src/scripts/seed-palazzopinto-rooms.ts"

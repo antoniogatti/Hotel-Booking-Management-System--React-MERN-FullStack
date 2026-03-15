@@ -117,15 +117,26 @@ app.use(compression());
 // Logging middleware
 app.use(morgan("combined"));
 
-const allowedOrigins = [
+const configuredOrigins = [
   process.env.FRONTEND_URL,
+  ...(process.env.FRONTEND_URLS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
+];
+
+const defaultOrigins = [
   "http://localhost:5174",
   "http://localhost:5173",
   "https://mern-booking-hotel.netlify.app",
-  "https://mern-booking-hotel.netlify.app/",
   "https://hotel-mern-booking.vercel.app",
-  "https://hotel-mern-booking.vercel.app/",
-].filter((origin): origin is string => Boolean(origin));
+];
+
+const allowedOrigins = new Set(
+  [...configuredOrigins, ...defaultOrigins]
+    .filter((origin): origin is string => Boolean(origin))
+    .map((origin) => origin.replace(/\/$/, ""))
+);
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -137,7 +148,7 @@ app.use(
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.has(origin.replace(/\/$/, ""))) {
         return callback(null, true);
       }
 
@@ -172,7 +183,7 @@ app.options(
         return callback(null, true);
       }
 
-      if (allowedOrigins.includes(origin)) {
+      if (allowedOrigins.has(origin.replace(/\/$/, ""))) {
         return callback(null, true);
       }
 
