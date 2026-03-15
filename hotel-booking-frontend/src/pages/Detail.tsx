@@ -18,14 +18,34 @@ import {
 const Detail = () => {
   const { hotelId } = useParams();
 
-  const { data: hotel } = useQueryWithLoading(
-    "fetchHotelById",
+  const {
+    data: hotel,
+    isLoading,
+    isError,
+  } = useQueryWithLoading(
+    ["fetchHotelById", hotelId],
     () => apiClient.fetchHotelById(hotelId || ""),
     {
       enabled: !!hotelId,
       loadingMessage: "Loading hotel details...",
     }
   );
+
+  if (isLoading) {
+    return (
+      <div className="text-center text-lg text-gray-500 py-10">
+        Loading room details...
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="text-center text-lg text-gray-500 py-10">
+        Unable to load this room right now. Please try again.
+      </div>
+    );
+  }
 
   if (!hotel) {
     return (

@@ -22,6 +22,8 @@ type Props = {
 };
 
 const SearchResultsCard = ({ hotel }: Props) => {
+  const detailPath = `/detail/${hotel._id}`;
+
   const getFacilityIcon = (facility: string) => {
     const iconMap: { [key: string]: any } = {
       "Free WiFi": Wifi,
@@ -38,7 +40,10 @@ const SearchResultsCard = ({ hotel }: Props) => {
   };
 
   return (
-    <div className="group bg-white rounded-2xl shadow-soft hover:shadow-large transition-all duration-300 border border-gray-100 overflow-hidden h-auto xl:h-[500px] flex">
+    <Link
+      to={detailPath}
+      className="group block bg-white rounded-2xl shadow-soft hover:shadow-large transition-all duration-300 border border-gray-100 overflow-hidden h-auto xl:h-[500px]"
+    >
       <div className="grid grid-cols-1 xl:grid-cols-[2fr_3fr] gap-0 w-full h-full">
         {/* Image Section */}
         <div className="relative overflow-hidden h-64 xl:h-[500px]">
@@ -102,12 +107,9 @@ const SearchResultsCard = ({ hotel }: Props) => {
                 </div>
               </div>
 
-              <Link
-                to={`/detail/${hotel._id}`}
-                className="text-2xl font-bold text-gray-900 hover:text-primary-600 transition-colors cursor-pointer"
-              >
+              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-primary-600 transition-colors cursor-pointer">
                 {hotel.name}
-              </Link>
+              </h3>
 
               <div className="flex items-center text-gray-600">
                 <MapPin className="w-4 h-4 mr-1" />
@@ -165,16 +167,13 @@ const SearchResultsCard = ({ hotel }: Props) => {
 
           {/* Action Button */}
           <div className="mt-6 pt-4 border-t border-gray-100">
-            <Link
-              to={`/detail/${hotel._id}`}
-              className="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3 px-6 rounded-xl font-semibold hover:from-primary-700 hover:to-primary-800 transform hover:scale-105 transition-all duration-200 text-center block"
-            >
+            <div className="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3 px-6 rounded-xl font-semibold hover:from-primary-700 hover:to-primary-800 transform hover:scale-105 transition-all duration-200 text-center block">
               View Details & Book
-            </Link>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 };
 
