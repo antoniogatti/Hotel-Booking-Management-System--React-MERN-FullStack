@@ -28,6 +28,8 @@ dist-ssr
 .env.e2e
 node_modules
 .cursorignore
+publish-profile-*.xml
+azure-credentials.json
 
 # Documentation
 AUTH_UI_IMPLEMENTATION_GUIDE.md

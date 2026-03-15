@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: deploy-main
@@ -41,11 +42,15 @@ jobs:
         working-directory: hotel-booking-backend
         run: npm run build
 
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Deploy backend to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.BACKEND_APP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_BACKEND }}
           package: hotel-booking-backend
 
   deploy-frontend:
@@ -71,9 +76,13 @@ jobs:
         working-directory: hotel-booking-frontend
         run: npm run build:prod
 
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
       - name: Deploy frontend to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.FRONTEND_APP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_FRONTEND }}
           package: hotel-booking-frontend
