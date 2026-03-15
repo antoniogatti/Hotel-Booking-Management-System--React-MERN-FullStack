@@ -79,7 +79,7 @@ const MyHotels = () => {
               </div>
             </div>
             <Link to="/sign-in">
-              <Button className="w-full font-bold bg-primary-600 hover:bg-primary-700 mt-4">
+              <Button className="w-full font-bold mt-4">
                 <LogIn className="h-4 w-4 mr-2 text-white" />
                 Sign In to View My Hotels
               </Button>
@@ -113,7 +113,7 @@ const MyHotels = () => {
           </p>
           <Link
             to="/add-hotel"
-            className="inline-flex items-center bg-primary-600 text-white px-6 py-3 rounded-xl font-semibold hover:bg-primary-700 transition-colors"
+            className="inline-flex items-center bg-[#ea836c] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#db755f] transition-colors"
           >
             <Plus className="w-5 h-5 mr-2" />
             Add Your First Hotel
@@ -330,14 +330,14 @@ const MyHotels = () => {
               <div className="flex space-x-3">
                 <Link
                   to={`/edit-hotel/${hotel._id}`}
-                  className="flex-1 bg-primary-600 text-white py-3 px-4 rounded-xl font-semibold hover:bg-primary-700 transition-colors text-center flex items-center justify-center"
+                  className="flex-1 bg-[#ea836c] text-white py-3 px-4 rounded-xl font-semibold hover:bg-[#db755f] transition-colors text-center flex items-center justify-center"
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Hotel
                 </Link>
                 <Link
                   to={`/detail/${hotel._id}`}
-                  className="flex-1 bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-semibold hover:bg-gray-200 transition-colors text-center flex items-center justify-center"
+                  className="flex-1 bg-white border-2 border-[#aab09a] text-[#2b4463] py-3 px-4 rounded-xl font-semibold hover:bg-[#f8fbf3] transition-colors text-center flex items-center justify-center"
                 >
                   <Eye className="w-4 h-4 mr-2" />
                   View Details

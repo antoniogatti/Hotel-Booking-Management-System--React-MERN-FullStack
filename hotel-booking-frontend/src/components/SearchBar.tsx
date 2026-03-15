@@ -340,14 +340,14 @@ const SearchBar = () => {
           <div className="flex flex-col sm:flex-row gap-2 sm:col-span-2 lg:col-span-1">
             <Button
               type="submit"
-              className="flex-1 items-center text-white bg-primary-600 px-6 py-2 rounded-md font-semibold hover:bg-primary-500 hover:shadow-medium transition-all duration-200 group"
+              className="flex-1 items-center px-6 py-2 rounded-md font-semibold hover:shadow-medium transition-all duration-200 group"
             >
               Search Rooms
             </Button>
             <Button
               type="button"
               variant="secondary"
-              className="flex-1 items-center text-white bg-gray-500 px-6 py-2 rounded-md font-semibold hover:bg-gray-400 hover:shadow-medium transition-all duration-200 group"
+              className="flex-1 items-center px-6 py-2 rounded-md font-semibold hover:shadow-medium transition-all duration-200 group"
               onClick={handleClear}
             >
               Clear

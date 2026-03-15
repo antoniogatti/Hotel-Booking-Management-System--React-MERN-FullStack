@@ -71,7 +71,7 @@ const MyBookings = () => {
               </div>
             </div>
             <Link to="/sign-in">
-              <Button className="w-full font-bold bg-primary-600 hover:bg-primary-700 mt-4">
+              <Button className="w-full font-bold mt-4">
                 <LogIn className="h-4 w-4 mr-2 text-white" />
                 Sign In to View Bookings
               </Button>

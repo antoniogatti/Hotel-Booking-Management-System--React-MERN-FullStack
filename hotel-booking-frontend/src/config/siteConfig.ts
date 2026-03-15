@@ -8,7 +8,7 @@ export const siteConfig = {
     shortName: "Palazzo Pinto B&B",
     fullName: "Palazzo Pinto Bed and Breakfast",
     tagline: "Where the sounds, scents and emotions of the past echo",
-    logoPath: "/common/LOGOPAYOFF_PalazzoPinto.png",
+    logoPath: "/common/LOGO+PAYOFF_PalazzoPinto.svg",
   },
   property: {
     city: "Brindisi",

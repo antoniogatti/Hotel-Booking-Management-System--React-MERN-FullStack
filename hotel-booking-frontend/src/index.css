@@ -28,3 +28,57 @@
     --radius: 0.5rem;
   }
 }
+
+/* Cookie consent brand theme */
+#cc-main {
+  --cc-bg: #ffffff;
+  --cc-font-family: "Manrope", sans-serif;
+  --cc-modal-border-radius: 14px;
+  --cc-modal-transition-duration: 0.28s;
+  --cc-btn-border-radius: 10px;
+  --cc-btn-primary-bg: #ea836c;
+  --cc-btn-primary-border-color: #ea836c;
+  --cc-btn-primary-hover-bg: #d9725d;
+  --cc-btn-primary-hover-border-color: #d9725d;
+  --cc-btn-primary-color: #ffffff;
+  --cc-btn-secondary-bg: #ffffff;
+  --cc-btn-secondary-border-color: #9fb08b;
+  --cc-btn-secondary-hover-bg: #f6f8f2;
+  --cc-btn-secondary-hover-border-color: #7f9471;
+  --cc-btn-secondary-color: #2b4463;
+  --cc-toggle-on-bg: #9fb08b;
+  --cc-toggle-off-bg: #cad3bc;
+  --cc-separator-border-color: #e7e9df;
+  --cc-footer-bg: #f6f8f2;
+  --cc-section-border-radius: 12px;
+}
+
+#cc-main .cm,
+#cc-main .pm {
+  border: 1px solid #e7e9df;
+  box-shadow: 0 18px 45px rgba(43, 68, 99, 0.16);
+}
+
+#cc-main .cm__title,
+#cc-main .pm__title,
+#cc-main .pm__section-title {
+  color: #2b4463;
+}
+
+#cc-main .cm__desc,
+#cc-main .pm__section-desc {
+  color: #3f4d5f;
+}
+
+#cc-main .cm__link,
+#cc-main .pm__link,
+#cc-main .cc__link {
+  color: #ea836c;
+}
+
+#cc-main .cm__btn,
+#cc-main .pm__btn {
+  font-weight: 700;
+  border-width: 2px;
+  min-height: 44px;
+}

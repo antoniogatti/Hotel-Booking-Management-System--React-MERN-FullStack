@@ -71,7 +71,7 @@ const MobileNavLinks = () => {
           <UsernameMenu />
         ) : (
           <Link to="/sign-in" className="w-full">
-            <Button className="w-full font-bold bg-primary-600 hover:bg-primary-700">
+            <Button className="w-full font-bold">
               <LogIn className="h-4 w-4 mr-2" />
               Log In
             </Button>

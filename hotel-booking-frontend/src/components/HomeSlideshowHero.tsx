@@ -104,7 +104,7 @@ const HomeSlideshowHero = () => {
           onClick={() =>
             setActiveIndex((prev) => (prev - 1 + slides.length) % slides.length)
           }
-          className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-[#2b4463] shadow-md hover:bg-white"
+          className="absolute left-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-[#2b4463] shadow-md hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/40"
         >
           &#8592;
         </button>
@@ -112,7 +112,7 @@ const HomeSlideshowHero = () => {
           type="button"
           aria-label="Next slide"
           onClick={() => setActiveIndex((prev) => (prev + 1) % slides.length)}
-          className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-[#2b4463] shadow-md hover:bg-white"
+          className="absolute right-4 top-1/2 z-10 -translate-y-1/2 rounded-full bg-white/85 px-3 py-2 text-lg text-[#2b4463] shadow-md hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black/40"
         >
           &#8594;
         </button>
@@ -137,7 +137,11 @@ const HomeSlideshowHero = () => {
           onSubmit={handleSubmit}
           className="grid gap-3 rounded-md bg-white p-4 shadow-large md:grid-cols-[1.1fr_1.1fr_0.9fr_1fr] md:gap-4 md:p-5"
         >
+          <label htmlFor="hero-checkin" className="sr-only">
+            Check-in date
+          </label>
           <DatePicker
+            id="hero-checkin"
             selected={checkIn}
             onChange={(date) => setCheckIn((date as Date) || minDate)}
             selectsStart
@@ -145,12 +149,16 @@ const HomeSlideshowHero = () => {
             endDate={checkOut}
             minDate={minDate}
             placeholderText="Check In"
-            className="h-12 w-full rounded-sm border border-[#d9ddd3] px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c]"
+            className="h-12 w-full rounded-sm border border-[#d9ddd3] px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c] focus-visible:ring-2 focus-visible:ring-[#aab09a]"
             wrapperClassName="w-full"
             dateFormat="dd/MM/yyyy"
           />
 
+          <label htmlFor="hero-checkout" className="sr-only">
+            Check-out date
+          </label>
           <DatePicker
+            id="hero-checkout"
             selected={checkOut}
             onChange={(date) => setCheckOut((date as Date) || checkIn)}
             selectsEnd
@@ -158,15 +166,19 @@ const HomeSlideshowHero = () => {
             endDate={checkOut}
             minDate={checkIn}
             placeholderText="Check Out"
-            className="h-12 w-full rounded-sm border border-[#d9ddd3] px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c]"
+            className="h-12 w-full rounded-sm border border-[#d9ddd3] px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c] focus-visible:ring-2 focus-visible:ring-[#aab09a]"
             wrapperClassName="w-full"
             dateFormat="dd/MM/yyyy"
           />
 
+          <label htmlFor="hero-guests" className="sr-only">
+            Number of guests
+          </label>
           <select
+            id="hero-guests"
             value={guests}
             onChange={(event) => setGuests(parseInt(event.target.value, 10))}
-            className="h-12 w-full rounded-sm border border-[#d9ddd3] bg-white px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c]"
+            className="h-12 w-full rounded-sm border border-[#d9ddd3] bg-white px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c] focus-visible:ring-2 focus-visible:ring-[#aab09a]"
           >
             {Array.from({ length: 8 }, (_, i) => i + 1).map((count) => (
               <option key={count} value={count}>
@@ -177,7 +189,7 @@ const HomeSlideshowHero = () => {
 
           <button
             type="submit"
-            className="h-12 rounded-sm bg-[#ea836c] px-6 text-sm font-semibold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#db755f]"
+            className="h-12 rounded-sm bg-[#ea836c] px-6 text-sm font-semibold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#db755f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
           >
             Check Availability
           </button>

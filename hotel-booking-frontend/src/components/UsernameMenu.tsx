@@ -94,7 +94,7 @@ const UsernameMenu = () => {
         <DropdownMenuItem className="py-1.5 rounded-md cursor-pointer">
           <Button
             onClick={handleLogout}
-            className="w-full font-bold bg-primary-600 hover:bg-primary-700 text-white"
+            className="w-full font-bold"
           >
             <LogOut className="h-4 w-4 mr-2" />
             Log Out

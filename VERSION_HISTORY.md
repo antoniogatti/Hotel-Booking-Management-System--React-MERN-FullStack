@@ -1,5 +1,17 @@
 # Version History
 
+## 1.2.0 - 2026-03-15
+
+### Privacy and Consent UX
+- Added a dedicated `Privacy and Cookie Policy` page in the frontend.
+- Added route-level page title support for the new privacy policy page.
+- Linked cookie-consent footer actions to the internal privacy policy route.
+- Added a footer shortcut link (`Privacy & Cookies`) for easier policy access.
+- Improved cookie banner and preferences modal styling to match Palazzo Pinto branding.
+
+### Deployment
+- Updated deployment build version marker to `1.2.0`.
+
 ## 1.0.2 - 2026-03-15
 
 ### Cleanup and Branding

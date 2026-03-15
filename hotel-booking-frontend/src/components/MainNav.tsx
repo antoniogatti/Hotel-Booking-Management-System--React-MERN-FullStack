@@ -15,7 +15,7 @@ import { siteConfig } from "../config/siteConfig";
 const NAV_AUTH_WIDTH = "min-w-[120px]";
 
 const navLinkClass =
-  "flex items-center text-white/90 hover:text-white px-4 py-2 rounded-lg font-medium hover:bg-white/10 transition-all duration-200";
+  "flex items-center text-[#2b4463] hover:text-[#ea836c] px-4 py-2 rounded-lg font-medium hover:bg-[#eef1e7] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
 const MainNav = () => {
   const { isLoggedIn, isOwnerOrAdmin } = useAppContext();
@@ -50,7 +50,7 @@ const MainNav = () => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className={`${navLinkClass} flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-white/50 focus:ring-offset-2 focus:ring-offset-primary-600 rounded-lg`}
+                  className={`${navLinkClass} flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-[#aab09a] focus:ring-offset-2 focus:ring-offset-white rounded-lg`}
                 >
                   API
                   <ChevronDown className="h-4 w-4" />
@@ -88,7 +88,7 @@ const MainNav = () => {
           <Link to="/sign-in">
             <Button
               variant="ghost"
-              className="font-bold bg-white text-primary-600 hover:bg-primary-50 hover:text-primary-700 border-2 border-white/80"
+              className="font-bold bg-[#ea836c] text-white hover:bg-[#db755f] border border-[#db755f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
             >
               Log In
             </Button>
