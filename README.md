@@ -1020,8 +1020,8 @@ const PriceFilter = ({ onPriceChange }: PriceFilterProps) => {
         step={10}
       />
       <div className="flex justify-between text-xs text-gray-500">
-        <span>£{priceRange[0]}</span>
-        <span>£{priceRange[1]}</span>
+        <span>€{priceRange[0]}</span>
+        <span>€{priceRange[1]}</span>
       </div>
     </div>
   );

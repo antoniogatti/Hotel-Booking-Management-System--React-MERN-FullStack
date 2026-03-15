@@ -248,7 +248,7 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
                       Total Revenue
                     </p>
                     <p className="text-2xl font-bold text-gray-900">
-                      £
+                      
                       {bookings
                         .filter((b: BookingType) => b.paymentStatus === "paid")
                         .reduce(
@@ -457,7 +457,7 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
                                 <div className="flex items-center space-x-2 text-sm">
                                   <CreditCard className="w-4 h-4 text-gray-500" />
                                   <span className="text-gray-700">
-                                    Total: £
+                                    Total: 
                                     {booking.totalCost?.toLocaleString()}
                                   </span>
                                 </div>
@@ -466,7 +466,7 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
                                     <div className="flex items-center space-x-2 text-sm">
                                       <CreditCard className="w-4 h-4 text-red-500" />
                                       <span className="text-red-700">
-                                        Refunded: £
+                                        Refunded: 
                                         {booking.refundAmount.toLocaleString()}
                                       </span>
                                     </div>

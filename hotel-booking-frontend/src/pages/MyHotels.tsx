@@ -182,7 +182,7 @@ const MyHotels = () => {
             <div>
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
               <p className="text-2xl font-bold text-gray-900">
-                £
+                
                 {hotelData
                   .reduce((sum, hotel) => sum + (hotel.totalRevenue || 0), 0)
                   .toLocaleString()}
@@ -236,7 +236,7 @@ const MyHotels = () => {
               {/* Badges */}
               <div className="absolute top-4 left-4 flex flex-col space-y-2">
                 <Badge className="bg-primary-600 text-white">
-                  £{hotel.pricePerNight}/night
+                  {hotel.pricePerNight}/night
                 </Badge>
                 {hotel.isFeatured && (
                   <Badge className="bg-yellow-500 text-white">Featured</Badge>
@@ -294,7 +294,7 @@ const MyHotels = () => {
                 </div>
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <BiMoney className="w-4 h-4 text-primary-600" />
-                  <span>£{hotel.pricePerNight} per night</span>
+                  <span>{hotel.pricePerNight} per night</span>
                 </div>
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <BiHotel className="w-4 h-4 text-primary-600" />
@@ -314,7 +314,7 @@ const MyHotels = () => {
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-bold text-gray-900">
-                    £{(hotel.totalRevenue || 0).toLocaleString()}
+                    {(hotel.totalRevenue || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-gray-600">Revenue</p>
                 </div>

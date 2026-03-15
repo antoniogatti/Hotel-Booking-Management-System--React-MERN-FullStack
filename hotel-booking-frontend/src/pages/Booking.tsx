@@ -147,7 +147,7 @@ const Booking = () => {
                       {hotel.starRating} Stars
                     </Badge>
                     <Badge variant="outline" className="text-xs">
-                      £{hotel.pricePerNight}/night
+                      {hotel.pricePerNight}/night
                     </Badge>
                   </div>
                   {hotel.type && hotel.type.length > 0 && (

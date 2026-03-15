@@ -95,7 +95,7 @@ const Detail = () => {
             )}
             {hotel.totalRevenue && hotel.totalRevenue > 0 && (
               <Badge variant="outline">
-                £{hotel.totalRevenue.toLocaleString()} revenue
+                {hotel.totalRevenue.toLocaleString()} revenue
               </Badge>
             )}
             {/* Rating Badge - Always show with appropriate message */}
