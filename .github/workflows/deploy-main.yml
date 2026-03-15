@@ -74,6 +74,10 @@ jobs:
 
       - name: Build frontend
         working-directory: hotel-booking-frontend
+        env:
+          VITE_API_BASE_URL: https://palazzopinto-api-2603151048.azurewebsites.net
+          VITE_APP_ENV: production
+          VITE_APP_VERSION: "1.0"
         run: npm run build:prod
 
       - name: Azure Login
