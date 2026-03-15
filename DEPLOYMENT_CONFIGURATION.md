@@ -98,24 +98,23 @@ Automatic deployment on each push to `main` is configured in:
 
 ### Required GitHub Secrets
 
-Add these in repository settings -> Secrets and variables -> Actions:
+Add this in repository settings -> Secrets and variables -> Actions:
 
-- `AZURE_WEBAPP_PUBLISH_PROFILE_BACKEND`
-- `AZURE_WEBAPP_PUBLISH_PROFILE_FRONTEND`
+- `AZURE_CREDENTIALS`
 
-### How to get publish profiles
+### How to generate `AZURE_CREDENTIALS`
 
-Run these commands and copy the XML output into the corresponding GitHub secret:
+Create a service principal scoped to the resource group and capture credentials:
 
 ```bash
-az webapp deployment list-publishing-profiles \
-  --resource-group PalazzoPintoBnB \
-  --name palazzopinto-api-2603151048
-
-az webapp deployment list-publishing-profiles \
-  --resource-group PalazzoPintoBnB \
-  --name palazzopinto-web-2603151048
+az ad sp create-for-rbac \
+  --name github-actions-palazzopinto \
+  --role contributor \
+  --scopes /subscriptions/927d8895-21e1-452d-a35a-e04253f2c80e/resourceGroups/PalazzoPintoBnB \
+  --sdk-auth
 ```
+
+Store the JSON output as the `AZURE_CREDENTIALS` secret.
 
 ### Pipeline behavior
 
