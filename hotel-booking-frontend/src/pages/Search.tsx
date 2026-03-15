@@ -31,7 +31,7 @@ const Search = () => {
         new Date(checkIn),
         new Date(checkOut),
         parseInt(adultCount || "1", 10),
-        parseInt(childCount || "1", 10)
+        parseInt(childCount || "0", 10)
       );
     }
   }, [isSinglePropertyMode, urlSearchParams.toString()]);
@@ -45,8 +45,8 @@ const Search = () => {
     destination: search.destination?.trim() || "",
     checkIn: search.checkIn.toISOString(),
     checkOut: search.checkOut.toISOString(),
-    adultCount: search.adultCount.toString(),
-    childCount: search.childCount.toString(),
+    adultCount: isSinglePropertyMode ? "1" : search.adultCount.toString(),
+    childCount: isSinglePropertyMode ? "0" : search.childCount.toString(),
     page: page.toString(),
     stars: isSinglePropertyMode ? [] : selectedStars,
     types: isSinglePropertyMode ? [] : selectedHotelTypes,

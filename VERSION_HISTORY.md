@@ -1,5 +1,13 @@
 # Version History
 
+## 1.0.1 - 2026-03-15
+
+### Fixes
+- Fixed single-property room visibility issue where persisted guest filters could hide `Fuocorosa`.
+- Set default `childCount` fallback to `0` in frontend search context.
+- Forced single-property mode search requests to use `adultCount=1` and `childCount=0` to avoid stale filter regressions.
+- Updated deployment build version marker to `1.0.1`.
+
 ## 1.0 - 2026-03-15
 
 ### Release Highlights
