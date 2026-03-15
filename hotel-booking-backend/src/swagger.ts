@@ -17,10 +17,9 @@ const options = {
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Hotel Booking API",
+      title: "Palazzo Pinto B&B API",
       version: "1.0.0",
-      description:
-        "A comprehensive API for hotel booking and management system",
+      description: "A comprehensive API for Palazzo Pinto B&B operations",
       contact: {
         name: "API Support",
         email: "support@mernholidays.com",

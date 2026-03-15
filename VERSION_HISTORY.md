@@ -1,5 +1,17 @@
 # Version History
 
+## 1.0.2 - 2026-03-15
+
+### Cleanup and Branding
+- Removed verified unused frontend and test example files to reduce maintenance overhead.
+- Removed unused dependencies from frontend and backend package manifests.
+- Rebranded project-facing docs and API labels from the generic hotel project name to `Palazzo Pinto B&B`.
+- Updated frontend metadata and route-based page titles for consistent `Palazzo Pinto B&B` branding.
+- Switched site favicon and social preview defaults to `hotel-booking-frontend/public/home/favicon.png`.
+
+### Deployment
+- Updated deployment build version marker to `1.0.2`.
+
 ## 1.0.1 - 2026-03-15
 
 ### Fixes

@@ -1,6 +1,6 @@
-# Hotel Booking Management System Frontend - React, TypeScript MERN Project
+# Palazzo Pinto B&B Frontend
 
-A modern, responsive frontend application for the Hotel Booking Management System. Built with React 18, TypeScript, Vite, and Tailwind CSS, featuring advanced search, booking management, and seamless user experience across all devices.
+A modern, responsive frontend application for Palazzo Pinto B&B. Built with React 18, TypeScript, Vite, and Tailwind CSS, featuring advanced search, booking management, and seamless user experience across all devices.
 
 - **Frontend-Live-Demo:** [https://hotel-mern-booking.vercel.app/](https://hotel-mern-booking.vercel.app/)
 - **Backend-Live-Demo:** [https://hotel-booking-backend.arnobmahmud.com](https://hotel-booking-backend.arnobmahmud.com)

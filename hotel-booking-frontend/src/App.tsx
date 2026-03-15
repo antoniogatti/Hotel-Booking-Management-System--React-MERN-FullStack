@@ -3,7 +3,9 @@ import {
   Route,
   Routes,
   Navigate,
+  useLocation,
 } from "react-router-dom";
+import { useEffect } from "react";
 import Layout from "./layouts/Layout";
 import AuthLayout from "./layouts/AuthLayout";
 import ScrollToTop from "./components/ScrollToTop";
@@ -24,10 +26,47 @@ import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import AuthCallback from "./pages/AuthCallback";
 import { siteConfig } from "./config/siteConfig";
 
+const BRAND_NAME = "Palazzo Pinto B&B";
+
+const getPageTitle = (pathname: string): string => {
+  if (pathname === "/") return `${BRAND_NAME} | Home`;
+  if (pathname === "/search") return `${BRAND_NAME} | Search Rooms`;
+  if (pathname === "/rooms") return `${BRAND_NAME} | Rooms`;
+  if (pathname.startsWith("/detail/")) return `${BRAND_NAME} | Room Details`;
+  if (pathname === "/api-docs") return `${BRAND_NAME} | API Documentation`;
+  if (pathname === "/api-status") return `${BRAND_NAME} | API Status`;
+  if (pathname === "/business-insights") {
+    return `${BRAND_NAME} | Business Insights`;
+  }
+  if (pathname === "/register") return `${BRAND_NAME} | Register`;
+  if (pathname === "/sign-in") return `${BRAND_NAME} | Sign In`;
+  if (pathname === "/auth/callback") return `${BRAND_NAME} | Sign In`;
+  if (pathname === "/my-hotels") return `${BRAND_NAME} | My Properties`;
+  if (pathname === "/my-bookings") return `${BRAND_NAME} | My Bookings`;
+  if (pathname.startsWith("/hotel/") && pathname.endsWith("/booking")) {
+    return `${BRAND_NAME} | Complete Booking`;
+  }
+  if (pathname === "/add-hotel") return `${BRAND_NAME} | Add Property`;
+  if (pathname.startsWith("/edit-hotel/")) return `${BRAND_NAME} | Edit Property`;
+
+  return `${BRAND_NAME} | Book Your Stay`;
+};
+
+const PageTitleManager = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    document.title = getPageTitle(location.pathname);
+  }, [location.pathname]);
+
+  return null;
+};
+
 const App = () => {
   const { isLoggedIn, isOwnerOrAdmin } = useAppContext();
   return (
     <Router>
+      <PageTitleManager />
       <ScrollToTop />
       <Routes>
         <Route

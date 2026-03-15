@@ -183,7 +183,7 @@ const ApiStatus = () => {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">API Status</h1>
           <p className="text-xl text-gray-600">
-            Real-time monitoring of our hotel booking API health and performance
+            Real-time monitoring of the Palazzo Pinto B&B API health and performance
           </p>
         </div>
 

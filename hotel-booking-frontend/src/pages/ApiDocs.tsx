@@ -156,7 +156,7 @@ const ApiDocs = () => {
             API Documentation
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Comprehensive documentation for the Hotel Booking API. Explore
+            Comprehensive documentation for the Palazzo Pinto B&B API. Explore
             endpoints, understand authentication, and integrate with our
             services.
           </p>

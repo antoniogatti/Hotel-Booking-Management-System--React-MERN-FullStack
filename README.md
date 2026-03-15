@@ -1,4 +1,4 @@
-# Hotel Booking Management System - React, Express.js FullStack MERN Project (including Business-Insights Dashboard)
+# Palazzo Pinto B&B (including Business-Insights Dashboard)
 
 A comprehensive, production-ready hotel booking platform built with the MERN stack (MongoDB, Express.js, React, Node.js) featuring advanced search, booking management, analytics dashboard, and payment integration.
 
@@ -34,7 +34,7 @@ A comprehensive, production-ready hotel booking platform built with the MERN sta
 
 ### **What is this Project?**
 
-The **Hotel Booking Management System** is a full-stack web application that revolutionizes the way hotels are discovered, booked, and managed. Built with modern web technologies, it provides a seamless experience for travelers seeking accommodations and hotel owners managing their properties.
+**Palazzo Pinto B&B** is a full-stack web application that modernizes the way accommodations are discovered, booked, and managed. Built with modern web technologies, it provides a seamless experience for travelers and property owners.
 
 ### **Core Purpose & Vision**
 

@@ -211,7 +211,7 @@ app.use((req, res, next) => {
 });
 
 app.get("/", (req: Request, res: Response) => {
-  res.send("<h1>Hotel Booking Backend API is running 🚀</h1>");
+  res.send("<h1>Palazzo Pinto B&B Backend API is running 🚀</h1>");
 });
 
 app.use("/api/auth", authRoutes);
@@ -229,7 +229,7 @@ app.use(
   swaggerUi.serve,
   swaggerUi.setup(specs, {
     customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "Hotel Booking API Documentation",
+    customSiteTitle: "Palazzo Pinto B&B API Documentation",
   })
 );
 

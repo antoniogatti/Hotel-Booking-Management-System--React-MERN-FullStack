@@ -1,6 +1,6 @@
-# Hotel Booking Management System Backend - React, Express.js MERN Project
+# Palazzo Pinto B&B Backend
 
-A production-ready, scalable backend API for the Hotel Booking Management System. Built with Node.js, Express.js, TypeScript, and MongoDB, featuring secure authentication, real-time booking management, and third-party integrations.
+A production-ready, scalable backend API for Palazzo Pinto B&B. Built with Node.js, Express.js, TypeScript, and MongoDB, featuring secure authentication, real-time booking management, and third-party integrations.
 
 - **Frontend-Live-Demo:** [https://hotel-mern-booking.vercel.app/](https://hotel-mern-booking.vercel.app/)
 - **Backend-Live-Demo:** [https://hotel-booking-backend.arnobmahmud.com](https://hotel-booking-backend.arnobmahmud.com)
