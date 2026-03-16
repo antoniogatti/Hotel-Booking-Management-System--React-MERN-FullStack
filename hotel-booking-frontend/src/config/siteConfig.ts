@@ -1,6 +1,6 @@
 export const siteConfig = {
   app: {
-    version: "1.0.1",
+    version: "1.3.0",
     releaseDate: "2026-03-15",
   },
   singlePropertyMode: true,
@@ -21,13 +21,13 @@ export const siteConfig = {
     phone: "+39 0831 1785476",
     whatsapp: "3908311785476",
     email: "info@palazzopintobnb.com",
-    address: "Brindisi, Italy",
+    address: "Via Masaniello, 30 72100 Brindisi",
   },
   links: {
     website: "https://palazzopintobnb.com/en/",
     rooms: "https://palazzopintobnb.com/en/rooms/",
     services: "https://palazzopintobnb.com/en/services/",
-    contact: "https://palazzopintobnb.com/en/contact-us/",
+    contact: "/contact-us",
   },
   social: {
     facebook: "https://www.facebook.com/palazzopintobnb",

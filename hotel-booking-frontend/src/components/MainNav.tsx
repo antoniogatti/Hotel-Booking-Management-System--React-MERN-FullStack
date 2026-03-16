@@ -34,6 +34,9 @@ const MainNav = () => {
       <Link to="/my-bookings" className={navLinkClass}>
         My Bookings
       </Link>
+      <Link to="/contact-us" className={navLinkClass}>
+        Contact Us
+      </Link>
 
       {isOwnerOrAdmin && (
         <>

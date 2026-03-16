@@ -1,5 +1,23 @@
 # Version History
 
+## 1.3.0 - 2026-03-16
+
+### Contact Form and Email Delivery
+- Added a new `Contact Us` page and route (`/contact-us`) with validated form submission flow.
+- Added backend `POST /api/contact` endpoint with input validation and Microsoft Graph mail delivery.
+- Implemented dual-email behavior for contact requests: admin notification to inbox and confirmation email to the user.
+- Added contact mail configuration options in backend environment examples and documentation.
+
+### UX and Content Updates
+- Added `Contact Us` links to desktop/mobile navigation and footer shortcuts.
+- Updated contact UI to use WhatsApp icon/link for phone actions.
+- Updated contact address to `Via Masaniello, 30 72100 Brindisi` with Google Maps linking.
+- Added direct `Privacy Policy` link in contact consent text.
+
+### Runtime and Config Improvements
+- Added additional local CORS origins (`5175`, `5176`) for smoother development workflows.
+- Updated deployment build version marker to `1.3.0`.
+
 ## 1.2.0 - 2026-03-15
 
 ### Privacy and Consent UX

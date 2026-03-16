@@ -12,6 +12,9 @@ import { Link } from "react-router-dom";
 import { siteConfig } from "../config/siteConfig";
 
 const Footer = () => {
+  const mapsQuery = encodeURIComponent(siteConfig.contact.address);
+  const mapsLink = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+
   return (
     <footer className="bg-[#c7cabd] text-[#2b4463] border-t border-[#b6baa8]">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -103,14 +106,12 @@ const Footer = () => {
                 </a>
               </li>
               <li>
-                <a
-                  href={siteConfig.links.contact}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  to="/contact-us"
                   className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
                 >
                   Contact Us
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -167,7 +168,14 @@ const Footer = () => {
               </div>
               <div className="flex items-center space-x-3">
                 <MapPin className="w-5 h-5 text-[#ea836c]" />
-                <span className="text-[#2b4463]/85">{siteConfig.contact.address}</span>
+                <a
+                  href={mapsLink}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#c7cabd] rounded-sm"
+                >
+                  {siteConfig.contact.address}
+                </a>
               </div>
             </div>
           </div>

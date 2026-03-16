@@ -8,6 +8,7 @@ import {
   BarChart3,
   LogIn,
   Hotel,
+  Mail,
 } from "lucide-react";
 import UsernameMenu from "./UsernameMenu";
 import useAppContext from "../hooks/useAppContext";
@@ -32,6 +33,10 @@ const MobileNavLinks = () => {
       <Link to="/my-bookings" className={linkClass}>
         <Calendar className="h-4 w-4" />
         My Bookings
+      </Link>
+      <Link to="/contact-us" className={linkClass}>
+        <Mail className="h-4 w-4" />
+        Contact Us
       </Link>
 
       {isOwnerOrAdmin && (

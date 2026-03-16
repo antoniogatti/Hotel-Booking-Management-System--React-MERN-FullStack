@@ -25,6 +25,7 @@ import ApiStatus from "./pages/ApiStatus";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import AuthCallback from "./pages/AuthCallback";
 import PrivacyCookiePolicy from "./pages/PrivacyCookiePolicy";
+import ContactUs from "./pages/ContactUs";
 import { siteConfig } from "./config/siteConfig";
 
 const BRAND_NAME = "Palazzo Pinto B&B";
@@ -36,6 +37,7 @@ const getPageTitle = (pathname: string): string => {
   if (pathname.startsWith("/detail/")) return `${BRAND_NAME} | Room Details`;
   if (pathname === "/api-docs") return `${BRAND_NAME} | API Documentation`;
   if (pathname === "/api-status") return `${BRAND_NAME} | API Status`;
+  if (pathname === "/contact-us") return `${BRAND_NAME} | Contact Us`;
   if (pathname === "/privacy-cookie-policy") {
     return `${BRAND_NAME} | Privacy and Cookie Policy`;
   }
@@ -128,6 +130,14 @@ const App = () => {
           element={
             <Layout>
               <PrivacyCookiePolicy />
+            </Layout>
+          }
+        />
+        <Route
+          path="/contact-us"
+          element={
+            <Layout>
+              <ContactUs />
             </Layout>
           }
         />

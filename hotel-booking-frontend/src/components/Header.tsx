@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
-import { Mail, MapPin, MessageCircle } from "lucide-react";
+import { Mail, MapPin } from "lucide-react";
+import { FaWhatsapp } from "react-icons/fa";
 import useSearchContext from "../hooks/useSearchContext";
 import MobileNav from "./MobileNav";
 import MainNav from "./MainNav";
@@ -42,7 +43,7 @@ const Header = () => {
               className="inline-flex items-center gap-1.5 hover:text-[#ea836c] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-[#eef1e7] rounded-sm"
               title="WhatsApp"
             >
-              <MessageCircle className="h-3.5 w-3.5" />
+              <FaWhatsapp className="h-3.5 w-3.5" />
               <span>{siteConfig.contact.phone}</span>
             </a>
             <a

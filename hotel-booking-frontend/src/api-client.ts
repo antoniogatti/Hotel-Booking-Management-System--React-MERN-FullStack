@@ -243,3 +243,16 @@ export const fetchBusinessInsightsPerformance = async () => {
   const response = await axiosInstance.get("/api/business-insights/system-stats/public");
   return response.data;
 };
+
+export type ContactFormPayload = {
+  name: string;
+  email: string;
+  phone?: string;
+  message: string;
+  privacyAccepted: boolean;
+};
+
+export const submitContactForm = async (payload: ContactFormPayload) => {
+  const response = await axiosInstance.post("/api/contact", payload);
+  return response.data;
+};

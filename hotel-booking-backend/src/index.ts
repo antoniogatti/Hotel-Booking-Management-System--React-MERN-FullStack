@@ -13,6 +13,7 @@ import bookingRoutes from "./routes/my-bookings";
 import bookingsManagementRoutes from "./routes/bookings";
 import healthRoutes from "./routes/health";
 import businessInsightsRoutes from "./routes/business-insights";
+import contactRoutes from "./routes/contact";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./swagger";
 import helmet from "helmet";
@@ -128,6 +129,8 @@ const configuredOrigins = [
 const defaultOrigins = [
   "http://localhost:5174",
   "http://localhost:5173",
+  "http://localhost:5175",
+  "http://localhost:5176",
   "https://mern-booking-hotel.netlify.app",
   "https://hotel-mern-booking.vercel.app",
 ];
@@ -222,6 +225,7 @@ app.use("/api/my-bookings", bookingRoutes);
 app.use("/api/bookings", bookingsManagementRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/business-insights", businessInsightsRoutes);
+app.use("/api/contact", contactRoutes);
 
 // Swagger API Documentation
 app.use(

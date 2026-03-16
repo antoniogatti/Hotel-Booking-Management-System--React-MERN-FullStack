@@ -90,6 +90,17 @@ JWT_SECRET_KEY=your-super-secure-jwt-secret-key-here
 # Frontend URL (for CORS)
 FRONTEND_URL=http://localhost:5174
 
+# Microsoft Entra OAuth / Graph
+MS_ENTRA_CLIENT_ID=your_microsoft_client_id
+MS_ENTRA_CLIENT_SECRET=your_microsoft_client_secret
+MS_ENTRA_TENANT_ID=your_tenant_id_or_common
+
+# Contact form outbound mail (Graph sendMail)
+CONTACT_MAIL_SENDER=info@palazzopintobnb.com
+CONTACT_MAIL_INBOX=info@palazzopintobnb.com
+CONTACT_MAIL_SUBJECT_PREFIX=[PalazzoPinto][ContactForm]
+CONTACT_MAIL_CONFIRMATION_SUBJECT=Message Sent - Confirmation
+
 # Cloudinary (Image Storage)
 CLOUDINARY_CLOUD_NAME=your-cloud-name
 CLOUDINARY_API_KEY=your-api-key
@@ -233,6 +244,12 @@ hotel-booking-backend/
 | ------ | ----------- | ----------------------- | ------------- |
 | `GET`  | `/`         | Basic health check      | ❌            |
 | `GET`  | `/detailed` | Detailed system metrics | ❌            |
+
+### **Contact** (`/api/contact`)
+
+| Method | Endpoint | Description                                   | Auth Required |
+| ------ | -------- | --------------------------------------------- | ------------- |
+| `POST` | `/`      | Send contact request + user confirmation mail | ❌            |
 
 ---
 
