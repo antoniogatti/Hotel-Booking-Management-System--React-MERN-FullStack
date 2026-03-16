@@ -252,7 +252,46 @@ export type ContactFormPayload = {
   privacyAccepted: boolean;
 };
 
+export type BookingRequestPayload = {
+  hotelId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  city: string;
+  country: string;
+  specialRequests?: string;
+  arrivalTime: "Morning" | "Afternoon" | "Evening" | "Night";
+  coupon?: string;
+  adultCount: number;
+  childCount: number;
+  checkIn: string;
+  checkOut: string;
+  totalCost: number;
+  nights: number;
+  roomName: string;
+  hotelName: string;
+};
+
+export type BookingRequestResponse = {
+  message: string;
+  bookingId: string;
+  reservationNumber: string;
+  emailsSent?: boolean;
+  warning?: string;
+};
+
 export const submitContactForm = async (payload: ContactFormPayload) => {
   const response = await axiosInstance.post("/api/contact", payload);
+  return response.data;
+};
+
+export const submitBookingRequest = async (
+  payload: BookingRequestPayload
+): Promise<BookingRequestResponse> => {
+  const response = await axiosInstance.post(
+    `/api/hotels/${payload.hotelId}/booking-request`,
+    payload
+  );
   return response.data;
 };

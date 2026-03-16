@@ -2,8 +2,7 @@ import { useForm } from "react-hook-form";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import useSearchContext from "../../hooks/useSearchContext";
-import useAppContext from "../../hooks/useAppContext";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -30,9 +29,7 @@ type GuestInfoFormData = {
 
 const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
   const search = useSearchContext();
-  const { isLoggedIn } = useAppContext();
   const navigate = useNavigate();
-  const location = useLocation();
 
   const {
     watch,
@@ -64,24 +61,25 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
   const maxDate = new Date();
   maxDate.setFullYear(maxDate.getFullYear() + 1);
 
-  const onSignInClick = (data: GuestInfoFormData) => {
-    search.saveSearchValues(
-      "",
-      data.checkIn,
-      data.checkOut,
-      data.adultCount,
-      data.childCount
-    );
-    navigate("/sign-in", { state: { from: location } });
-  };
-
   const onSubmit = (data: GuestInfoFormData) => {
+    const normalizedCheckIn = new Date(data.checkIn);
+    const normalizedCheckOut = new Date(data.checkOut);
+
+    if (Number.isNaN(normalizedCheckIn.getTime()) || Number.isNaN(normalizedCheckOut.getTime())) {
+      return;
+    }
+
+    if (normalizedCheckOut < normalizedCheckIn) {
+      return;
+    }
+
     search.saveSearchValues(
       "",
-      data.checkIn,
-      data.checkOut,
+      normalizedCheckIn,
+      normalizedCheckOut,
       data.adultCount,
-      data.childCount
+      data.childCount,
+      hotelId
     );
     navigate(`/hotel/${hotelId}/booking`);
   };
@@ -173,9 +171,7 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
           </div>
 
           <form
-            onSubmit={
-              isLoggedIn ? handleSubmit(onSubmit) : handleSubmit(onSignInClick)
-            }
+            onSubmit={handleSubmit(onSubmit)}
             className="space-y-4"
           >
             {/* Date Selection */}
@@ -265,29 +261,37 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
                     max={20}
                     className="text-center font-semibold"
                     {...register("childCount", {
+                      min: {
+                        value: 0,
+                        message: "Children cannot be negative",
+                      },
                       valueAsNumber: true,
                     })}
                   />
+                  {errors.childCount && (
+                    <span className="text-red-500 text-xs">
+                      {errors.childCount.message}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
 
+            {checkOut && checkIn && checkOut < checkIn && (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                Check-out date cannot be earlier than check-in date.
+              </div>
+            )}
+
             {/* Action Button */}
             <Button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+              className="w-full bg-[#ea836c] hover:bg-[#db755f] text-white font-semibold py-3 px-6 rounded-lg shadow-lg transform transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             >
-              {isLoggedIn ? (
-                <div className="flex items-center gap-2">
-                  <CreditCard className="h-4 w-4" />
-                  Book Now
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  Sign in to Book
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                Proceed to your details
+              </div>
             </Button>
           </form>
 

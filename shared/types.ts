@@ -43,7 +43,7 @@ export type HotelType = {
   childCount: number;
   facilities: string[];
   pricePerNight: number;
-  starRating: number;
+  starRating?: number;
   imageUrls: string[];
   lastUpdated: Date;
   // Remove embedded bookings - using separate collection now
@@ -97,6 +97,7 @@ export type HotelType = {
 
 export type BookingType = {
   _id: string;
+  reservationNumber?: string;
   userId: string;
   hotelId: string;
   firstName: string;

@@ -1,5 +1,29 @@
 # Version History
 
+## 1.4.0 - 2026-03-16
+
+### End-User Booking Flow (First Fully Working Version)
+- Implemented complete guest booking journey: `Detail` -> `Booking` -> `Checkout` without requiring sign-in.
+- Replaced sign-in booking CTA with a direct progression CTA (`Proceed to your details`) using primary brand color.
+- Added a dedicated checkout summary stage and final booking request submission step.
+- Added Terms & Conditions page and linked consent references in booking flow.
+
+### Booking Reliability and Safeguards
+- Added backend-generated unique reservation numbers (`Booking Reference`) for each booking request.
+- Included booking reference in both user-facing confirmation email and admin technical email.
+- Added duplicate-request protection for repeated submissions within a time window (same guest/date window).
+- Hardened server-side validation for guest booking requests (date order, capacity checks, server-side total calculation).
+- Improved degraded behavior on email-delivery issues (booking remains saved, response includes warning).
+
+### Contact Flow Hardening
+- Added contact form draft persistence to reduce data loss on refresh/failure.
+- Added inline contact submission error surface in addition to toast notifications.
+
+### End-to-End Verification
+- Added dedicated Playwright E2E for guest booking flow including homepage entry path.
+- Added Playwright E2E for contact form flow and validation.
+- Verified frontend and backend production builds locally.
+
 ## 1.3.0 - 2026-03-16
 
 ### Contact Form and Email Delivery

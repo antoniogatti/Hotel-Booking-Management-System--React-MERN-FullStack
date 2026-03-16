@@ -221,9 +221,6 @@ const MyBookings = () => {
                       className="w-24 h-24 rounded-lg object-cover object-center shadow-md"
                       alt={hotel.name}
                     />
-                    <div className="absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full">
-                      {hotel.starRating}★
-                    </div>
                   </div>
                   <div className="flex-1">
                     <h2 className="text-2xl font-bold text-gray-900 mb-2">

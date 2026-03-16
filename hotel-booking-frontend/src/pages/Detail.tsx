@@ -98,12 +98,6 @@ const Detail = () => {
                 {hotel.totalRevenue.toLocaleString()} revenue
               </Badge>
             )}
-            {/* Rating Badge - Always show with appropriate message */}
-            <Badge variant="outline" className="text-gray-600">
-              {hotel.averageRating && hotel.averageRating > 0
-                ? `${hotel.averageRating.toFixed(1)} avg rating`
-                : "Rating feature not yet implemented"}
-            </Badge>
             {hotel.isFeatured && (
               <Badge className="bg-yellow-100 text-yellow-800">Featured</Badge>
             )}

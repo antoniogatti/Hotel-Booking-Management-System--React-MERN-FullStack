@@ -12,7 +12,8 @@ export type SearchContext = {
     checkIn: Date,
     checkOut: Date,
     adultCount: number,
-    childCount: number
+    childCount: number,
+    hotelId?: string
   ) => void;
   clearSearchValues: () => void;
 };
@@ -46,7 +47,7 @@ export const SearchContextProvider = ({
     parseInt(sessionStorage.getItem("childCount") || "0")
   );
   const [hotelId, setHotelId] = useState<string>(
-    () => sessionStorage.getItem("hotelID") || ""
+    () => sessionStorage.getItem("hotelId") || ""
   );
 
   const saveSearchValues = (

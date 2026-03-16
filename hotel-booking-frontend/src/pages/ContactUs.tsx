@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useMutation } from "react-query";
 import { useForm } from "react-hook-form";
 import { Mail, MapPin } from "lucide-react";
@@ -18,28 +19,50 @@ type ContactFormValues = {
 
 const ContactUs = () => {
   const { toast } = useToast();
+  const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const savedDraft = (() => {
+    const raw = sessionStorage.getItem("contactFormDraft");
+    if (!raw) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(raw) as Partial<ContactFormValues>;
+    } catch {
+      return null;
+    }
+  })();
   const {
     register,
     handleSubmit,
     reset,
+    watch,
     formState: { errors },
   } = useForm<ContactFormValues>({
     defaultValues: {
-      name: "",
-      email: "",
-      phone: "",
-      message: "",
-      privacyAccepted: false,
+      name: savedDraft?.name || "",
+      email: savedDraft?.email || "",
+      phone: savedDraft?.phone || "",
+      message: savedDraft?.message || "",
+      privacyAccepted: savedDraft?.privacyAccepted || false,
     },
   });
 
+  const draftValues = watch();
+
+  useEffect(() => {
+    sessionStorage.setItem("contactFormDraft", JSON.stringify(draftValues));
+  }, [draftValues]);
+
   const mutation = useMutation(submitContactForm, {
     onSuccess: () => {
+      setSubmissionError(null);
       toast({
         title: "Message sent",
         description:
           "Thank you for contacting us. We sent a confirmation to your email.",
       });
+      sessionStorage.removeItem("contactFormDraft");
       reset();
     },
     onError: (error) => {
@@ -49,6 +72,8 @@ const ContactUs = () => {
         typeof error.response.data.message === "string"
           ? error.response.data.message
           : "We could not send your message right now. Please try again shortly.";
+
+      setSubmissionError(apiMessage);
 
       toast({
         title: "Sending failed",
@@ -129,6 +154,12 @@ const ContactUs = () => {
 
           <div className="lg:col-span-7 bg-white border border-[#e7e9df] rounded-2xl p-6 sm:p-8 shadow-soft">
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+              {submissionError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {submissionError}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-[#2b4463] mb-1" htmlFor="contact-name">

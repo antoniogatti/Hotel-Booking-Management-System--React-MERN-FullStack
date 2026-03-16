@@ -5,6 +5,27 @@ type ContactFormPayload = {
   message: string;
 };
 
+type BookingRequestPayload = {
+  reservationNumber: string;
+  hotelName: string;
+  roomName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  city: string;
+  country: string;
+  checkIn: string;
+  checkOut: string;
+  adultCount: number;
+  childCount: number;
+  nights: number;
+  totalCost: number;
+  arrivalTime: "Morning" | "Afternoon" | "Evening" | "Night";
+  specialRequests?: string;
+  coupon?: string;
+};
+
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
 
 const escapeHtml = (value: string) =>
@@ -173,6 +194,59 @@ const toUserHtml = (payload: ContactFormPayload) => {
   `;
 };
 
+const toBookingAdminHtml = (payload: BookingRequestPayload) => {
+  const submittedAt = new Date().toISOString();
+
+  return `
+    <h2>New Booking Request (Technical Copy)</h2>
+    <p><strong>Submitted At (UTC):</strong> ${submittedAt}</p>
+    <p><strong>Reservation Number:</strong> ${escapeHtml(payload.reservationNumber)}</p>
+    <hr/>
+    <p><strong>Property:</strong> ${escapeHtml(payload.hotelName)}</p>
+    <p><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
+    <p><strong>Guest:</strong> ${escapeHtml(payload.firstName)} ${escapeHtml(payload.lastName)}</p>
+    <p><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
+    <p><strong>Phone:</strong> ${escapeHtml(payload.phone)}</p>
+    <p><strong>Location:</strong> ${escapeHtml(payload.city)}, ${escapeHtml(payload.country)}</p>
+    <p><strong>Check-In:</strong> ${escapeHtml(payload.checkIn)}</p>
+    <p><strong>Check-Out:</strong> ${escapeHtml(payload.checkOut)}</p>
+    <p><strong>Nights:</strong> ${payload.nights}</p>
+    <p><strong>Guests:</strong> ${payload.adultCount} adults, ${payload.childCount} children</p>
+    <p><strong>Arrival Time:</strong> ${escapeHtml(payload.arrivalTime)}</p>
+    <p><strong>Total Cost (quoted):</strong> EUR ${payload.totalCost}</p>
+    <p><strong>Coupon:</strong> ${payload.coupon ? escapeHtml(payload.coupon) : "Not provided"}</p>
+    <p><strong>Special Requests:</strong></p>
+    <p style="white-space: pre-wrap;">${payload.specialRequests ? escapeHtml(payload.specialRequests) : "None"}</p>
+  `;
+};
+
+const toBookingUserHtml = (payload: BookingRequestPayload) => {
+  return `
+    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
+      <h2 style="margin-bottom: 8px;">Thank You For Your Booking Request</h2>
+      <p>Hello ${escapeHtml(payload.firstName)},</p>
+      <p>
+        We have received your booking request for <strong>${escapeHtml(payload.hotelName)}</strong>
+        and our team will contact you shortly to confirm availability and final details.
+      </p>
+      <p><strong>Booking Reference:</strong> ${escapeHtml(payload.reservationNumber)}</p>
+      <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin: 16px 0;">
+        <p><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
+        <p><strong>Check-In:</strong> ${escapeHtml(payload.checkIn)}</p>
+        <p><strong>Check-Out:</strong> ${escapeHtml(payload.checkOut)}</p>
+        <p><strong>Guests:</strong> ${payload.adultCount} adults, ${payload.childCount} children</p>
+        <p><strong>Arrival:</strong> ${escapeHtml(payload.arrivalTime)}</p>
+        <p><strong>Estimated Total:</strong> EUR ${payload.totalCost}</p>
+      </div>
+      <p>
+        Kind regards,<br/>
+        Palazzo Pinto B&B<br/>
+        Reservations Team
+      </p>
+    </div>
+  `;
+};
+
 export const sendContactEmails = async (payload: ContactFormPayload) => {
   const {
     tenantId,
@@ -206,5 +280,37 @@ export const sendContactEmails = async (payload: ContactFormPayload) => {
     subject: userSubject,
     html: toUserHtml(payload),
     text: payload.message,
+  });
+};
+
+export const sendBookingRequestEmails = async (payload: BookingRequestPayload) => {
+  const {
+    tenantId,
+    clientId,
+    clientSecret,
+    senderAddress,
+    inboxAddress,
+    subjectPrefix,
+  } = resolveMailConfig();
+
+  const token = await getGraphAccessToken(tenantId, clientId, clientSecret);
+
+  await sendMail({
+    token,
+    senderAddress,
+    to: inboxAddress,
+    subject: `${subjectPrefix} Booking Request - ${payload.hotelName} (${payload.reservationNumber})`,
+    html: toBookingAdminHtml(payload),
+    text: `Booking request from ${payload.firstName} ${payload.lastName} for ${payload.hotelName}`,
+    replyTo: payload.email,
+  });
+
+  await sendMail({
+    token,
+    senderAddress,
+    to: payload.email,
+    subject: `Booking Request Received - ${payload.hotelName} (${payload.reservationNumber})`,
+    html: toBookingUserHtml(payload),
+    text: `Your booking request for ${payload.hotelName} has been received.`,
   });
 };

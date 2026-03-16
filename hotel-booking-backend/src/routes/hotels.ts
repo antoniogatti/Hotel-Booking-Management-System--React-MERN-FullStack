@@ -3,13 +3,39 @@ import Hotel from "../models/hotel";
 import Booking from "../models/booking";
 import User from "../models/user";
 import { BookingType, HotelSearchResponse } from "../../../shared/types";
-import { param, validationResult } from "express-validator";
+import { body, param, validationResult } from "express-validator";
+import { randomBytes } from "crypto";
 import Stripe from "stripe";
 import verifyToken from "../middleware/auth";
+import { sendBookingRequestEmails } from "../lib/contact-mail";
 
 const stripe = new Stripe(process.env.STRIPE_API_KEY as string);
 
 const router = express.Router();
+const DUPLICATE_BOOKING_WINDOW_MS = 30 * 60 * 1000;
+
+const buildReservationNumber = () => {
+  const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const randomSuffix = randomBytes(3).toString("hex").toUpperCase();
+  return `PP-${date}-${randomSuffix}`;
+};
+
+const generateUniqueReservationNumber = async () => {
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const candidate = buildReservationNumber();
+    const existing = await Booking.exists({ reservationNumber: candidate });
+    if (!existing) {
+      return candidate;
+    }
+  }
+
+  throw new Error("Unable to generate a unique reservation number");
+};
+
+const calculateNights = (checkIn: Date, checkOut: Date) => {
+  const diff = checkOut.getTime() - checkIn.getTime();
+  return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+};
 
 router.get("/search", async (req: Request, res: Response) => {
   try {
@@ -89,6 +115,149 @@ router.get(
 );
 
 router.post(
+  "/:hotelId/booking-request",
+  [
+    param("hotelId").notEmpty().withMessage("Hotel ID is required"),
+    body("firstName").trim().notEmpty().withMessage("First name is required"),
+    body("lastName").trim().notEmpty().withMessage("Last name is required"),
+    body("email").isEmail().withMessage("A valid email is required"),
+    body("phone").trim().notEmpty().withMessage("Phone is required"),
+    body("city").trim().notEmpty().withMessage("City is required"),
+    body("country").trim().notEmpty().withMessage("Country is required"),
+    body("adultCount").isInt({ min: 1 }).withMessage("Adult count is required"),
+    body("childCount").isInt({ min: 0 }).withMessage("Child count must be 0 or greater"),
+    body("checkIn").isISO8601().withMessage("Check-in date is invalid"),
+    body("checkOut").isISO8601().withMessage("Check-out date is invalid"),
+    body("totalCost").isNumeric().withMessage("Total cost is required"),
+    body("nights").isInt({ min: 1 }).withMessage("Nights is required"),
+    body("hotelName").trim().notEmpty().withMessage("Hotel name is required"),
+    body("roomName").trim().notEmpty().withMessage("Room name is required"),
+    body("arrivalTime")
+      .isIn(["Morning", "Afternoon", "Evening", "Night"])
+      .withMessage("Arrival time is invalid"),
+  ],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const hotelId = req.params.hotelId;
+      const hotel = await Hotel.findById(hotelId);
+
+      if (!hotel) {
+        return res.status(404).json({ message: "Hotel not found" });
+      }
+
+      const checkIn = new Date(req.body.checkIn);
+      const checkOut = new Date(req.body.checkOut);
+      const normalizedEmail = String(req.body.email).trim().toLowerCase();
+
+      if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
+        return res.status(400).json({ message: "Invalid booking dates" });
+      }
+
+      if (checkOut < checkIn) {
+        return res.status(400).json({ message: "Check-out date cannot be earlier than check-in date" });
+      }
+
+      if (req.body.adultCount > hotel.adultCount || req.body.childCount > hotel.childCount) {
+        return res.status(400).json({
+          message: "Guest count exceeds the room capacity",
+        });
+      }
+
+      const duplicateThreshold = new Date(Date.now() - DUPLICATE_BOOKING_WINDOW_MS);
+      const existingRecentBooking = await Booking.findOne({
+        hotelId,
+        email: normalizedEmail,
+        checkIn,
+        checkOut,
+        createdAt: { $gte: duplicateThreshold },
+        status: { $in: ["pending", "confirmed"] },
+      }).sort({ createdAt: -1 });
+
+      if (existingRecentBooking) {
+        return res.status(409).json({
+          message: "A booking request for the same guest and stay dates was already submitted recently.",
+          bookingId: existingRecentBooking._id,
+          reservationNumber: existingRecentBooking.reservationNumber,
+        });
+      }
+
+      const nights = calculateNights(checkIn, checkOut);
+      const totalCost = hotel.pricePerNight * nights;
+      const reservationNumber = await generateUniqueReservationNumber();
+
+      const bookingRequest = {
+        reservationNumber,
+        userId: "guest-request",
+        hotelId,
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
+        email: normalizedEmail,
+        phone: req.body.phone,
+        adultCount: Number(req.body.adultCount),
+        childCount: Number(req.body.childCount),
+        checkIn,
+        checkOut,
+        totalCost,
+        specialRequests: req.body.specialRequests || "",
+        status: "pending",
+        paymentStatus: "pending",
+      };
+
+      const newBooking = new Booking(bookingRequest);
+      await newBooking.save();
+
+      let emailsSent = true;
+      let warning: string | undefined;
+
+      try {
+        await sendBookingRequestEmails({
+          reservationNumber,
+          hotelName: hotel.name,
+          roomName: req.body.roomName,
+          firstName: req.body.firstName,
+          lastName: req.body.lastName,
+          email: normalizedEmail,
+          phone: req.body.phone,
+          city: req.body.city,
+          country: req.body.country,
+          checkIn: checkIn.toISOString(),
+          checkOut: checkOut.toISOString(),
+          adultCount: Number(req.body.adultCount),
+          childCount: Number(req.body.childCount),
+          nights,
+          totalCost,
+          arrivalTime: req.body.arrivalTime,
+          specialRequests: req.body.specialRequests,
+          coupon: req.body.coupon,
+        });
+      } catch (emailError) {
+        emailsSent = false;
+        warning = "Booking saved, but confirmation emails could not be sent immediately.";
+        console.log("Booking request email delivery failed", emailError);
+      }
+
+      return res.status(200).json({
+        message: emailsSent
+          ? "Booking request submitted successfully"
+          : "Booking request saved with email delivery pending",
+        bookingId: newBooking._id,
+        reservationNumber,
+        emailsSent,
+        warning,
+      });
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({ message: "Unable to submit booking request" });
+    }
+  }
+);
+
+router.post(
   "/:hotelId/bookings/payment-intent",
   verifyToken,
   async (req: Request, res: Response) => {
@@ -153,8 +322,11 @@ router.post(
         });
       }
 
+      const reservationNumber = await generateUniqueReservationNumber();
+
       const newBooking: BookingType = {
         ...req.body,
+        reservationNumber,
         userId: req.userId,
         hotelId: req.params.hotelId,
         createdAt: new Date(), // Add booking creation timestamp

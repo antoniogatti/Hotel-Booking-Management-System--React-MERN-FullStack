@@ -18,6 +18,7 @@ import EditHotel from "./pages/EditHotel";
 import Search from "./pages/Search";
 import Detail from "./pages/Detail";
 import Booking from "./pages/Booking";
+import Checkout from "./pages/Checkout";
 import MyBookings from "./pages/MyBookings";
 import Home from "./pages/Home";
 import ApiDocs from "./pages/ApiDocs";
@@ -25,6 +26,7 @@ import ApiStatus from "./pages/ApiStatus";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import AuthCallback from "./pages/AuthCallback";
 import PrivacyCookiePolicy from "./pages/PrivacyCookiePolicy";
+import TermsConditions from "./pages/TermsConditions";
 import ContactUs from "./pages/ContactUs";
 import { siteConfig } from "./config/siteConfig";
 
@@ -41,6 +43,9 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/privacy-cookie-policy") {
     return `${BRAND_NAME} | Privacy and Cookie Policy`;
   }
+  if (pathname === "/terms-conditions") {
+    return `${BRAND_NAME} | Terms and Conditions`;
+  }
   if (pathname === "/business-insights") {
     return `${BRAND_NAME} | Business Insights`;
   }
@@ -50,7 +55,10 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/my-hotels") return `${BRAND_NAME} | My Properties`;
   if (pathname === "/my-bookings") return `${BRAND_NAME} | My Bookings`;
   if (pathname.startsWith("/hotel/") && pathname.endsWith("/booking")) {
-    return `${BRAND_NAME} | Complete Booking`;
+    return `${BRAND_NAME} | Booking Details`;
+  }
+  if (pathname.startsWith("/hotel/") && pathname.endsWith("/checkout")) {
+    return `${BRAND_NAME} | Checkout`;
   }
   if (pathname === "/add-hotel") return `${BRAND_NAME} | Add Property`;
   if (pathname.startsWith("/edit-hotel/")) return `${BRAND_NAME} | Edit Property`;
@@ -134,6 +142,14 @@ const App = () => {
           }
         />
         <Route
+          path="/terms-conditions"
+          element={
+            <Layout>
+              <TermsConditions />
+            </Layout>
+          }
+        />
+        <Route
           path="/contact-us"
           element={
             <Layout>
@@ -191,16 +207,25 @@ const App = () => {
           }
         />
 
+        <Route
+          path="/hotel/:hotelId/booking"
+          element={
+            <Layout>
+              <Booking />
+            </Layout>
+          }
+        />
+        <Route
+          path="/hotel/:hotelId/checkout"
+          element={
+            <Layout>
+              <Checkout />
+            </Layout>
+          }
+        />
+
         {isLoggedIn && (
           <>
-            <Route
-              path="/hotel/:hotelId/booking"
-              element={
-                <Layout>
-                  <Booking />
-                </Layout>
-              }
-            />
             {isOwnerOrAdmin && (
               <>
                 <Route

@@ -196,6 +196,12 @@ const Footer = () => {
             >
               Privacy & Cookies
             </Link>
+            <Link
+              to="/terms-conditions"
+              className="text-[#2b4463]/85 hover:text-[#ea836c] text-sm transition-colors"
+            >
+              Terms & Conditions
+            </Link>
             <a
               href={siteConfig.links.website}
               target="_blank"

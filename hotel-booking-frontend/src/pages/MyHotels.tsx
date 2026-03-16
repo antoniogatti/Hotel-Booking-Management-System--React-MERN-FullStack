@@ -9,7 +9,6 @@ import {
   Eye,
   TrendingUp,
   Users,
-  Star,
   Building2,
   Calendar,
   LogIn,
@@ -194,26 +193,6 @@ const MyHotels = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-soft border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Avg Rating</p>
-              <p className="text-2xl font-bold text-gray-900">
-                {hotelData.length > 0
-                  ? (
-                      hotelData.reduce(
-                        (sum, hotel) => sum + (hotel.averageRating || 0),
-                        0,
-                      ) / hotelData.length
-                    ).toFixed(1)
-                  : "0.0"}
-              </p>
-            </div>
-            <div className="bg-orange-100 p-3 rounded-xl">
-              <Star className="w-6 h-6 text-orange-600" />
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Hotels Grid */}
@@ -243,12 +222,7 @@ const MyHotels = () => {
                 )}
               </div>
 
-              <div className="absolute top-4 right-4">
-                <Badge className="bg-white/90 text-gray-800">
-                  <Star className="w-3 h-3 mr-1 text-yellow-500" />
-                  {hotel.starRating}
-                </Badge>
-              </div>
+
             </div>
 
             {/* Hotel Content */}
@@ -318,12 +292,7 @@ const MyHotels = () => {
                   </p>
                   <p className="text-xs text-gray-600">Revenue</p>
                 </div>
-                <div className="text-center">
-                  <p className="text-lg font-bold text-gray-900">
-                    {hotel.averageRating?.toFixed(1) || "0.0"}
-                  </p>
-                  <p className="text-xs text-gray-600">Rating</p>
-                </div>
+
               </div>
 
               {/* Action Buttons */}

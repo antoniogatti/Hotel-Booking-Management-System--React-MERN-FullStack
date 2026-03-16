@@ -58,7 +58,6 @@ interface AnalyticsData {
   hotelPerformance: Array<{
     name: string;
     city: string;
-    starRating: number;
     pricePerNight: number;
     bookingCount: number;
     totalRevenue: number;
@@ -432,9 +431,6 @@ const AnalyticsDashboard = () => {
                         City
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Rating
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Price/Night
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -455,9 +451,6 @@ const AnalyticsDashboard = () => {
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {hotel.city}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {hotel.starRating} ⭐
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatCurrency(hotel.pricePerNight)}

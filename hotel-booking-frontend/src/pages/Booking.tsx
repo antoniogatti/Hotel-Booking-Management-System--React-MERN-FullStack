@@ -1,213 +1,319 @@
-import { useQuery } from "react-query";
+import { useEffect, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { useQueryWithLoading } from "../hooks/useLoadingHooks";
 import * as apiClient from "../api-client";
-import BookingForm from "../forms/BookingForm/BookingForm";
 import useSearchContext from "../hooks/useSearchContext";
-import { useParams } from "react-router-dom";
-import { useEffect, useState } from "react";
-import BookingDetailsSummary from "../components/BookingDetailsSummary";
-import { Elements } from "@stripe/react-stripe-js";
-import useAppContext from "../hooks/useAppContext";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
-import { Loader2, CreditCard, Calendar, Users } from "lucide-react";
+
+type BookingDetailsFormData = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  city: string;
+  country: string;
+  specialRequests?: string;
+  arrivalTime: "Morning" | "Afternoon" | "Evening" | "Night";
+  coupon?: string;
+  termsAccepted: boolean;
+};
 
 const Booking = () => {
-  const { stripePromise } = useAppContext();
-  const search = useSearchContext();
+  const navigate = useNavigate();
   const { hotelId } = useParams();
+  const search = useSearchContext();
 
-  const [numberOfNights, setNumberOfNights] = useState<number>(0);
-
-  useEffect(() => {
-    if (search.checkIn && search.checkOut) {
-      const nights =
-        Math.abs(search.checkOut.getTime() - search.checkIn.getTime()) /
-        (1000 * 60 * 60 * 24);
-
-      setNumberOfNights(Math.ceil(nights));
+  const savedDraft = (() => {
+    const raw = sessionStorage.getItem("bookingDraft");
+    if (!raw) {
+      return null;
     }
-  }, [search.checkIn, search.checkOut]);
 
-  const { data: paymentIntentData, isLoading: isLoadingPayment } = useQuery(
-    "createPaymentIntent",
-    () =>
-      apiClient.createPaymentIntent(
-        hotelId as string,
-        numberOfNights.toString()
-      ),
-    {
-      enabled: !!hotelId && numberOfNights > 0,
+    try {
+      return JSON.parse(raw) as Partial<BookingDetailsFormData>;
+    } catch {
+      return null;
     }
-  );
+  })();
 
-  const { data: hotel, isLoading: isLoadingHotel } = useQuery(
-    "fetchHotelByID",
-    () => apiClient.fetchHotelById(hotelId as string),
+  const {
+    data: hotel,
+    isLoading,
+    isError,
+  } = useQueryWithLoading(
+    ["fetchHotelById", hotelId],
+    () => apiClient.fetchHotelById(hotelId || ""),
     {
       enabled: !!hotelId,
+      loadingMessage: "Loading booking details...",
     }
   );
 
-  const { data: currentUser, isLoading: isLoadingUser } = useQuery(
-    "fetchCurrentUser",
-    apiClient.fetchCurrentUser
-  );
+  const { register, handleSubmit, watch, formState } = useForm<BookingDetailsFormData>({
+    defaultValues: {
+      firstName: savedDraft?.firstName || "",
+      lastName: savedDraft?.lastName || "",
+      email: savedDraft?.email || "",
+      phone: savedDraft?.phone || "",
+      city: savedDraft?.city || "",
+      country: savedDraft?.country || "",
+      specialRequests: savedDraft?.specialRequests || "",
+      coupon: savedDraft?.coupon || "",
+      arrivalTime: savedDraft?.arrivalTime || "Morning",
+      termsAccepted: savedDraft?.termsAccepted || false,
+    },
+  });
 
-  if (isLoadingHotel || isLoadingUser) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="flex items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="text-lg font-medium text-gray-700">
-            Loading booking details...
-          </span>
-        </div>
-      </div>
-    );
+  const checkIn = search.checkIn;
+  const checkOut = search.checkOut;
+  const draftValues = watch();
+  const nights = useMemo(() => {
+    const diff = checkOut.getTime() - checkIn.getTime();
+    return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
+  }, [checkIn, checkOut]);
+
+  useEffect(() => {
+    sessionStorage.setItem("bookingDraft", JSON.stringify(draftValues));
+  }, [draftValues]);
+
+  if (isLoading) {
+    return <div className="text-center py-10 text-gray-500">Loading booking page...</div>;
   }
 
-  if (!hotel) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-2">
-            Hotel Not Found
-          </h2>
-          <p className="text-gray-600">
-            The hotel you're looking for doesn't exist.
-          </p>
-        </div>
-      </div>
-    );
+  if (isError || !hotel || !hotelId) {
+    return <div className="text-center py-10 text-gray-500">Unable to load booking details.</div>;
   }
+
+  const onSubmit = (formValues: BookingDetailsFormData) => {
+    if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime()) || checkOut < checkIn) {
+      return;
+    }
+
+    const checkoutState = {
+      guestDetails: formValues,
+      bookingDetails: {
+        hotelId,
+        hotelName: hotel.name,
+        roomName: Array.isArray(hotel.type) && hotel.type.length > 0 ? hotel.type[0] : "Room",
+        checkIn: checkIn.toISOString(),
+        checkOut: checkOut.toISOString(),
+        adultCount: search.adultCount,
+        childCount: search.childCount,
+        nights,
+        pricePerNight: hotel.pricePerNight,
+        totalPrice: hotel.pricePerNight * nights,
+      },
+    };
+
+    sessionStorage.setItem("checkoutState", JSON.stringify(checkoutState));
+    navigate(`/hotel/${hotelId}/checkout`, {
+      state: checkoutState,
+    });
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <CreditCard className="h-6 w-6 text-blue-600" />
-            <h1 className="text-3xl font-bold text-gray-900">
-              Complete Your Booking
-            </h1>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+        <section className="bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
+          <div className="mb-6 rounded-md bg-sky-500 text-white text-sm p-3">
+            Please fill the form below to continue with your booking request.
           </div>
-          <p className="text-gray-600">
-            Please review your details and complete the payment to confirm your
-            reservation.
-          </p>
-        </div>
 
-        {/* Main Content */}
-        <div className="grid lg:grid-cols-[1fr_2fr] gap-8">
-          {/* Booking Summary */}
-          <div className="space-y-6">
-            <Card className="shadow-lg border-0 bg-white">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                  <Calendar className="h-5 w-5 text-blue-600" />
-                  Booking Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <BookingDetailsSummary
-                  checkIn={search.checkIn}
-                  checkOut={search.checkOut}
-                  adultCount={search.adultCount}
-                  childCount={search.childCount}
-                  numberOfNights={numberOfNights}
-                  hotel={hotel}
+          <h2 className="text-2xl font-semibold text-slate-700 mb-4">Billing Details</h2>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">First Name</label>
+                <input
+                  {...register("firstName", {
+                    required: "First name is required",
+                    minLength: { value: 2, message: "First name is too short" },
+                  })}
+                  className="w-full border border-slate-300 rounded px-3 py-2"
                 />
-              </CardContent>
-            </Card>
+                {formState.errors.firstName && (
+                  <p className="text-xs text-red-600 mt-1">{formState.errors.firstName.message}</p>
+                )}
+              </div>
 
-            {/* Hotel Info Card */}
-            <Card className="shadow-lg border-0 bg-white">
-              <CardHeader className="pb-4">
-                <CardTitle className="flex items-center gap-2 text-lg font-semibold">
-                  <Users className="h-5 w-5 text-blue-600" />
-                  Hotel Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">
-                    {hotel.name}
-                  </h3>
-                  <p className="text-gray-600 text-sm mb-3">
-                    {hotel.city}, {hotel.country}
-                  </p>
-                  <div className="flex items-center gap-2 mb-3">
-                    <Badge variant="outline" className="text-xs">
-                      {hotel.starRating} Stars
-                    </Badge>
-                    <Badge variant="outline" className="text-xs">
-                      {hotel.pricePerNight}/night
-                    </Badge>
-                  </div>
-                  {hotel.type && hotel.type.length > 0 && (
-                    <div className="flex flex-wrap gap-1">
-                      {hotel.type.map((type, index) => (
-                        <Badge
-                          key={index}
-                          variant="outline"
-                          className="text-xs"
-                        >
-                          {type}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Last Name</label>
+                <input
+                  {...register("lastName", {
+                    required: "Last name is required",
+                    minLength: { value: 2, message: "Last name is too short" },
+                  })}
+                  className="w-full border border-slate-300 rounded px-3 py-2"
+                />
+                {formState.errors.lastName && (
+                  <p className="text-xs text-red-600 mt-1">{formState.errors.lastName.message}</p>
+                )}
+              </div>
 
-          {/* Booking Form */}
-          <div className="space-y-6">
-            {isLoadingPayment ? (
-              <Card className="shadow-lg border-0 bg-white">
-                <CardContent className="flex items-center justify-center py-12">
-                  <div className="flex items-center gap-3">
-                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                    <span className="text-gray-700">Preparing payment...</span>
-                  </div>
-                </CardContent>
-              </Card>
-            ) : currentUser && paymentIntentData ? (
-              <Card className="shadow-lg border-0 bg-white">
-                <CardContent className="p-0">
-                  <Elements
-                    stripe={stripePromise}
-                    options={{
-                      clientSecret: paymentIntentData.clientSecret,
-                    }}
-                    key={paymentIntentData.clientSecret}
-                  >
-                    <BookingForm
-                      currentUser={currentUser}
-                      paymentIntent={paymentIntentData}
-                    />
-                  </Elements>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="shadow-lg border-0 bg-white">
-                <CardContent className="flex items-center justify-center py-12">
-                  <div className="text-center">
-                    <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-3" />
-                    <p className="text-gray-700">Loading payment form...</p>
-                  </div>
-                </CardContent>
-              </Card>
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Email</label>
+                <input
+                  type="email"
+                  {...register("email", {
+                    required: "Email is required",
+                    pattern: {
+                      value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                      message: "Enter a valid email address",
+                    },
+                  })}
+                  className="w-full border border-slate-300 rounded px-3 py-2"
+                />
+                {formState.errors.email && (
+                  <p className="text-xs text-red-600 mt-1">{formState.errors.email.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Phone</label>
+                <input
+                  {...register("phone", {
+                    required: "Phone is required",
+                    minLength: { value: 6, message: "Phone number is too short" },
+                  })}
+                  className="w-full border border-slate-300 rounded px-3 py-2"
+                />
+                {formState.errors.phone && (
+                  <p className="text-xs text-red-600 mt-1">{formState.errors.phone.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">City</label>
+                <input
+                  {...register("city", { required: "City is required" })}
+                  className="w-full border border-slate-300 rounded px-3 py-2"
+                />
+                {formState.errors.city && (
+                  <p className="text-xs text-red-600 mt-1">{formState.errors.city.message}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Country</label>
+                <input
+                  {...register("country", { required: "Country is required" })}
+                  className="w-full border border-slate-300 rounded px-3 py-2"
+                />
+                {formState.errors.country && (
+                  <p className="text-xs text-red-600 mt-1">{formState.errors.country.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-600 mb-1">Special Requests</label>
+              <textarea
+                {...register("specialRequests")}
+                rows={5}
+                placeholder="Let us know if you have any special requests."
+                className="w-full border border-slate-300 rounded px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-slate-600 mb-2">Arrival Time</label>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {(["Morning", "Afternoon", "Evening", "Night"] as const).map((option) => {
+                  const selected = watch("arrivalTime") === option;
+                  return (
+                    <label
+                      key={option}
+                      className={`border rounded px-3 py-2 text-center text-sm cursor-pointer ${
+                        selected ? "bg-emerald-50 border-emerald-400 text-emerald-800" : "bg-white border-slate-300"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        value={option}
+                        className="sr-only"
+                        {...register("arrivalTime")}
+                      />
+                      {option}
+                    </label>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3 items-end">
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Coupon</label>
+                <input
+                  {...register("coupon")}
+                  placeholder="Enter coupon code if you have one"
+                  className="w-full border border-slate-300 rounded px-3 py-2"
+                />
+              </div>
+              <button
+                type="button"
+                className="bg-[#ea836c] hover:bg-[#db755f] text-white px-6 py-2 rounded font-semibold"
+              >
+                Validate Code
+              </button>
+            </div>
+
+            <label className="flex items-start gap-2 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                {...register("termsAccepted", {
+                  required: "Please accept the terms and conditions",
+                })}
+                className="mt-0.5"
+              />
+              <span>
+                I agree to the {" "}
+                <Link to="/terms-conditions" className="text-[#ea836c] underline" target="_blank" rel="noreferrer">
+                  Terms and Conditions
+                </Link>
+              </span>
+            </label>
+            {formState.errors.termsAccepted && (
+              <p className="text-xs text-red-600">{formState.errors.termsAccepted.message}</p>
             )}
+
+            {checkOut < checkIn && (
+              <p className="text-sm text-red-600">
+                Check-out date cannot be earlier than check-in date.
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={checkOut < checkIn}
+              className="w-full bg-[#ea836c] hover:bg-[#db755f] disabled:opacity-60 text-white font-semibold py-3 rounded"
+            >
+              Proceed to Checkout
+            </button>
+          </form>
+        </section>
+
+        <aside className="bg-white border border-slate-200 rounded-lg shadow-sm h-fit">
+          <img
+            src={hotel.imageUrls?.[0]}
+            alt={hotel.name}
+            className="w-full h-48 object-cover rounded-t-lg"
+          />
+          <div className="p-4 space-y-3">
+            <h3 className="font-semibold text-slate-800">Booking Details</h3>
+            <div className="text-sm text-slate-600 space-y-2">
+              <p><strong>Check In:</strong> {checkIn.toLocaleDateString()}</p>
+              <p><strong>Check Out:</strong> {checkOut.toLocaleDateString()}</p>
+              <p><strong>Nights:</strong> {nights}</p>
+              <p><strong>Guests:</strong> {search.adultCount} Adults, {search.childCount} Children</p>
+              <p><strong>Room:</strong> {Array.isArray(hotel.type) && hotel.type.length > 0 ? hotel.type[0] : "Room"}</p>
+            </div>
+            <div className="border-t pt-3 text-sm text-slate-700 space-y-1">
+              <p className="flex justify-between"><span>Price Summary</span><span>EUR {hotel.pricePerNight * nights}</span></p>
+              <p className="flex justify-between font-semibold text-base"><span>Total Price</span><span>EUR {hotel.pricePerNight * nights}</span></p>
+            </div>
           </div>
-        </div>
+        </aside>
       </div>
     </div>
   );

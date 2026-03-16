@@ -32,7 +32,6 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     // Advanced filters
     minPrice: "",
     maxPrice: "",
-    starRating: "",
     hotelType: "",
     facilities: [] as string[],
     sortBy: "relevance",
@@ -224,8 +223,6 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         searchParams.append("minPrice", searchData.minPrice);
       if (searchData.maxPrice)
         searchParams.append("maxPrice", searchData.maxPrice);
-      if (searchData.starRating)
-        searchParams.append("starRating", searchData.starRating);
       if (searchData.hotelType)
         searchParams.append("hotelType", searchData.hotelType);
       if (searchData.sortBy) searchParams.append("sortBy", searchData.sortBy);
@@ -248,7 +245,6 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           childCount: 0,
           minPrice: "",
           maxPrice: "",
-          starRating: "",
           hotelType: "",
           facilities: [],
           sortBy: "relevance",
@@ -293,8 +289,6 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       searchParams.append("minPrice", searchData.minPrice);
     if (searchData.maxPrice)
       searchParams.append("maxPrice", searchData.maxPrice);
-    if (searchData.starRating)
-      searchParams.append("starRating", searchData.starRating);
     if (searchData.hotelType)
       searchParams.append("hotelType", searchData.hotelType);
     if (searchData.sortBy) searchParams.append("sortBy", searchData.sortBy);
@@ -317,7 +311,6 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
         childCount: 0,
         minPrice: "",
         maxPrice: "",
-        starRating: "",
         hotelType: "",
         facilities: [],
         sortBy: "relevance",
@@ -356,7 +349,6 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
   //     childCount: 0,
   //     minPrice: "",
   //     maxPrice: "",
-  //     starRating: "",
   //     hotelType: "",
   //     facilities: [],
   //     sortBy: "relevance",
@@ -550,26 +542,6 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
                   }
                 />
               </div>
-            </div>
-
-            {/* Star Rating */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Star Rating
-              </label>
-              <select
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                value={searchData.starRating}
-                onChange={(e) =>
-                  handleInputChange("starRating", e.target.value)
-                }
-              >
-                <option value="">Any Rating</option>
-                <option value="5">5 Stars</option>
-                <option value="4">4+ Stars</option>
-                <option value="3">3+ Stars</option>
-                <option value="2">2+ Stars</option>
-              </select>
             </div>
 
             {/* Hotel Type */}

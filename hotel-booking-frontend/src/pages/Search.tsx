@@ -5,7 +5,6 @@ import * as apiClient from "../api-client";
 import { useEffect, useState } from "react";
 import SearchResultsCard from "../components/SearchResultsCard";
 import Pagination from "../components/Pagination";
-import StarRatingFilter from "../components/StarRatingFilter";
 import HotelTypesFilter from "../components/HotelTypesFilter";
 import FacilitiesFilter from "../components/FacilitiesFilter";
 import PriceFilter from "../components/PriceFilter";
@@ -35,7 +34,6 @@ const Search = () => {
       );
     }
   }, [isSinglePropertyMode, urlSearchParams.toString()]);
-  const [selectedStars, setSelectedStars] = useState<string[]>([]);
   const [selectedHotelTypes, setSelectedHotelTypes] = useState<string[]>([]);
   const [selectedFacilities, setSelectedFacilities] = useState<string[]>([]);
   const [selectedPrice, setSelectedPrice] = useState<number | undefined>();
@@ -48,7 +46,7 @@ const Search = () => {
     adultCount: isSinglePropertyMode ? "1" : search.adultCount.toString(),
     childCount: isSinglePropertyMode ? "0" : search.childCount.toString(),
     page: page.toString(),
-    stars: isSinglePropertyMode ? [] : selectedStars,
+    stars: [],
     types: isSinglePropertyMode ? [] : selectedHotelTypes,
     facilities: isSinglePropertyMode ? [] : selectedFacilities,
     maxPrice: isSinglePropertyMode ? undefined : selectedPrice?.toString(),
@@ -62,16 +60,6 @@ const Search = () => {
       loadingMessage: "Searching for perfect hotels...",
     }
   );
-
-  const handleStarsChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const starRating = event.target.value;
-
-    setSelectedStars((prevStars) =>
-      event.target.checked
-        ? [...prevStars, starRating]
-        : prevStars.filter((star) => star !== starRating)
-    );
-  };
 
   const handleHotelTypeChange = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -117,10 +105,6 @@ const Search = () => {
               <h3 className="text-lg font-semibold border-b border-slate-300 pb-5">
                 Filter by:
               </h3>
-              <StarRatingFilter
-                selectedStars={selectedStars}
-                onChange={handleStarsChange}
-              />
               <HotelTypesFilter
                 selectedHotelTypes={selectedHotelTypes}
                 onChange={handleHotelTypeChange}
@@ -151,7 +135,6 @@ const Search = () => {
                 className="p-2 border rounded-md"
               >
                 <option value="">Sort By</option>
-                <option value="starRating">Star Rating</option>
                 <option value="pricePerNightAsc">
                   Price Per Night (low to high)
                 </option>
@@ -187,25 +170,11 @@ const Search = () => {
                   <>
                     We couldn't find any hotels in{" "}
                     <span className="font-medium">{search.destination}</span>
-                    {selectedStars.length > 0 && (
-                      <>
-                        {" "}
-                        with {selectedStars.length === 1 ? "a" : ""}{" "}
-                        {selectedStars.join(", ")} star rating
-                      </>
-                    )}
                     {selectedPrice && <> under ${selectedPrice} per night</>}.
                   </>
                 ) : (
                   <>
                     We couldn't find any {isSinglePropertyMode ? "rooms" : "hotels"} matching your criteria
-                    {selectedStars.length > 0 && (
-                      <>
-                        {" "}
-                        with {selectedStars.length === 1 ? "a" : ""}{" "}
-                        {selectedStars.join(", ")} star rating
-                      </>
-                    )}
                     {selectedPrice && <> under ${selectedPrice} per night</>}.
                   </>
                 )}
@@ -217,13 +186,11 @@ const Search = () => {
                     : "Try adjusting your filters or search for a different destination."}
                 </p>
                 {!isSinglePropertyMode &&
-                (selectedStars.length > 0 ||
-                selectedHotelTypes.length > 0 ||
+                (selectedHotelTypes.length > 0 ||
                 selectedFacilities.length > 0 ||
                 selectedPrice) ? (
                   <button
                     onClick={() => {
-                      setSelectedStars([]);
                       setSelectedHotelTypes([]);
                       setSelectedFacilities([]);
                       setSelectedPrice(undefined);
