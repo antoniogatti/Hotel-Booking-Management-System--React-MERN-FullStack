@@ -6,7 +6,6 @@ import userRoutes from "./routes/users";
 import authRoutes from "./routes/auth";
 import cookieParser from "cookie-parser";
 import path from "path";
-import { v2 as cloudinary } from "cloudinary";
 import myHotelRoutes from "./routes/my-hotels";
 import hotelRoutes from "./routes/hotels";
 import bookingRoutes from "./routes/my-bookings";
@@ -25,9 +24,6 @@ import rateLimit from "express-rate-limit";
 const requiredEnvVars = [
   "MONGODB_CONNECTION_STRING",
   "JWT_SECRET_KEY",
-  "CLOUDINARY_CLOUD_NAME",
-  "CLOUDINARY_API_KEY",
-  "CLOUDINARY_API_SECRET",
   "STRIPE_API_KEY",
 ];
 
@@ -45,14 +41,6 @@ console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || "Not set"}`);
 console.log(
   `🔗 Backend URL: ${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`}`
 );
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-console.log("☁️  Cloudinary configured successfully");
 
 // MongoDB Connection with Error Handling
 const connectDB = async () => {

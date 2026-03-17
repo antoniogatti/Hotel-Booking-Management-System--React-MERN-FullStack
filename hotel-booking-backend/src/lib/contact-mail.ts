@@ -15,6 +15,7 @@ type BookingRequestPayload = {
   phone: string;
   city: string;
   country: string;
+  nationality: string;
   checkIn: string;
   checkOut: string;
   adultCount: number;
@@ -26,6 +27,38 @@ type BookingRequestPayload = {
   coupon?: string;
 };
 
+type BookingDecisionPayload = {
+  reservationNumber: string;
+  hotelName: string;
+  roomName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  checkIn: string;
+  checkOut: string;
+  decision: "confirmed" | "rejected";
+  reason?: string;
+};
+
+type CheckInNotificationPayload = {
+  reservationNumber: string;
+  hotelName: string;
+  roomName: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  checkIn: string;
+  checkOut: string;
+  arrivalTime: string;
+  nationality: string;
+  bookingChannel: string;
+  paymentDetails: string;
+  cityTax: number;
+  documentCount: number;
+  specialNotes?: string;
+};
+
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
 
 const escapeHtml = (value: string) =>
@@ -35,6 +68,21 @@ const escapeHtml = (value: string) =>
     .replace(/>/g, "&gt;")
     .replace(/\"/g, "&quot;")
     .replace(/'/g, "&#39;");
+
+const formatFriendlyDate = (value: string | Date) => {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+};
 
 const resolveMailConfig = () => {
   const tenantId = process.env.MS_ENTRA_TENANT_ID;
@@ -163,7 +211,7 @@ const sendMail = async (params: {
 };
 
 const toAdminHtml = (payload: ContactFormPayload) => {
-  const submittedAt = new Date().toISOString();
+  const submittedAt = formatFriendlyDate(new Date());
   const name = escapeHtml(payload.name);
   const email = escapeHtml(payload.email);
   const phone = payload.phone ? escapeHtml(payload.phone) : "Not provided";
@@ -171,7 +219,7 @@ const toAdminHtml = (payload: ContactFormPayload) => {
 
   return `
     <h2>New Website Contact Request</h2>
-    <p><strong>Submitted At (UTC):</strong> ${submittedAt}</p>
+    <p><strong>Submitted On:</strong> ${submittedAt}</p>
     <p><strong>Name:</strong> ${name}</p>
     <p><strong>Email:</strong> ${email}</p>
     <p><strong>Phone:</strong> ${phone}</p>
@@ -195,11 +243,11 @@ const toUserHtml = (payload: ContactFormPayload) => {
 };
 
 const toBookingAdminHtml = (payload: BookingRequestPayload) => {
-  const submittedAt = new Date().toISOString();
+  const submittedAt = formatFriendlyDate(new Date());
 
   return `
     <h2>New Booking Request (Technical Copy)</h2>
-    <p><strong>Submitted At (UTC):</strong> ${submittedAt}</p>
+    <p><strong>Submitted On:</strong> ${submittedAt}</p>
     <p><strong>Reservation Number:</strong> ${escapeHtml(payload.reservationNumber)}</p>
     <hr/>
     <p><strong>Property:</strong> ${escapeHtml(payload.hotelName)}</p>
@@ -208,8 +256,9 @@ const toBookingAdminHtml = (payload: BookingRequestPayload) => {
     <p><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
     <p><strong>Phone:</strong> ${escapeHtml(payload.phone)}</p>
     <p><strong>Location:</strong> ${escapeHtml(payload.city)}, ${escapeHtml(payload.country)}</p>
-    <p><strong>Check-In:</strong> ${escapeHtml(payload.checkIn)}</p>
-    <p><strong>Check-Out:</strong> ${escapeHtml(payload.checkOut)}</p>
+    <p><strong>Nationality:</strong> ${escapeHtml(payload.nationality)}</p>
+    <p><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
+    <p><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
     <p><strong>Nights:</strong> ${payload.nights}</p>
     <p><strong>Guests:</strong> ${payload.adultCount} adults, ${payload.childCount} children</p>
     <p><strong>Arrival Time:</strong> ${escapeHtml(payload.arrivalTime)}</p>
@@ -232,9 +281,10 @@ const toBookingUserHtml = (payload: BookingRequestPayload) => {
       <p><strong>Booking Reference:</strong> ${escapeHtml(payload.reservationNumber)}</p>
       <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin: 16px 0;">
         <p><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
-        <p><strong>Check-In:</strong> ${escapeHtml(payload.checkIn)}</p>
-        <p><strong>Check-Out:</strong> ${escapeHtml(payload.checkOut)}</p>
+        <p><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
+        <p><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
         <p><strong>Guests:</strong> ${payload.adultCount} adults, ${payload.childCount} children</p>
+        <p><strong>Nationality:</strong> ${escapeHtml(payload.nationality)}</p>
         <p><strong>Arrival:</strong> ${escapeHtml(payload.arrivalTime)}</p>
         <p><strong>Estimated Total:</strong> EUR ${payload.totalCost}</p>
       </div>
@@ -244,6 +294,86 @@ const toBookingUserHtml = (payload: BookingRequestPayload) => {
         Reservations Team
       </p>
     </div>
+  `;
+};
+
+const toBookingDecisionAdminHtml = (payload: BookingDecisionPayload) => {
+  const submittedAt = formatFriendlyDate(new Date());
+  const decisionLabel = payload.decision === "confirmed" ? "CONFIRMED" : "REJECTED";
+
+  return `
+    <h2>Booking Request ${decisionLabel}</h2>
+    <p><strong>Decision On:</strong> ${submittedAt}</p>
+    <p><strong>Reservation Number:</strong> ${escapeHtml(payload.reservationNumber)}</p>
+    <hr/>
+    <p><strong>Property:</strong> ${escapeHtml(payload.hotelName)}</p>
+    <p><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
+    <p><strong>Guest:</strong> ${escapeHtml(payload.firstName)} ${escapeHtml(payload.lastName)}</p>
+    <p><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
+    <p><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
+    <p><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
+    <p><strong>Decision:</strong> ${decisionLabel}</p>
+    <p><strong>Reason:</strong> ${payload.reason ? escapeHtml(payload.reason) : "Not provided"}</p>
+  `;
+};
+
+const toBookingDecisionUserHtml = (payload: BookingDecisionPayload) => {
+  const isConfirmed = payload.decision === "confirmed";
+  const title = isConfirmed ? "Your Booking Request Is Confirmed" : "Update On Your Booking Request";
+  const intro = isConfirmed
+    ? "Great news. Your booking request has been confirmed by our team."
+    : "Thank you for your request. At this time we are unable to confirm it.";
+
+  return `
+    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
+      <h2 style="margin-bottom: 8px;">${title}</h2>
+      <p>Hello ${escapeHtml(payload.firstName)},</p>
+      <p>${intro}</p>
+      <p><strong>Booking Reference:</strong> ${escapeHtml(payload.reservationNumber)}</p>
+      <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin: 16px 0;">
+        <p><strong>Property:</strong> ${escapeHtml(payload.hotelName)}</p>
+        <p><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
+        <p><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
+        <p><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
+        <p><strong>Status:</strong> ${isConfirmed ? "Booked" : "Rejected"}</p>
+      </div>
+      ${
+        payload.reason
+          ? `<p><strong>Note:</strong> ${escapeHtml(payload.reason)}</p>`
+          : ""
+      }
+      <p>
+        Kind regards,<br/>
+        Palazzo Pinto B&B<br/>
+        Reservations Team
+      </p>
+    </div>
+  `;
+};
+
+const toCheckInAdminHtml = (payload: CheckInNotificationPayload) => {
+  const submittedAt = formatFriendlyDate(new Date());
+
+  return `
+    <h2>Guest Check-in Completed</h2>
+    <p><strong>Saved On:</strong> ${submittedAt}</p>
+    <p><strong>Reservation Number:</strong> ${escapeHtml(payload.reservationNumber)}</p>
+    <hr/>
+    <p><strong>Property:</strong> ${escapeHtml(payload.hotelName)}</p>
+    <p><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
+    <p><strong>Guest:</strong> ${escapeHtml(payload.firstName)} ${escapeHtml(payload.lastName)}</p>
+    <p><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
+    <p><strong>Phone:</strong> ${payload.phone ? escapeHtml(payload.phone) : "Not provided"}</p>
+    <p><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
+    <p><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
+    <p><strong>Arrival Time:</strong> ${escapeHtml(payload.arrivalTime)}</p>
+    <p><strong>Nationality:</strong> ${escapeHtml(payload.nationality)}</p>
+    <p><strong>Booking Channel:</strong> ${escapeHtml(payload.bookingChannel)}</p>
+    <p><strong>Payment Details:</strong> ${escapeHtml(payload.paymentDetails)}</p>
+    <p><strong>City Tax:</strong> EUR ${payload.cityTax.toFixed(2)}</p>
+    <p><strong>Uploaded Documents:</strong> ${payload.documentCount}</p>
+    <p><strong>Special Notes:</strong></p>
+    <p style="white-space: pre-wrap;">${payload.specialNotes ? escapeHtml(payload.specialNotes) : "None"}</p>
   `;
 };
 
@@ -312,5 +442,65 @@ export const sendBookingRequestEmails = async (payload: BookingRequestPayload) =
     subject: `Booking Request Received - ${payload.hotelName} (${payload.reservationNumber})`,
     html: toBookingUserHtml(payload),
     text: `Your booking request for ${payload.hotelName} has been received.`,
+  });
+};
+
+export const sendBookingDecisionEmails = async (
+  payload: BookingDecisionPayload
+) => {
+  const {
+    tenantId,
+    clientId,
+    clientSecret,
+    senderAddress,
+    inboxAddress,
+    subjectPrefix,
+  } = resolveMailConfig();
+
+  const token = await getGraphAccessToken(tenantId, clientId, clientSecret);
+  const decisionLabel = payload.decision === "confirmed" ? "Confirmed" : "Rejected";
+
+  await sendMail({
+    token,
+    senderAddress,
+    to: inboxAddress,
+    subject: `${subjectPrefix} Booking ${decisionLabel} - ${payload.hotelName} (${payload.reservationNumber})`,
+    html: toBookingDecisionAdminHtml(payload),
+    text: `Booking ${decisionLabel.toLowerCase()} for ${payload.reservationNumber}`,
+    replyTo: payload.email,
+  });
+
+  await sendMail({
+    token,
+    senderAddress,
+    to: payload.email,
+    subject: `Booking ${decisionLabel} - ${payload.hotelName} (${payload.reservationNumber})`,
+    html: toBookingDecisionUserHtml(payload),
+    text: `Booking ${decisionLabel.toLowerCase()} for reservation ${payload.reservationNumber}`,
+  });
+};
+
+export const sendCheckInNotificationEmail = async (
+  payload: CheckInNotificationPayload
+) => {
+  const {
+    tenantId,
+    clientId,
+    clientSecret,
+    senderAddress,
+    inboxAddress,
+    subjectPrefix,
+  } = resolveMailConfig();
+
+  const token = await getGraphAccessToken(tenantId, clientId, clientSecret);
+
+  await sendMail({
+    token,
+    senderAddress,
+    to: inboxAddress,
+    subject: `${subjectPrefix} Check-in Saved - ${payload.hotelName} (${payload.reservationNumber})`,
+    html: toCheckInAdminHtml(payload),
+    text: `Check-in saved for reservation ${payload.reservationNumber}`,
+    replyTo: payload.email,
   });
 };

@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQueryWithLoading } from "../hooks/useLoadingHooks";
 import * as apiClient from "../api-client";
 import useSearchContext from "../hooks/useSearchContext";
+import { formatFriendlyDate } from "../lib/utils";
 
 type BookingDetailsFormData = {
   firstName: string;
@@ -12,6 +13,7 @@ type BookingDetailsFormData = {
   phone: string;
   city: string;
   country: string;
+  nationality: string;
   specialRequests?: string;
   arrivalTime: "Morning" | "Afternoon" | "Evening" | "Night";
   coupon?: string;
@@ -57,6 +59,7 @@ const Booking = () => {
       phone: savedDraft?.phone || "",
       city: savedDraft?.city || "",
       country: savedDraft?.country || "",
+      nationality: savedDraft?.nationality || "",
       specialRequests: savedDraft?.specialRequests || "",
       coupon: savedDraft?.coupon || "",
       arrivalTime: savedDraft?.arrivalTime || "Morning",
@@ -204,6 +207,18 @@ const Booking = () => {
                   <p className="text-xs text-red-600 mt-1">{formState.errors.country.message}</p>
                 )}
               </div>
+
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Nationality</label>
+                <input
+                  {...register("nationality", { required: "Nationality is required" })}
+                  className="w-full border border-slate-300 rounded px-3 py-2"
+                  placeholder="e.g. Italian"
+                />
+                {formState.errors.nationality && (
+                  <p className="text-xs text-red-600 mt-1">{formState.errors.nationality.message}</p>
+                )}
+              </div>
             </div>
 
             <div>
@@ -302,8 +317,8 @@ const Booking = () => {
           <div className="p-4 space-y-3">
             <h3 className="font-semibold text-slate-800">Booking Details</h3>
             <div className="text-sm text-slate-600 space-y-2">
-              <p><strong>Check In:</strong> {checkIn.toLocaleDateString()}</p>
-              <p><strong>Check Out:</strong> {checkOut.toLocaleDateString()}</p>
+              <p><strong>Check In:</strong> {formatFriendlyDate(checkIn)}</p>
+              <p><strong>Check Out:</strong> {formatFriendlyDate(checkOut)}</p>
               <p><strong>Nights:</strong> {nights}</p>
               <p><strong>Guests:</strong> {search.adultCount} Adults, {search.childCount} Children</p>
               <p><strong>Room:</strong> {Array.isArray(hotel.type) && hotel.type.length > 0 ? hotel.type[0] : "Room"}</p>

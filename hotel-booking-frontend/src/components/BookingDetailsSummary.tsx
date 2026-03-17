@@ -1,4 +1,5 @@
 import { HotelType } from "../../../shared/types";
+import { formatFriendlyDate } from "../lib/utils";
 
 type Props = {
   checkIn: Date;
@@ -27,11 +28,11 @@ const BookingDetailsSummary = ({
       <div className="flex justify-between">
         <div>
           Check-in
-          <div className="font-bold"> {checkIn.toDateString()}</div>
+          <div className="font-bold"> {formatFriendlyDate(checkIn)}</div>
         </div>
         <div>
           Check-out
-          <div className="font-bold"> {checkOut.toDateString()}</div>
+          <div className="font-bold"> {formatFriendlyDate(checkOut)}</div>
         </div>
       </div>
       <div className="border-t border-b py-2">

@@ -14,7 +14,7 @@ export interface IBooking extends Document {
   checkIn: Date;
   checkOut: Date;
   totalCost: number;
-  status: "pending" | "confirmed" | "cancelled" | "completed" | "refunded";
+  status: "pending" | "confirmed" | "arrived" | "cancelled" | "completed" | "refunded";
   paymentStatus: "pending" | "paid" | "failed" | "refunded";
   paymentMethod: string;
   specialRequests: string;
@@ -22,6 +22,22 @@ export interface IBooking extends Document {
   refundAmount: number;
   createdAt: Date;
   updatedAt: Date;
+  checkInInfo?: {
+    arrivalTime: string;
+    phone: string;
+    email: string;
+    nationality: string;
+    bookingChannel: string;
+    paymentDetails: string;
+    specialNotes?: string;
+    documents?: string[];
+    cityTax?: number;
+    checkedInAt?: Date;
+  };
+  city?: string;
+  country?: string;
+  arrivalTime?: "Morning" | "Afternoon" | "Evening" | "Night";
+  nationality?: string;
 }
 
 const bookingSchema = new mongoose.Schema(
@@ -40,7 +56,7 @@ const bookingSchema = new mongoose.Schema(
     totalCost: { type: Number, required: true },
     status: {
       type: String,
-      enum: ["pending", "confirmed", "cancelled", "completed", "refunded"],
+      enum: ["pending", "confirmed", "arrived", "cancelled", "completed", "refunded"],
       default: "pending",
       index: true,
     },
@@ -57,6 +73,27 @@ const bookingSchema = new mongoose.Schema(
     // Audit fields
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    // Address Information
+    city: { type: String },
+    country: { type: String },
+    arrivalTime: {
+      type: String,
+      enum: ["Morning", "Afternoon", "Evening", "Night"],
+    },
+    nationality: { type: String },
+    // Check-in Information
+    checkInInfo: {
+      arrivalTime: { type: String },
+      phone: { type: String },
+      email: { type: String },
+      nationality: { type: String },
+      bookingChannel: { type: String },
+      paymentDetails: { type: String },
+      specialNotes: { type: String },
+      documents: [{ type: String }],
+      cityTax: { type: Number, default: 0 },
+      checkedInAt: { type: Date },
+    },
   },
   {
     timestamps: true,

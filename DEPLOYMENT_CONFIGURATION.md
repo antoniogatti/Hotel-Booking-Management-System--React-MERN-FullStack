@@ -51,9 +51,6 @@ az webapp config appsettings set \
   MS_ENTRA_CLIENT_ID="<entra-client-id>" \
   MS_ENTRA_CLIENT_SECRET="<entra-client-secret>" \
   MS_ENTRA_TENANT_ID="<tenant-id-or-common>" \
-  CLOUDINARY_CLOUD_NAME="<cloud-name>" \
-  CLOUDINARY_API_KEY="<cloud-key>" \
-  CLOUDINARY_API_SECRET="<cloud-secret>" \
   STRIPE_API_KEY="<stripe-secret-key>"
 ```
 

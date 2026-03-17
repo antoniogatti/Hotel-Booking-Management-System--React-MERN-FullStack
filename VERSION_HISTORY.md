@@ -1,5 +1,63 @@
 # Version History
 
+## 1.5.0 - 2026-03-17
+
+### Booking Operations and Backoffice Management
+- Added a complete booking operations module for admin/hotel-owner workflows.
+- Added booking dashboard route and page (`/booking-dashboard`) with role-based access.
+- Added booking details route and page (`/booking/:bookingId`) with editable guest fields and status-aware actions.
+- Added booking decision flow (`confirm` / `reject`) with optional rejection reason handling.
+- Added check-in route and page (`/hotel/:hotelId/check-in/:bookingId`) with guest arrival details, payment metadata, document uploads, and city-tax calculation.
+- Added monthly booking management page (`/manage-bookings`) with calendar/table views and day-level controls.
+
+### Vacancy Monitoring and Occupancy Optimization
+- Added vacancy management page (`/vacancy-management`) and linked it from the dashboard vacancy card.
+- Added clickable vacancy-rate card with occupancy-style visual treatment and redirect behavior.
+- Added vacancy-focused date availability visualization to support marketing actions.
+- Added marketing recommendation section for high-vacancy period targeting.
+- Added sortable booking table columns in the booking dashboard for reference, guest, nationality, contact, stay dates, and guests.
+
+### Backend API and Data Model Enhancements
+- Added booking management endpoints for:
+	- room listing (`/api/bookings/rooms`)
+	- room calendar and day status
+	- booking decisions (`/:id/decision`)
+	- check-in submission (`/:id/check-in`)
+	- booking dashboard summary (`/dashboard/summary`)
+- Added `arrived` booking status support across models, validation, and frontend/backend flows.
+- Added `BookingDayStatus` model for closed-day controls in management calendar.
+- Added overlap-protection checks for conflicting bookings in hotel booking routes.
+- Extended booking payloads with nationality/arrival metadata and check-in details.
+
+### Notifications and Communications
+- Extended contact/mail service with booking decision and check-in notification templates.
+- Added decision notification emails (admin + guest) for confirm/reject actions.
+- Added check-in notification email with guest/check-in metadata and document counts.
+- Improved date formatting in outbound email templates.
+
+### Cloudinary Removal and Storage Simplification
+- Removed Cloudinary dependency and backend Cloudinary configuration requirements.
+- Removed Cloudinary environment variables from deployment/config samples.
+- Reworked upload handling to use direct data-URI/document storage flow.
+- Updated project documentation references from Cloudinary to SharePoint/document flow where applicable.
+
+### Frontend UX and Navigation Updates
+- Added booking/admin entries to user menu and role-aware navigation.
+- Updated booking flow forms and checkout with nationality support.
+- Improved booking conflict messaging in checkout for overlapping reservations.
+- Unified date rendering with shared friendly-date utility across analytics and booking surfaces.
+- Added page-title mappings for newly introduced booking/vacancy/check-in routes.
+
+### Tests, Seeds, and Data Adjustments
+- Expanded e2e guest booking coverage with additional capacity/date-window scenarios.
+- Updated duplicate protection test behavior to reflect overlap-based conflict logic.
+- Adjusted seeded room child capacity for family-booking scenarios.
+
+### Cleanup and Validation
+- Removed confirmed unused frontend/backend modules (unused pages/components/models).
+- Fixed booking details check-in navigation to target the defined check-in route structure.
+- Verified frontend and backend production builds after integration.
+
 ## 1.4.0 - 2026-03-16
 
 ### End-User Booking Flow (First Fully Working Version)

@@ -1,6 +1,5 @@
 import express, { Request, Response } from "express";
 import multer from "multer";
-import cloudinary from "cloudinary";
 import Hotel from "../models/hotel";
 import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
@@ -228,14 +227,7 @@ async function uploadImages(imageFiles: any[]) {
   const uploadPromises = imageFiles.map(async (image) => {
     const b64 = Buffer.from(image.buffer as Uint8Array).toString("base64");
     let dataURI = "data:" + image.mimetype + ";base64," + b64;
-    const res = await cloudinary.v2.uploader.upload(dataURI, {
-      secure: true, // Force HTTPS URLs
-      transformation: [
-        { width: 800, height: 600, crop: "fill" },
-        { quality: "auto" },
-      ],
-    });
-    return res.url;
+    return dataURI;
   });
 
   const imageUrls = await Promise.all(uploadPromises);

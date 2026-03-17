@@ -3,7 +3,6 @@ import { Button } from "./ui/button";
 import {
   FileText,
   Activity,
-  Building2,
   Calendar,
   BarChart3,
   LogIn,
@@ -41,10 +40,6 @@ const MobileNavLinks = () => {
 
       {isOwnerOrAdmin && (
         <>
-          <Link to="/my-hotels" className={linkClass}>
-            <Building2 className="h-4 w-4" />
-            Manage Rooms
-          </Link>
           {!siteConfig.singlePropertyMode && (
             <>
               <Link to="/business-insights" className={linkClass}>

@@ -124,9 +124,8 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Multer        │    │   Cloudinary    │    │   Stripe        │
-│  (File Upload)  │    │  (Image Mgmt)   │    │  (Payments)     │
+┌─────────────────┐    ┌─────────────────┐
+│  (File Upload)  │    │  (Payments)     │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -264,7 +263,7 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 
 - **Multi-role System**: User, Hotel Owner, and Admin roles
 - **Hotel CRUD Operations**: Create, read, update, delete hotel listings
-- **Image Upload**: Cloudinary integration for hotel image management
+- **Image Upload**: SharePoint integration for document management
 - **Advanced Hotel Details**: Location, amenities, policies, contact information
 - **Hotel Analytics**: Booking statistics, revenue tracking, occupancy rates
 
@@ -336,7 +335,7 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 - **JWT** - JSON Web Token authentication
 - **bcryptjs** - Password hashing
 - **Multer** - File upload handling
-- **Cloudinary** - Cloud image storage
+- **SharePoint** - Document management and storage
 - **Stripe** - Payment processing
 - **Swagger** - API documentation
 - **Helmet** - Security middleware
@@ -484,11 +483,7 @@ MONGODB_CONNECTION_STRING=mongodb://localhost:27017/hotel-booking
 JWT_SECRET=your-super-secret-jwt-key-here
 JWT_EXPIRES_IN=7d
 
-# Cloudinary Configuration (for image uploads)
-CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=your-api-key
-CLOUDINARY_API_SECRET=your-api-secret
-
+# SharePoint Configuration (for document storage)
 # Stripe Configuration (for payments)
 STRIPE_SECRET_KEY=sk_test_your-stripe-secret-key
 STRIPE_PUBLISHABLE_KEY=pk_test_your-stripe-publishable-key
@@ -527,13 +522,7 @@ VITE_GOOGLE_ANALYTICS_ID=GA_MEASUREMENT_ID
 3. Get connection string from "Connect" button
 4. Replace `<password>` with your database password
 
-#### 2. Cloudinary Setup
-
-1. Create account at [Cloudinary](https://cloudinary.com/)
-2. Go to Dashboard → API Keys
-3. Copy Cloud Name, API Key, and API Secret
-
-#### 3. Stripe Setup
+#### 2. Stripe Setup
 
 1. Create account at [Stripe](https://stripe.com/)
 2. Go to Developers → API Keys
@@ -1233,7 +1222,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Database Design**: MongoDB schema design and relationships
 - **Authentication**: JWT-based authentication system
 - **Payment Integration**: Stripe payment processing
-- **File Upload**: Cloudinary image management
+- **File Upload**: SharePoint document management
 - **API Design**: RESTful API with Swagger documentation
 - **State Management**: Server and client state management
 - **Testing**: End-to-end testing with Playwright
@@ -1267,7 +1256,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Shadcn UI](https://ui.shadcn.com/) - Component library
 - [React Query](https://tanstack.com/query/latest) - Data fetching
 - [Stripe](https://stripe.com/docs) - Payment processing
-- [Cloudinary](https://cloudinary.com/documentation) - Image management
 
 ### Best Practices
 

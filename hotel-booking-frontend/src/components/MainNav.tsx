@@ -45,10 +45,6 @@ const MainNav = () => {
               Business Insights
             </Link>
           )}
-          <Link to="/my-hotels" className={navLinkClass}>
-            Manage Rooms
-          </Link>
-
           {!siteConfig.singlePropertyMode && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

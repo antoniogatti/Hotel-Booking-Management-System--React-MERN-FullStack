@@ -106,10 +106,12 @@ export type BookingType = {
   phone?: string;
   adultCount: number;
   childCount: number;
+  arrivalTime?: "Morning" | "Afternoon" | "Evening" | "Night";
+  nationality?: string;
   checkIn: Date;
   checkOut: Date;
   totalCost: number;
-  status?: "pending" | "confirmed" | "cancelled" | "completed" | "refunded";
+  status?: "pending" | "confirmed" | "arrived" | "cancelled" | "completed" | "refunded";
   paymentStatus?: "pending" | "paid" | "failed" | "refunded";
   paymentMethod?: string;
   specialRequests?: string;
@@ -136,4 +138,49 @@ export type PaymentIntentResponse = {
   paymentIntentId: string;
   clientSecret: string;
   totalCost: number;
+};
+
+export type BookingCalendarDayStatus =
+  | "Available"
+  | "Requested"
+  | "Booked"
+  | "Closed";
+
+export type BookingManagementRoomType = {
+  _id: string;
+  name: string;
+  city: string;
+  country: string;
+};
+
+export type BookingCalendarDayType = {
+  date: string;
+  status: BookingCalendarDayStatus;
+  requestedCount: number;
+  bookedCount: number;
+  closed: boolean;
+  closedReason?: string;
+};
+
+export type BookingCalendarBookingRowType = {
+  _id: string;
+  reservationNumber?: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone?: string;
+  checkIn: Date;
+  checkOut: Date;
+  status: BookingCalendarDayStatus;
+  totalCost: number;
+  adultCount: number;
+  childCount: number;
+  createdAt?: Date;
+};
+
+export type BookingCalendarResponseType = {
+  room: BookingManagementRoomType;
+  month: string;
+  days: BookingCalendarDayType[];
+  bookings: BookingCalendarBookingRowType[];
 };

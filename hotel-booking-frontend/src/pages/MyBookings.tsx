@@ -26,6 +26,7 @@ import {
   UserCircle,
 } from "lucide-react";
 import useAppContext from "../hooks/useAppContext";
+import { formatFriendlyDate } from "../lib/utils";
 
 const MyBookings = () => {
   const { isLoggedIn } = useAppContext();
@@ -280,7 +281,7 @@ const MyBookings = () => {
                                 Booking #{booking._id.slice(-8).toUpperCase()}
                               </h3>
                               <p className="text-sm text-gray-500">
-                                Booked on {createdAt.toLocaleDateString()}
+                                Booked on {formatFriendlyDate(createdAt)}
                               </p>
                             </div>
                           </div>
@@ -326,11 +327,11 @@ const MyBookings = () => {
                             <div className="text-sm text-gray-600">
                               <div className="mb-1">
                                 <span className="font-medium">Check-in:</span>{" "}
-                                {checkInDate.toDateString()}
+                                {formatFriendlyDate(checkInDate)}
                               </div>
                               <div>
                                 <span className="font-medium">Check-out:</span>{" "}
-                                {checkOutDate.toDateString()}
+                                {formatFriendlyDate(checkOutDate)}
                               </div>
                             </div>
                           </div>

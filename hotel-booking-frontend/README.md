@@ -209,7 +209,7 @@ hotel-booking-frontend/
 ### **Payment & Media**
 
 - **Stripe React**: Payment processing integration
-- **Cloudinary**: Image management (via backend)
+- **SharePoint**: Document management (via backend)
 
 ### **Development Tools**
 
@@ -579,7 +579,7 @@ const createPaymentIntent = async (hotelId: string, numberOfNights: string) => {
 ### **Hotel Management**
 
 - **CRUD Operations**: Complete hotel listing management
-- **Image Upload**: Cloudinary integration for hotel photos
+- **Document Upload**: SharePoint integration for booking documents
 - **Analytics Dashboard**: Business insights and performance metrics
 - **Booking Management**: Real-time booking tracking
 
@@ -766,7 +766,7 @@ import { loadStripe } from "@stripe/stripe-js";
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 
-// Cloudinary image optimization
+// SharePoint document upload
 const optimizedImageUrl = (url: string, width: number) => {
   return url.replace("/upload/", `/upload/w_${width},c_fill/`);
 };

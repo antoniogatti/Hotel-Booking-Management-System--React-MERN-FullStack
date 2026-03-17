@@ -35,6 +35,7 @@ import {
   Clock,
   AlertCircle,
 } from "lucide-react";
+import { formatFriendlyDate } from "../lib/utils";
 
 interface AnalyticsData {
   overview: {
@@ -358,15 +359,11 @@ const AnalyticsDashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="date"
-                      tickFormatter={(value) =>
-                        new Date(value).toLocaleDateString()
-                      }
+                      tickFormatter={(value) => formatFriendlyDate(value)}
                     />
                     <YAxis />
                     <Tooltip
-                      labelFormatter={(value) =>
-                        new Date(value).toLocaleDateString()
-                      }
+                      labelFormatter={(value) => formatFriendlyDate(value)}
                       formatter={(value) => [value, "Bookings"]}
                     />
                     <Bar dataKey="bookings" fill="#3B82F6" />
@@ -552,15 +549,11 @@ const AnalyticsDashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="week"
-                      tickFormatter={(value) =>
-                        new Date(value).toLocaleDateString()
-                      }
+                      tickFormatter={(value) => formatFriendlyDate(value)}
                     />
                     <YAxis />
                     <Tooltip
-                      labelFormatter={(value) =>
-                        new Date(value).toLocaleDateString()
-                      }
+                      labelFormatter={(value) => formatFriendlyDate(value)}
                       formatter={(value, name) => [
                         value,
                         name === "bookings" ? "Bookings" : "Forecast",
@@ -599,15 +592,11 @@ const AnalyticsDashboard = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis
                       dataKey="week"
-                      tickFormatter={(value) =>
-                        new Date(value).toLocaleDateString()
-                      }
+                      tickFormatter={(value) => formatFriendlyDate(value)}
                     />
                     <YAxis />
                     <Tooltip
-                      labelFormatter={(value) =>
-                        new Date(value).toLocaleDateString()
-                      }
+                      labelFormatter={(value) => formatFriendlyDate(value)}
                       formatter={(value) => [
                         formatCurrency(value as number),
                         "Revenue",

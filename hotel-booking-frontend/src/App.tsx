@@ -28,6 +28,11 @@ import AuthCallback from "./pages/AuthCallback";
 import PrivacyCookiePolicy from "./pages/PrivacyCookiePolicy";
 import TermsConditions from "./pages/TermsConditions";
 import ContactUs from "./pages/ContactUs";
+import ManageBookings from "./pages/ManageBookings";
+import BookingCheckIn from "./pages/BookingCheckIn";
+import BookingDashboard from "./pages/BookingDashboard";
+import BookingDetails from "./pages/BookingDetails";
+import VacancyDashboard from "./pages/VacancyDashboard";
 import { siteConfig } from "./config/siteConfig";
 
 const BRAND_NAME = "Palazzo Pinto B&B";
@@ -53,12 +58,19 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/sign-in") return `${BRAND_NAME} | Sign In`;
   if (pathname === "/auth/callback") return `${BRAND_NAME} | Sign In`;
   if (pathname === "/my-hotels") return `${BRAND_NAME} | My Properties`;
+  if (pathname === "/booking-dashboard") return `${BRAND_NAME} | Booking Dashboard`;
+  if (pathname.startsWith("/booking/")) return `${BRAND_NAME} | Booking Details`;
+  if (pathname === "/vacancy-management") return `${BRAND_NAME} | Vacancy Management`;
+  if (pathname === "/manage-bookings") return `${BRAND_NAME} | Manage Bookings`;
   if (pathname === "/my-bookings") return `${BRAND_NAME} | My Bookings`;
   if (pathname.startsWith("/hotel/") && pathname.endsWith("/booking")) {
     return `${BRAND_NAME} | Booking Details`;
   }
   if (pathname.startsWith("/hotel/") && pathname.endsWith("/checkout")) {
     return `${BRAND_NAME} | Checkout`;
+  }
+  if (pathname.startsWith("/hotel/") && pathname.includes("/check-in/")) {
+    return `${BRAND_NAME} | Guest Check-in`;
   }
   if (pathname === "/add-hotel") return `${BRAND_NAME} | Add Property`;
   if (pathname.startsWith("/edit-hotel/")) return `${BRAND_NAME} | Edit Property`;
@@ -77,7 +89,7 @@ const PageTitleManager = () => {
 };
 
 const App = () => {
-  const { isLoggedIn, isOwnerOrAdmin } = useAppContext();
+  const { isLoggedIn, isOwnerOrAdmin, userRole } = useAppContext();
   return (
     <Router>
       <PageTitleManager />
@@ -206,6 +218,54 @@ const App = () => {
             </Layout>
           }
         />
+        <Route
+          path="/booking-dashboard"
+          element={
+            userRole === "admin" || userRole === "hotel_owner" ? (
+              <Layout>
+                <BookingDashboard />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/vacancy-management"
+          element={
+            userRole === "admin" || userRole === "hotel_owner" ? (
+              <Layout>
+                <VacancyDashboard />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/booking/:bookingId"
+          element={
+            userRole === "admin" || userRole === "hotel_owner" ? (
+              <Layout>
+                <BookingDetails />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/manage-bookings"
+          element={
+            userRole === "admin" ? (
+              <Layout>
+                <ManageBookings />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
 
         <Route
           path="/hotel/:hotelId/booking"
@@ -215,6 +275,19 @@ const App = () => {
             </Layout>
           }
         />
+        <Route
+          path="/hotel/:hotelId/check-in/:bookingId"
+          element={
+            userRole === "admin" ? (
+              <Layout>
+                <BookingCheckIn />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+
         <Route
           path="/hotel/:hotelId/checkout"
           element={

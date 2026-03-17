@@ -1,5 +1,4 @@
 import axiosInstance, { getApiBaseUrl } from "./lib/api-client";
-import { RegisterFormData } from "./pages/Register";
 import { SignInFormData } from "./pages/SignIn";
 import {
   HotelSearchResponse,
@@ -8,11 +7,21 @@ import {
   UserType,
   HotelWithBookingsType,
   BookingType,
+  BookingManagementRoomType,
+  BookingCalendarResponseType,
 } from "../../shared/types";
 import { BookingFormData } from "./forms/BookingForm/BookingForm";
 import { queryClient } from "./main";
 
 export { getApiBaseUrl };
+
+type RegisterFormData = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  password: string;
+  confirmPassword: string;
+};
 
 export const fetchCurrentUser = async (): Promise<UserType> => {
   const response = await axiosInstance.get("/api/users/me");
@@ -228,6 +237,60 @@ export const fetchHotelBookings = async (
   return response.data;
 };
 
+export const fetchBooking = async (bookingId: string): Promise<any> => {
+  const response = await axiosInstance.get(`/api/bookings/${bookingId}`);
+  return response.data;
+};
+
+export const fetchBookingManagementRooms = async (): Promise<
+  BookingManagementRoomType[]
+> => {
+  const response = await axiosInstance.get("/api/bookings/rooms");
+  return response.data;
+};
+
+export const fetchRoomBookingCalendar = async (
+  hotelId: string,
+  month: string
+): Promise<BookingCalendarResponseType> => {
+  const response = await axiosInstance.get(
+    `/api/bookings/calendar/${hotelId}?month=${encodeURIComponent(month)}`
+  );
+  return response.data;
+};
+
+export const updateRoomDayStatus = async (payload: {
+  hotelId: string;
+  date: string;
+  status: "closed" | "available";
+  note?: string;
+}) => {
+  const response = await axiosInstance.post(
+    `/api/bookings/calendar/${payload.hotelId}/day-status`,
+    {
+      date: payload.date,
+      status: payload.status,
+      note: payload.note,
+    }
+  );
+  return response.data;
+};
+
+export const processRequestedBooking = async (payload: {
+  bookingId: string;
+  action: "confirm" | "reject";
+  reason?: string;
+}) => {
+  const response = await axiosInstance.post(
+    `/api/bookings/${payload.bookingId}/decision`,
+    {
+      action: payload.action,
+      reason: payload.reason,
+    }
+  );
+  return response.data;
+};
+
 // Business Insights API functions (public endpoints - no auth required)
 export const fetchBusinessInsightsDashboard = async () => {
   const response = await axiosInstance.get("/api/business-insights/dashboard/public");
@@ -241,6 +304,24 @@ export const fetchBusinessInsightsForecast = async () => {
 
 export const fetchBusinessInsightsPerformance = async () => {
   const response = await axiosInstance.get("/api/business-insights/system-stats/public");
+  return response.data;
+};
+
+export const fetchBookingDashboardSummary = async (filters?: {
+  year?: number;
+  month?: number;
+  hotelId?: string;
+  status?: string;
+}) => {
+  const params = new URLSearchParams();
+  if (filters?.year) params.append("year", String(filters.year));
+  if (filters?.month) params.append("month", String(filters.month));
+  if (filters?.hotelId) params.append("hotelId", filters.hotelId);
+  if (filters?.status) params.append("status", filters.status);
+
+  const response = await axiosInstance.get(
+    `/api/bookings/dashboard/summary?${params.toString()}`
+  );
   return response.data;
 };
 
@@ -260,6 +341,7 @@ export type BookingRequestPayload = {
   phone: string;
   city: string;
   country: string;
+  nationality: string;
   specialRequests?: string;
   arrivalTime: "Morning" | "Afternoon" | "Evening" | "Night";
   coupon?: string;

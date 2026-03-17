@@ -26,8 +26,7 @@ This backend serves as the **core API engine** for a comprehensive hotel booking
 - **📅 Booking System**: Real-time booking creation and management
 - **💳 Payment Processing**: Stripe integration for secure transactions
 - **📊 Analytics Engine**: Business insights and performance metrics
-- **🖼️ File Management**: Cloudinary integration for image handling
-- **🔒 Security**: Rate limiting, CORS, input validation, and data protection
+- ** Security**: Rate limiting, CORS, input validation, and data protection
 
 ### **Architecture Highlights**
 
@@ -39,8 +38,8 @@ This backend serves as the **core API engine** for a comprehensive hotel booking
          │                       │                       │
          ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Multer        │    │   Cloudinary    │    │   Stripe        │
-│  (File Upload)  │    │  (Image Mgmt)   │    │  (Payments)     │
+│   Multer        │    │   Stripe        │    │  SharePoint     │
+│  (File Upload)  │    │  (Payments)     │    │  (Documents)    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -100,11 +99,6 @@ CONTACT_MAIL_SENDER=info@palazzopintobnb.com
 CONTACT_MAIL_INBOX=info@palazzopintobnb.com
 CONTACT_MAIL_SUBJECT_PREFIX=[PalazzoPinto][ContactForm]
 CONTACT_MAIL_CONFIRMATION_SUBJECT=Message Sent - Confirmation
-
-# Cloudinary (Image Storage)
-CLOUDINARY_CLOUD_NAME=your-cloud-name
-CLOUDINARY_API_KEY=your-api-key
-CLOUDINARY_API_SECRET=your-api-secret
 
 # Stripe (Payment Processing)
 STRIPE_API_KEY=sk_test_your-stripe-secret-key
@@ -167,7 +161,7 @@ hotel-booking-backend/
 ### **File & Media Handling**
 
 - **Multer**: File upload middleware
-- **Cloudinary**: Cloud image storage and management
+- **SharePoint**: Document storage and management
 
 ### **Payment Processing**
 
@@ -471,35 +465,7 @@ export const createPaymentIntent = async (req: Request, res: Response) => {
 
 ---
 
-## 🖼️ File Upload System
-
-### **Cloudinary Integration**
-
-```typescript
-// Image upload middleware
-const uploadImages = async (imageFiles: any[]) => {
-  const uploadPromises = imageFiles.map(async (image) => {
-    const b64 = Buffer.from(image.buffer).toString("base64");
-    let dataURI = "data:" + image.mimetype + ";base64," + b64;
-
-    const res = await cloudinary.v2.uploader.upload(dataURI, {
-      folder: "hotel-booking",
-      transformation: [
-        { width: 800, height: 600, crop: "fill" },
-        { quality: "auto" },
-      ],
-    });
-
-    return res.url;
-  });
-
-  return await Promise.all(uploadPromises);
-};
-```
-
----
-
-## 📊 Analytics Engine
+##  Analytics Engine
 
 ### **Business Insights API**
 
@@ -565,7 +531,7 @@ export const getAnalyticsDashboard = async (req: Request, res: Response) => {
 
 - [ ] Environment variables configured
 - [ ] MongoDB Atlas cluster set up
-- [ ] Cloudinary production account
+- [ ] SharePoint document library setup
 - [ ] Stripe production keys
 - [ ] CORS settings updated for production domain
 - [ ] Rate limiting configured

@@ -19,6 +19,7 @@ import {
   // X,
   Filter,
 } from "lucide-react";
+import { formatFriendlyDate } from "../lib/utils";
 
 interface BookingLogModalProps {
   isOpen: boolean;
@@ -49,6 +50,8 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
     switch (status) {
       case "confirmed":
         return "bg-green-100 text-green-800 border-green-200";
+      case "arrived":
+        return "bg-sky-100 text-sky-800 border-sky-200";
       case "pending":
         return "bg-yellow-100 text-yellow-800 border-yellow-200";
       case "cancelled":
@@ -180,6 +183,7 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
             <option value="all">All Status</option>
             <option value="pending">Pending</option>
             <option value="confirmed">Confirmed</option>
+            <option value="arrived">Arrived</option>
             <option value="cancelled">Cancelled</option>
             <option value="completed">Completed</option>
             <option value="refunded">Refunded</option>
@@ -425,18 +429,14 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
                                   <Calendar className="w-4 h-4 text-gray-500" />
                                   <span className="text-gray-700">
                                     Check-in:{" "}
-                                    {new Date(
-                                      booking.checkIn
-                                    ).toLocaleDateString()}
+                                    {formatFriendlyDate(booking.checkIn)}
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-2 text-sm">
                                   <Calendar className="w-4 h-4 text-gray-500" />
                                   <span className="text-gray-700">
                                     Check-out:{" "}
-                                    {new Date(
-                                      booking.checkOut
-                                    ).toLocaleDateString()}
+                                    {formatFriendlyDate(booking.checkOut)}
                                   </span>
                                 </div>
                                 <div className="flex items-center space-x-2 text-sm">
@@ -444,9 +444,7 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
                                   <span className="text-gray-700">
                                     Booked:{" "}
                                     {booking.createdAt
-                                      ? new Date(
-                                          booking.createdAt
-                                        ).toLocaleDateString()
+                                      ? formatFriendlyDate(booking.createdAt)
                                       : "N/A"}
                                   </span>
                                 </div>

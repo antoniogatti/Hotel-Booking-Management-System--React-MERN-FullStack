@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMutation } from "react-query";
 import * as apiClient from "../api-client";
 import useAppContext from "../hooks/useAppContext";
+import { formatFriendlyDate } from "../lib/utils";
 
 type CheckoutState = {
   guestDetails: {
@@ -13,6 +14,7 @@ type CheckoutState = {
     phone: string;
     city: string;
     country: string;
+    nationality: string;
     specialRequests?: string;
     arrivalTime: "Morning" | "Afternoon" | "Evening" | "Night";
     coupon?: string;
@@ -77,16 +79,30 @@ const Checkout = () => {
         const responseMessage = axiosError.response?.data?.message;
         const duplicateReservationNumber = axiosError.response?.data?.reservationNumber;
 
-        if (axiosError.response?.status === 409 && duplicateReservationNumber) {
-          setReservationNumber(duplicateReservationNumber);
-          setSubmissionError(
-            `${responseMessage || "A duplicate booking request was already submitted."} Existing booking reference: ${duplicateReservationNumber}.`
-          );
-          showToast({
-            title: "Booking Already Submitted",
-            description: `Existing booking reference ${duplicateReservationNumber}.`,
-            type: "INFO",
-          });
+        if (axiosError.response?.status === 409) {
+          if (duplicateReservationNumber) {
+            setReservationNumber(duplicateReservationNumber);
+            setSubmissionError(
+              `${responseMessage || "A conflicting booking already exists for these dates."} Existing booking reference: ${duplicateReservationNumber}.`
+            );
+            showToast({
+              title: "Room Not Available",
+              description: `Conflicting booking reference ${duplicateReservationNumber}.`,
+              type: "INFO",
+            });
+          } else {
+            setSubmissionError(
+              responseMessage ||
+                "This room is not available for the selected dates because another booking overlaps."
+            );
+            showToast({
+              title: "Room Not Available",
+              description:
+                responseMessage ||
+                "Please select different dates.",
+              type: "INFO",
+            });
+          }
           return;
         }
 
@@ -122,8 +138,8 @@ const Checkout = () => {
     const checkIn = new Date(bookingDetails.checkIn);
     const checkOut = new Date(bookingDetails.checkOut);
     return {
-      checkIn: checkIn.toLocaleDateString(),
-      checkOut: checkOut.toLocaleDateString(),
+      checkIn: formatFriendlyDate(checkIn),
+      checkOut: formatFriendlyDate(checkOut),
     };
   }, [bookingDetails.checkIn, bookingDetails.checkOut]);
 
@@ -136,6 +152,7 @@ const Checkout = () => {
       phone: guestDetails.phone,
       city: guestDetails.city,
       country: guestDetails.country,
+      nationality: guestDetails.nationality,
       specialRequests: guestDetails.specialRequests,
       arrivalTime: guestDetails.arrivalTime,
       coupon: guestDetails.coupon,
@@ -170,6 +187,7 @@ const Checkout = () => {
           <div className="space-y-3">
             <p><strong>Guests:</strong> {bookingDetails.adultCount} Adults, {bookingDetails.childCount} Children</p>
             <p><strong>Location:</strong> {guestDetails.city}, {guestDetails.country}</p>
+            <p><strong>Nationality:</strong> {guestDetails.nationality}</p>
             <p><strong>Total Price:</strong> EUR {bookingDetails.totalPrice}</p>
           </div>
         </div>

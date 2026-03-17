@@ -37,6 +37,19 @@ const calculateNights = (checkIn: Date, checkOut: Date) => {
   return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 };
 
+const findOverlappingBooking = async (params: {
+  hotelId: string;
+  checkIn: Date;
+  checkOut: Date;
+}) => {
+  return Booking.findOne({
+    hotelId: params.hotelId,
+    status: { $in: ["pending", "confirmed", "arrived", "completed"] },
+    checkIn: { $lt: params.checkOut },
+    checkOut: { $gt: params.checkIn },
+  }).select("_id reservationNumber status checkIn checkOut");
+};
+
 router.get("/search", async (req: Request, res: Response) => {
   try {
     const query = constructSearchQuery(req.query);
@@ -124,6 +137,7 @@ router.post(
     body("phone").trim().notEmpty().withMessage("Phone is required"),
     body("city").trim().notEmpty().withMessage("City is required"),
     body("country").trim().notEmpty().withMessage("Country is required"),
+    body("nationality").trim().notEmpty().withMessage("Nationality is required"),
     body("adultCount").isInt({ min: 1 }).withMessage("Adult count is required"),
     body("childCount").isInt({ min: 0 }).withMessage("Child count must be 0 or greater"),
     body("checkIn").isISO8601().withMessage("Check-in date is invalid"),
@@ -168,6 +182,22 @@ router.post(
         });
       }
 
+      const overlappingBooking = await findOverlappingBooking({
+        hotelId,
+        checkIn,
+        checkOut,
+      });
+
+      if (overlappingBooking) {
+        return res.status(409).json({
+          message:
+            "This room is not available for the selected dates because there is already a booking/request in the same period.",
+          bookingId: overlappingBooking._id,
+          reservationNumber: overlappingBooking.reservationNumber,
+          conflictStatus: overlappingBooking.status,
+        });
+      }
+
       const duplicateThreshold = new Date(Date.now() - DUPLICATE_BOOKING_WINDOW_MS);
       const existingRecentBooking = await Booking.findOne({
         hotelId,
@@ -198,6 +228,10 @@ router.post(
         lastName: req.body.lastName,
         email: normalizedEmail,
         phone: req.body.phone,
+        city: req.body.city,
+        country: req.body.country,
+        arrivalTime: req.body.arrivalTime,
+        nationality: req.body.nationality,
         adultCount: Number(req.body.adultCount),
         childCount: Number(req.body.childCount),
         checkIn,
@@ -225,6 +259,7 @@ router.post(
           phone: req.body.phone,
           city: req.body.city,
           country: req.body.country,
+          nationality: req.body.nationality,
           checkIn: checkIn.toISOString(),
           checkOut: checkOut.toISOString(),
           adultCount: Number(req.body.adultCount),
@@ -319,6 +354,33 @@ router.post(
       if (paymentIntent.status !== "succeeded") {
         return res.status(400).json({
           message: `payment intent not succeeded. Status: ${paymentIntent.status}`,
+        });
+      }
+
+      const checkIn = new Date(req.body.checkIn);
+      const checkOut = new Date(req.body.checkOut);
+
+      if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
+        return res.status(400).json({ message: "Invalid booking dates" });
+      }
+
+      if (checkOut <= checkIn) {
+        return res.status(400).json({ message: "Check-out must be after check-in" });
+      }
+
+      const overlappingBooking = await findOverlappingBooking({
+        hotelId: req.params.hotelId,
+        checkIn,
+        checkOut,
+      });
+
+      if (overlappingBooking) {
+        return res.status(409).json({
+          message:
+            "This room is not available for the selected dates because there is already a booking/request in the same period.",
+          bookingId: overlappingBooking._id,
+          reservationNumber: overlappingBooking.reservationNumber,
+          conflictStatus: overlappingBooking.status,
         });
       }
 
