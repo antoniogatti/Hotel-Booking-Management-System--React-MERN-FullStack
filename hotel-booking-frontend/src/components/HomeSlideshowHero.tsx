@@ -14,6 +14,16 @@ const HomeSlideshowHero = () => {
   const navigate = useNavigate();
   const search = useSearchContext();
 
+  const minDate = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  }, []);
+
+  const initialCheckIn = search.checkIn < minDate ? minDate : search.checkIn;
+  const initialCheckOut =
+    search.checkOut < initialCheckIn ? initialCheckIn : search.checkOut;
+
   const slides: Slide[] = useMemo(
     () => [
       {
@@ -37,8 +47,8 @@ const HomeSlideshowHero = () => {
   );
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [checkIn, setCheckIn] = useState<Date>(search.checkIn);
-  const [checkOut, setCheckOut] = useState<Date>(search.checkOut);
+  const [checkIn, setCheckIn] = useState<Date | null>(initialCheckIn);
+  const [checkOut, setCheckOut] = useState<Date | null>(initialCheckOut);
   const [guests, setGuests] = useState<number>(Math.max(1, search.adultCount));
 
   useEffect(() => {
@@ -51,14 +61,14 @@ const HomeSlideshowHero = () => {
     return () => window.clearInterval(timer);
   }, [slides.length]);
 
-  const minDate = new Date();
-
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
 
-    const normalizedCheckOut = checkOut < checkIn ? checkIn : checkOut;
+    const normalizedCheckIn = checkIn && checkIn >= minDate ? checkIn : minDate;
+    const normalizedCheckOut =
+      checkOut && checkOut >= normalizedCheckIn ? checkOut : normalizedCheckIn;
 
-    search.saveSearchValues("", checkIn, normalizedCheckOut, guests, 0);
+    search.saveSearchValues("", normalizedCheckIn, normalizedCheckOut, guests, 0);
 
     if (siteConfig.singlePropertyMode) {
       navigate("/rooms");
@@ -86,14 +96,11 @@ const HomeSlideshowHero = () => {
 
         <div className="relative z-10 mx-auto flex h-full max-w-8xl items-center justify-center px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <p className="mb-2 text-sm uppercase tracking-[0.35em] text-[#f4d6cd] sm:text-base">
-              Palazzo Pinto
-            </p>
             <h1 className="font-serif text-5xl font-semibold leading-none text-white sm:text-6xl lg:text-7xl">
-              Welcome
+              Palazzo Pinto
             </h1>
             <p className="mt-5 text-lg font-medium text-white/95 sm:text-2xl">
-              {siteConfig.brand.tagline}
+              Dimore di viaggio
             </p>
           </div>
         </div>
@@ -135,39 +142,28 @@ const HomeSlideshowHero = () => {
       <div className="relative z-20 mx-auto -mt-10 max-w-5xl px-4 pb-6 sm:px-6 lg:px-8">
         <form
           onSubmit={handleSubmit}
-          className="grid gap-3 rounded-md bg-white p-4 shadow-large md:grid-cols-[1.1fr_1.1fr_0.9fr_1fr] md:gap-4 md:p-5"
+          className="grid gap-3 rounded-md bg-white p-4 shadow-large md:grid-cols-[1.5fr_0.8fr_1fr] md:gap-4 md:p-5"
         >
-          <label htmlFor="hero-checkin" className="sr-only">
-            Check-in date
+          <label htmlFor="hero-stay-period" className="sr-only">
+            Stay period
           </label>
           <DatePicker
-            id="hero-checkin"
+            id="hero-stay-period"
             selected={checkIn}
-            onChange={(date) => setCheckIn((date as Date) || minDate)}
-            selectsStart
+            onChange={(dates) => {
+              const [start, end] = dates as [Date | null, Date | null];
+              setCheckIn(start);
+              setCheckOut(end);
+            }}
+            selectsRange
             startDate={checkIn}
             endDate={checkOut}
             minDate={minDate}
-            placeholderText="Check In"
+            monthsShown={2}
+            shouldCloseOnSelect={false}
+            placeholderText="Check In -> Check Out"
             className="h-12 w-full rounded-sm border border-[#d9ddd3] px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c] focus-visible:ring-2 focus-visible:ring-[#aab09a]"
-            wrapperClassName="w-full"
-            dateFormat="dd/MM/yyyy"
-          />
-
-          <label htmlFor="hero-checkout" className="sr-only">
-            Check-out date
-          </label>
-          <DatePicker
-            id="hero-checkout"
-            selected={checkOut}
-            onChange={(date) => setCheckOut((date as Date) || checkIn)}
-            selectsEnd
-            startDate={checkIn}
-            endDate={checkOut}
-            minDate={checkIn}
-            placeholderText="Check Out"
-            className="h-12 w-full rounded-sm border border-[#d9ddd3] px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c] focus-visible:ring-2 focus-visible:ring-[#aab09a]"
-            wrapperClassName="w-full"
+            wrapperClassName="w-full md:col-start-1 md:row-start-1"
             dateFormat="dd/MM/yyyy"
           />
 
@@ -178,7 +174,7 @@ const HomeSlideshowHero = () => {
             id="hero-guests"
             value={guests}
             onChange={(event) => setGuests(parseInt(event.target.value, 10))}
-            className="h-12 w-full rounded-sm border border-[#d9ddd3] bg-white px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c] focus-visible:ring-2 focus-visible:ring-[#aab09a]"
+            className="h-12 w-full rounded-sm border border-[#d9ddd3] bg-white px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c] focus-visible:ring-2 focus-visible:ring-[#aab09a] md:col-start-2 md:row-start-1"
           >
             {Array.from({ length: 8 }, (_, i) => i + 1).map((count) => (
               <option key={count} value={count}>
@@ -189,7 +185,7 @@ const HomeSlideshowHero = () => {
 
           <button
             type="submit"
-            className="h-12 rounded-sm bg-[#ea836c] px-6 text-sm font-semibold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#db755f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+            className="h-12 rounded-sm bg-[#ea836c] px-6 text-sm font-semibold uppercase tracking-[0.08em] text-white transition-colors hover:bg-[#db755f] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-white md:col-start-3 md:row-start-1"
           >
             Check Availability
           </button>

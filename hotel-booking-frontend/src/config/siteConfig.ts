@@ -1,12 +1,12 @@
 export const siteConfig = {
   app: {
-    version: "1.3.0",
-    releaseDate: "2026-03-15",
+    version: "1.6.0",
+    releaseDate: "2026-03-18",
   },
   singlePropertyMode: true,
   brand: {
     shortName: "Palazzo Pinto B&B",
-    fullName: "Palazzo Pinto Bed and Breakfast",
+    fullName: "Palazzo Pinto B&B",
     tagline: "Where the sounds, scents and emotions of the past echo",
     logoPath: "/common/LOGO+PAYOFF_PalazzoPinto.svg",
   },

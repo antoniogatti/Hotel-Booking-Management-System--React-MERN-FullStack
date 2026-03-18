@@ -96,7 +96,7 @@ const ContactUs = () => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           <div className="lg:col-span-5 bg-white border border-[#e7e9df] rounded-2xl p-6 sm:p-8 shadow-soft">
             <p className="uppercase tracking-[0.25em] text-[#ea836c] text-xs font-semibold mb-3">
-              Palazzo Pinto B&B
+              Palazzo Pinto
             </p>
             <h1 className="text-3xl sm:text-4xl font-serif text-[#2b4463] leading-tight mb-4">
               Contact Us

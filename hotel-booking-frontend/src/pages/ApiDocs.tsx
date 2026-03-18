@@ -49,15 +49,15 @@ const ApiDocs = () => {
       category: "Hotels",
       icon: <FileText className="w-5 h-5" />,
       endpoints: [
-        { method: "GET", path: "/api/hotels", description: "Get all hotels" },
+        { method: "GET", path: "/api/rooms", description: "Get all hotels" },
         {
           method: "GET",
-          path: "/api/hotels/search",
+          path: "/api/rooms/search",
           description: "Search hotels",
         },
         {
           method: "GET",
-          path: "/api/hotels/:id",
+          path: "/api/rooms/:id",
           description: "Get hotel by ID",
         },
         { method: "POST", path: "/api/my-hotels", description: "Add hotel" },
@@ -84,7 +84,7 @@ const ApiDocs = () => {
       endpoints: [
         {
           method: "POST",
-          path: "/api/hotels/:id/bookings",
+          path: "/api/rooms/:id/bookings",
           description: "Create booking",
         },
         {
@@ -94,7 +94,7 @@ const ApiDocs = () => {
         },
         {
           method: "POST",
-          path: "/api/hotels/:id/bookings/payment-intent",
+          path: "/api/rooms/:id/bookings/payment-intent",
           description: "Create payment intent",
         },
       ],
@@ -156,7 +156,7 @@ const ApiDocs = () => {
             API Documentation
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Comprehensive documentation for the Palazzo Pinto B&B API. Explore
+            Comprehensive documentation for the Palazzo Pinto API. Explore
             endpoints, understand authentication, and integrate with our
             services.
           </p>

@@ -81,7 +81,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
 
         const apiBaseUrl =
           import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-        const response = await fetch(`${apiBaseUrl}/api/hotels`);
+        const response = await fetch(`${apiBaseUrl}/api/rooms`);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);

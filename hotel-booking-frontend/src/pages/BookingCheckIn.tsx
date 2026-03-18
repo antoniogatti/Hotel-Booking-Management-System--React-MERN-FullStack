@@ -183,7 +183,7 @@ const BookingCheckIn = () => {
   }
 
   const mailSubject = encodeURIComponent(
-    `Palazzo Pinto B&B Brindisi - ${booking.reservationNumber || "Booking"}`
+    `Palazzo Pinto Brindisi - ${booking.reservationNumber || "Booking"}`
   );
   const whatsappHref = `https://wa.me/${(formData.phone || "").replace(/\D/g, "")}`;
   const ms = new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime();

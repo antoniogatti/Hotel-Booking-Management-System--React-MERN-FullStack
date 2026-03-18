@@ -1,9 +1,6 @@
-import { Link } from "react-router-dom";
+﻿import { Link } from "react-router-dom";
 import { HotelType } from "../../../shared/types";
 import {
-  MapPin,
-  Building2,
-  Users,
   Wifi,
   Car,
   Waves,
@@ -12,19 +9,20 @@ import {
   UtensilsCrossed,
   Coffee,
   Plane,
-  Building,
+  Building2,
+  ChevronRight,
 } from "lucide-react";
-import { Badge } from "./ui/badge";
 
 type Props = {
   hotel: HotelType;
+  viewMode?: "list" | "grid";
 };
 
-const SearchResultsCard = ({ hotel }: Props) => {
+const SearchResultsCard = ({ hotel, viewMode = "list" }: Props) => {
   const detailPath = `/detail/${hotel._id}`;
 
   const getFacilityIcon = (facility: string) => {
-    const iconMap: { [key: string]: any } = {
+    const iconMap: Record<string, React.ElementType> = {
       "Free WiFi": Wifi,
       "Free Parking": Car,
       "Swimming Pool": Waves,
@@ -33,125 +31,149 @@ const SearchResultsCard = ({ hotel }: Props) => {
       Restaurant: UtensilsCrossed,
       "Bar/Lounge": Coffee,
       "Airport Shuttle": Plane,
-      "Business Center": Building,
     };
     return iconMap[facility] || Building2;
   };
 
-  return (
-    <Link
-      to={detailPath}
-      className="group block bg-white rounded-2xl shadow-soft hover:shadow-large transition-all duration-300 border border-gray-100 overflow-hidden h-auto xl:h-[500px]"
-    >
-      <div className="grid grid-cols-1 xl:grid-cols-[2fr_3fr] gap-0 w-full h-full">
-        {/* Image Section */}
-        <div className="relative overflow-hidden h-64 xl:h-[500px]">
+  if (viewMode === "grid") {
+    return (
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+        {/* Image */}
+        <Link to={detailPath} className="block relative overflow-hidden h-52 flex-shrink-0">
           <img
             src={hotel.imageUrls[0]}
-            className="w-full h-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
+            alt={hotel.name}
+            className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
           />
-
-          {/* Overlay Badges */}
-          <div className="absolute top-4 left-4 flex flex-col space-y-2">
-            <div className="bg-primary-600 text-white rounded-full px-3 py-1">
-              <span className="text-sm font-bold">{hotel.pricePerNight}</span>
-            </div>
-            {hotel.isFeatured && (
-              <div className="bg-yellow-500 text-white rounded-full px-3 py-1">
-                <span className="text-xs font-bold">Featured</span>
-              </div>
-            )}
+          <div className="absolute bottom-0 right-0 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-tl-lg text-sm font-bold text-[#2b4463]">
+            €{hotel.pricePerNight}<span className="text-xs font-normal text-gray-500"> /night</span>
           </div>
+        </Link>
 
+        {/* Content */}
+        <div className="p-4 flex flex-col flex-1">
+          <Link
+            to={detailPath}
+            className="text-base font-bold text-[#2b4463] hover:text-[#ea836c] transition-colors leading-snug mb-2"
+          >
+            {hotel.name}
+          </Link>
 
-        </div>
+          <p className="text-sm text-gray-500 line-clamp-3 flex-1 mb-3">
+            {hotel.description}
+          </p>
 
-        {/* Content Section */}
-        <div className="p-6 flex flex-col justify-between h-auto xl:h-full overflow-hidden">
-          <div className="space-y-4 overflow-y-auto xl:flex-1">
-            {/* Header */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <div className="flex flex-wrap gap-1">
-                    {Array.isArray(hotel.type) ? (
-                      hotel.type.slice(0, 4).map((type) => (
-                        <Badge
-                          key={type}
-                          variant="default"
-                          className="text-xs px-2 py-1"
-                        >
-                          {type}
-                        </Badge>
-                      ))
-                    ) : (
-                      <Badge variant="default" className="text-xs px-2 py-1">
-                        {hotel.type}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <h3 className="text-2xl font-bold text-gray-900 group-hover:text-primary-600 transition-colors cursor-pointer">
-                {hotel.name}
-              </h3>
-
-              <div className="flex items-center text-gray-600">
-                <MapPin className="w-4 h-4 mr-1" />
-                <span className="text-sm">
-                  {hotel.city}, {hotel.country}
-                </span>
-              </div>
-            </div>
-
-            {/* Description */}
-            <div className="text-gray-600 leading-relaxed line-clamp-3">
-              {hotel.description}
-            </div>
-
-            {/* Hotel Stats */}
-            <div className="flex items-center space-x-6 text-sm text-gray-600">
-              {hotel.totalBookings && (
-                <div className="flex items-center space-x-1">
-                  <Users className="w-4 h-4" />
-                  <span>{hotel.totalBookings} bookings</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Facilities */}
-          <div className="mt-6">
-            <h4 className="text-sm font-semibold text-gray-700 mb-3">
-              Key Amenities
-            </h4>
-            <div className="flex flex-wrap gap-2">
-              {hotel.facilities.slice(0, 6).map((facility) => {
-                const IconComponent = getFacilityIcon(facility);
+          {/* Facility icons */}
+          {hotel.facilities.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-4">
+              {hotel.facilities.slice(0, 5).map((facility) => {
+                const Icon = getFacilityIcon(facility);
                 return (
-                  <Badge
+                  <span
                     key={facility}
-                    variant="outline"
-                    className="flex items-center space-x-1.5 px-3 py-1.5 text-xs"
+                    title={facility}
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
                   >
-                    <IconComponent className="w-3 h-3 text-primary-600" />
-                    <span>{facility}</span>
-                  </Badge>
+                    <Icon className="w-3.5 h-3.5" />
+                  </span>
                 );
               })}
             </div>
-          </div>
+          )}
 
-          {/* Action Button */}
-          <div className="mt-6 pt-4 border-t border-gray-100">
-            <div className="w-full bg-gradient-to-r from-primary-600 to-primary-700 text-white py-3 px-6 rounded-xl font-semibold hover:from-primary-700 hover:to-primary-800 transform hover:scale-105 transition-all duration-200 text-center block">
-              View Details & Book
-            </div>
+          {/* Actions */}
+          <div className="mt-auto space-y-2">
+            <Link
+              to={detailPath}
+              className="block w-full text-center bg-[#ea836c] hover:bg-[#d9725d] text-white text-sm font-semibold py-2 rounded-lg transition-colors tracking-wide uppercase"
+            >
+              Book Now
+            </Link>
+            <Link
+              to={detailPath}
+              className="flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-[#ea836c] transition-colors"
+            >
+              Availability &amp; Details <ChevronRight className="w-3 h-3" />
+            </Link>
           </div>
         </div>
       </div>
-    </Link>
+    );
+  }
+
+  // ── List view (default) ──
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col sm:flex-row">
+      {/* Image */}
+      <Link
+        to={detailPath}
+        className="relative flex-shrink-0 overflow-hidden h-52 sm:h-auto sm:w-52"
+      >
+        <img
+          src={hotel.imageUrls[0]}
+          alt={hotel.name}
+          className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+        />
+      </Link>
+
+      {/* Main content */}
+      <div className="flex flex-1 flex-col sm:flex-row min-w-0">
+        {/* Text */}
+        <div className="flex-1 p-4 min-w-0">
+          <Link
+            to={detailPath}
+            className="text-lg font-bold text-[#2b4463] hover:text-[#ea836c] transition-colors leading-snug block mb-1.5"
+          >
+            {hotel.name}
+          </Link>
+
+          <p className="text-sm text-gray-500 line-clamp-4 mb-3">
+            {hotel.description}
+          </p>
+
+          {/* Facility icons */}
+          {hotel.facilities.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {hotel.facilities.slice(0, 6).map((facility) => {
+                const Icon = getFacilityIcon(facility);
+                return (
+                  <span
+                    key={facility}
+                    title={facility}
+                    className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Price + actions panel */}
+        <div className="flex sm:flex-col items-center sm:items-stretch justify-between sm:justify-center gap-3 px-4 pb-4 sm:py-4 sm:w-40 sm:border-l sm:border-gray-100 flex-shrink-0">
+          <div className="text-center">
+            <span className="text-2xl font-extrabold text-[#2b4463]">€{hotel.pricePerNight}</span>
+            <p className="text-xs text-gray-400 leading-none">per night</p>
+          </div>
+
+          <div className="space-y-2 w-full">
+            <Link
+              to={detailPath}
+              className="block w-full text-center bg-[#ea836c] hover:bg-[#d9725d] text-white text-xs font-semibold py-2 rounded-lg transition-colors tracking-wide uppercase"
+            >
+              Book Now
+            </Link>
+            <Link
+              to={detailPath}
+              className="flex items-center justify-center gap-0.5 text-xs text-gray-500 hover:text-[#ea836c] transition-colors"
+            >
+              Availability &amp; Details <ChevronRight className="w-3 h-3" />
+            </Link>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

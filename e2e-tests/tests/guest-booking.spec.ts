@@ -5,7 +5,7 @@ const API_URL = "http://localhost:5000";
 const TEST_EMAIL = "antoniogatti+palazzopintotest@gmail.com";
 
 test("should complete the guest booking flow and surface a booking reference", async ({ page, request }) => {
-  const hotelsResponse = await request.get(`${API_URL}/api/hotels`);
+  const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();
 
   const hotels = (await hotelsResponse.json()) as Array<{
@@ -62,7 +62,7 @@ test("should complete the guest booking flow and surface a booking reference", a
 });
 
 test("should complete guest booking for 2 adults for 2 nights", async ({ page, request }) => {
-  const hotelsResponse = await request.get(`${API_URL}/api/hotels`);
+  const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();
 
   const hotels = (await hotelsResponse.json()) as Array<{
@@ -120,7 +120,7 @@ test("should complete guest booking for 2 adults for 2 nights", async ({ page, r
 });
 
 test("should reject a repeated guest booking request in the duplicate protection window", async ({ request }) => {
-  const hotelsResponse = await request.get(`${API_URL}/api/hotels`);
+  const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();
 
   const hotels = (await hotelsResponse.json()) as Array<{
@@ -182,7 +182,7 @@ test("should reject a repeated guest booking request in the duplicate protection
       totalCost: 0,
     };
 
-    const candidateResponse = await request.post(`${API_URL}/api/hotels/${hotel._id}/booking-request`, {
+    const candidateResponse = await request.post(`${API_URL}/api/rooms/${hotel._id}/booking-request`, {
       data: candidatePayload,
     });
 
@@ -205,7 +205,7 @@ test("should reject a repeated guest booking request in the duplicate protection
   const firstBody = await firstResponse!.json();
   expect(firstBody.reservationNumber).toMatch(/^PP-\d{8}-[A-F0-9]{6}$/);
 
-  const duplicateResponse = await request.post(`${API_URL}/api/hotels/${hotel._id}/booking-request`, {
+  const duplicateResponse = await request.post(`${API_URL}/api/rooms/${hotel._id}/booking-request`, {
     data: payload!,
   });
   expect(duplicateResponse.status()).toBe(409);
@@ -215,7 +215,7 @@ test("should reject a repeated guest booking request in the duplicate protection
 });
 
 test("should complete guest booking for 2 adults and 2 children for 4 nights in the week after current week", async ({ page, request }) => {
-  const hotelsResponse = await request.get(`${API_URL}/api/hotels`);
+  const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();
 
   const hotels = (await hotelsResponse.json()) as Array<{

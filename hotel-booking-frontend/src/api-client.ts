@@ -192,17 +192,17 @@ export const searchHotels = async (
   searchParams.types?.forEach((type) => queryParams.append("types", type));
   searchParams.stars?.forEach((star) => queryParams.append("stars", star));
 
-  const response = await axiosInstance.get(`/api/hotels/search?${queryParams}`);
+  const response = await axiosInstance.get(`/api/rooms/search?${queryParams}`);
   return response.data;
 };
 
 export const fetchHotels = async (): Promise<HotelType[]> => {
-  const response = await axiosInstance.get("/api/hotels");
+  const response = await axiosInstance.get("/api/rooms");
   return response.data;
 };
 
 export const fetchHotelById = async (hotelId: string): Promise<HotelType> => {
-  const response = await axiosInstance.get(`/api/hotels/${hotelId}`);
+  const response = await axiosInstance.get(`/api/rooms/${hotelId}`);
   return response.data;
 };
 
@@ -211,7 +211,7 @@ export const createPaymentIntent = async (
   numberOfNights: string
 ): Promise<PaymentIntentResponse> => {
   const response = await axiosInstance.post(
-    `/api/hotels/${hotelId}/bookings/payment-intent`,
+    `/api/rooms/${hotelId}/bookings/payment-intent`,
     { numberOfNights }
   );
   return response.data;
@@ -219,7 +219,7 @@ export const createPaymentIntent = async (
 
 export const createRoomBooking = async (formData: BookingFormData) => {
   const response = await axiosInstance.post(
-    `/api/hotels/${formData.hotelId}/bookings`,
+    `/api/rooms/${formData.hotelId}/bookings`,
     formData
   );
   return response.data;
@@ -372,7 +372,7 @@ export const submitBookingRequest = async (
   payload: BookingRequestPayload
 ): Promise<BookingRequestResponse> => {
   const response = await axiosInstance.post(
-    `/api/hotels/${payload.hotelId}/booking-request`,
+    `/api/rooms/${payload.hotelId}/booking-request`,
     payload
   );
   return response.data;

@@ -1,5 +1,24 @@
 # Version History
 
+## 1.6.0 - 2026-03-18
+
+### API Route Alignment
+- Renamed public room endpoints from `/api/hotels` to `/api/rooms` across frontend, backend, and API docs.
+- Updated backend route registration and payment-intent limiter paths to the new `/api/rooms` namespace.
+- Updated E2E guest-booking tests to reflect the new room API route.
+
+### Search and Room Listing UX Refresh
+- Redesigned search results page with a booking-details sidebar, date range picker, guest counters, sorting, and list/grid toggles.
+- Reworked search result cards to support dedicated list and grid layouts with streamlined booking CTAs.
+
+### Room Detail Layout Refresh
+- Redesigned room detail page into a responsive two-column layout with gallery and room content on the left and booking widget on the right.
+- Updated booking sidebar form styling while preserving existing booking logic and validation behavior.
+- Refined responsive behavior and removed decorative sidebar image to keep focus on booking actions.
+
+### Validation
+- Verified TypeScript diagnostics for updated detail/search/booking components after layout and API route changes.
+
 ## 1.5.0 - 2026-03-17
 
 ### Booking Operations and Backoffice Management

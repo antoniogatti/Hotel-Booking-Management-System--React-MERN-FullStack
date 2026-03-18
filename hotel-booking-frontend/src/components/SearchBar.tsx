@@ -1,4 +1,4 @@
-import { FormEvent, useState, useEffect, useRef } from "react";
+import { FormEvent, useState, useEffect, useRef, useMemo } from "react";
 import useSearchContext from "../hooks/useSearchContext";
 import { MdTravelExplore } from "react-icons/md";
 import DatePicker from "react-datepicker";
@@ -14,13 +14,29 @@ const SearchBar = () => {
   const navigate = useNavigate();
   const search = useSearchContext();
 
+  const minDate = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  }, []);
+
+  const maxDate = useMemo(() => {
+    const nextYear = new Date(minDate);
+    nextYear.setFullYear(nextYear.getFullYear() + 1);
+    return nextYear;
+  }, [minDate]);
+
+  const initialCheckIn = search.checkIn < minDate ? minDate : search.checkIn;
+  const initialCheckOut =
+    search.checkOut < initialCheckIn ? initialCheckIn : search.checkOut;
+
   const [destination, setDestination] = useState<string>(search.destination);
   const [showDropdown, setShowDropdown] = useState(false);
   const [places, setPlaces] = useState<string[]>([]);
   const [filteredPlaces, setFilteredPlaces] = useState<string[]>([]);
   const [isLoadingPlaces, setIsLoadingPlaces] = useState(false);
-  const [checkIn, setCheckIn] = useState<Date>(search.checkIn);
-  const [checkOut, setCheckOut] = useState<Date>(search.checkOut);
+  const [checkIn, setCheckIn] = useState<Date | null>(initialCheckIn);
+  const [checkOut, setCheckOut] = useState<Date | null>(initialCheckOut);
   const [adultCount, setAdultCount] = useState<number>(search.adultCount);
   const [childCount, setChildCount] = useState<number>(search.childCount);
   const hasFetchedRef = useRef(false);
@@ -57,7 +73,7 @@ const SearchBar = () => {
 
         const apiBaseUrl =
           import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
-        const response = await fetch(`${apiBaseUrl}/api/hotels`);
+        const response = await fetch(`${apiBaseUrl}/api/rooms`);
 
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -138,8 +154,18 @@ const SearchBar = () => {
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
 
+    const normalizedCheckIn = checkIn && checkIn >= minDate ? checkIn : minDate;
+    const normalizedCheckOut =
+      checkOut && checkOut >= normalizedCheckIn ? checkOut : normalizedCheckIn;
+
     if (isSinglePropertyMode) {
-      search.saveSearchValues("", checkIn, checkOut, adultCount, childCount);
+      search.saveSearchValues(
+        "",
+        normalizedCheckIn,
+        normalizedCheckOut,
+        adultCount,
+        childCount
+      );
       navigate("/rooms");
       return;
     }
@@ -150,8 +176,8 @@ const SearchBar = () => {
       // Show all hotels when destination is empty
       search.saveSearchValues(
         "", // Empty destination to show all hotels
-        checkIn,
-        checkOut,
+        normalizedCheckIn,
+        normalizedCheckOut,
         adultCount,
         childCount
       );
@@ -177,8 +203,8 @@ const SearchBar = () => {
 
     search.saveSearchValues(
       destination.trim(),
-      checkIn,
-      checkOut,
+      normalizedCheckIn,
+      normalizedCheckOut,
       adultCount,
       childCount
     );
@@ -213,10 +239,6 @@ const SearchBar = () => {
     setIsInitialMount(false);
   };
 
-  const minDate = new Date();
-  const maxDate = new Date();
-  maxDate.setFullYear(maxDate.getFullYear() + 1);
-
   return (
     <Card className="p-4">
       <CardContent className="p-0">
@@ -224,8 +246,8 @@ const SearchBar = () => {
           onSubmit={handleSubmit}
           className={`grid grid-cols-1 sm:grid-cols-2 ${
             isSinglePropertyMode
-              ? "lg:grid-cols-3 2xl:grid-cols-4"
-              : "lg:grid-cols-3 2xl:grid-cols-5"
+              ? "lg:grid-cols-3"
+              : "lg:grid-cols-4"
           } items-center gap-4`}
           autoComplete="off"
         >
@@ -279,27 +301,21 @@ const SearchBar = () => {
           <div className="sm:col-span-1">
             <DatePicker
               selected={checkIn}
-              onChange={(date) => setCheckIn(date as Date)}
-              selectsStart
+              onChange={(dates) => {
+                const [start, end] = dates as [Date | null, Date | null];
+                setCheckIn(start);
+                setCheckOut(end);
+              }}
+              selectsRange
               startDate={checkIn}
               endDate={checkOut}
               minDate={minDate}
               maxDate={maxDate}
-              placeholderText="Check-in Date"
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              wrapperClassName="min-w-full"
-            />
-          </div>
-          <div className="sm:col-span-1">
-            <DatePicker
-              selected={checkOut}
-              onChange={(date) => setCheckOut(date as Date)}
-              selectsStart
-              startDate={checkIn}
-              endDate={checkOut}
-              minDate={minDate}
-              maxDate={maxDate}
-              placeholderText="Check-out Date"
+              filterDate={(date) => date >= minDate}
+              monthsShown={2}
+              shouldCloseOnSelect={false}
+              placeholderText="Check In -> Check Out"
+              dateFormat="dd/MM/yyyy"
               className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               wrapperClassName="min-w-full"
             />

@@ -98,7 +98,7 @@ const paymentLimiter = rateLimit({
 });
 
 app.use("/api/", generalLimiter);
-app.use("/api/hotels/*/bookings/payment-intent", paymentLimiter);
+app.use("/api/rooms/*/bookings/payment-intent", paymentLimiter);
 
 // Compression middleware
 app.use(compression());
@@ -208,7 +208,7 @@ app.get("/", (req: Request, res: Response) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/my-hotels", myHotelRoutes);
-app.use("/api/hotels", hotelRoutes);
+app.use("/api/rooms", hotelRoutes);
 app.use("/api/my-bookings", bookingRoutes);
 app.use("/api/bookings", bookingsManagementRoutes);
 app.use("/api/health", healthRoutes);

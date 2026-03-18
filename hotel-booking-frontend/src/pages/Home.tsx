@@ -2,9 +2,9 @@ import HomeSlideshowHero from "../components/HomeSlideshowHero";
 
 const Home = () => {
   const storyParagraphs = [
-    "Palazzo Pinto Bed and Breakfast is a prestigious residence where the sounds, scents and emotions of the past echo. Built in 1901, the house has been created thanks to the pioneering adventures and efforts of his original owner Giuseppe, a brilliant wine exporter that lived between Brindisi and El Cairo, where his commercial activities were based.",
+    "Palazzo Pinto is a prestigious residence where the sounds, scents and emotions of the past echo. Built in 1901, the house has been created thanks to the pioneering adventures and efforts of his original owner Giuseppe, a brilliant wine exporter that lived between Brindisi and El Cairo, where his commercial activities were based.",
     "Situated in the heart of Brindisi, Palazzo Pinto is nowadays a charmingly renovated boutique mansion that Giuseppe's grand-daughter converted in a modern and welcoming guest house provided with all kinds of comforts and facilities.",
-    "Moreover, Palazzo Pinto B&B is strategically located in a quiet position just 5 walking minutes from Central Station and few steps away from the most charming treasures and landmarks of the city.",
+    "Moreover, Palazzo Pinto is strategically located in a quiet position just 5 walking minutes from Central Station and few steps away from the most charming treasures and landmarks of the city.",
     "Brindisi is the perfect spot to start exploring the secular Mediterranean culture and the beauty of Puglian territory.",
   ];
 

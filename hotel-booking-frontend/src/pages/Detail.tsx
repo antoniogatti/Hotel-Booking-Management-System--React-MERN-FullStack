@@ -1,9 +1,8 @@
-import { useParams } from "react-router-dom";
+﻿import { useParams } from "react-router-dom";
 import { useQueryWithLoading } from "../hooks/useLoadingHooks";
 import * as apiClient from "./../api-client";
 import GuestInfoForm from "../forms/GuestInfoForm/GuestInfoForm";
 import FancyboxGallery from "../components/FancyboxGallery";
-import { Badge } from "../components/ui/badge";
 import {
   Clock,
   Car,
@@ -13,6 +12,10 @@ import {
   Sparkles,
   Plane,
   Building2,
+  Users,
+  BedDouble,
+  Maximize2,
+  CalendarDays,
 } from "lucide-react";
 
 const Detail = () => {
@@ -81,120 +84,117 @@ const Detail = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">{hotel.name}</h1>
+    <div className="mx-auto w-full max-w-[1380px] space-y-8">
+      {/* Two-column: content LEFT / booking widget RIGHT */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 xl:gap-8 items-start">
 
-        {/* Hotel Stats */}
-        {((hotel.totalBookings && hotel.totalBookings > 0) ||
-          (hotel.totalRevenue && hotel.totalRevenue > 0) ||
-          hotel.isFeatured) && (
-          <div className="flex gap-4 mt-4">
-            {hotel.totalBookings && hotel.totalBookings > 0 && (
-              <Badge variant="outline">{hotel.totalBookings} bookings</Badge>
-            )}
-            {hotel.totalRevenue && hotel.totalRevenue > 0 && (
-              <Badge variant="outline">
-                {hotel.totalRevenue.toLocaleString()} revenue
-              </Badge>
-            )}
-            {hotel.isFeatured && (
-              <Badge className="bg-yellow-100 text-yellow-800">Featured</Badge>
-            )}
-          </div>
-        )}
+        {/* LEFT column */}
+        <div className="min-w-0 lg:col-span-8 xl:col-span-9">
+          <h1 className="text-2xl font-bold text-[#2b4463] mb-4">{hotel.name}</h1>
 
-        {/* Hotel Types */}
-        {hotel.type && hotel.type.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-4">
-            {hotel.type.map((type, index) => (
-              <Badge
-                key={index}
-                variant="outline"
-                className="bg-blue-50 text-blue-700 border-blue-200"
-              >
-                {type}
-              </Badge>
-            ))}
-          </div>
-        )}
+          {/* Gallery: hero image + thumbnail strip */}
+          <FancyboxGallery images={hotel.imageUrls} title={hotel.name} />
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr] mt-6">
-          <div className="h-fit">
-            <GuestInfoForm
-              pricePerNight={hotel.pricePerNight}
-              hotelId={hotel._id}
-            />
-          </div>
-        </div>
-
-        {/* Room Highlights */}
-        {isFuocorosa && (
-          <div className="mt-6 border border-slate-300 rounded-lg p-4 bg-white">
-            <h3 className="text-xl font-semibold mb-3">Fuocorosa Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="rounded-md bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">
+          {/* Stats bar */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 border border-gray-200 divide-x divide-gray-200 rounded-b-lg bg-white -mt-px">
+            <div className="flex items-start gap-3 px-4 py-3">
+              <Users className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider leading-none mb-1">
                   Max. Guests
                 </p>
-                <p className="text-base font-semibold text-slate-900">
-                  4 Adults / 0 Children
+                <p className="text-sm font-semibold text-gray-800">
+                  {hotel.adultCount} Adults / {hotel.childCount} Children
                 </p>
-              </div>
-              <div className="rounded-md bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Booking Nights
-                </p>
-                <p className="text-base font-semibold text-slate-900">1 Min.</p>
-              </div>
-              <div className="rounded-md bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Bed Type
-                </p>
-                <p className="text-base font-semibold text-slate-900">Queen bed</p>
-              </div>
-              <div className="rounded-md bg-slate-50 p-3">
-                <p className="text-xs uppercase tracking-wide text-slate-500">
-                  Area
-                </p>
-                <p className="text-base font-semibold text-slate-900">60 m²</p>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Hotel Description */}
-        {(hotel.description || isFuocorosa) && (
-          <div className="mt-6">
-            <h3 className="text-xl font-semibold mb-3">
-              {isFuocorosa ? "Fuocorosa Overview" : "About This Hotel"}
-            </h3>
-            <p className="text-gray-700 leading-relaxed whitespace-pre-line">
-              {isFuocorosa ? fuocorosaDescription : hotel.description}
-            </p>
+            <div className="flex items-start gap-3 px-4 py-3">
+              <CalendarDays className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-xs text-gray-400 font-medium uppercase tracking-wider leading-none mb-1">
+                  Booking Nights
+                </p>
+                <p className="text-sm font-semibold text-gray-800">1 Min.</p>
+              </div>
+            </div>
+
+            {isFuocorosa ? (
+              <>
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <BedDouble className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider leading-none mb-1">
+                      Bed Type
+                    </p>
+                    <p className="text-sm font-semibold text-gray-800">Queen bed</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 px-4 py-3">
+                  <Maximize2 className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider leading-none mb-1">
+                      Area
+                    </p>
+                    <p className="text-sm font-semibold text-gray-800">60 m²</p>
+                  </div>
+                </div>
+              </>
+            ) : (
+              hotel.type && hotel.type.length > 0 && (
+                <div className="flex items-start gap-3 px-4 py-3 col-span-2">
+                  <BedDouble className="w-5 h-5 text-gray-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gray-400 font-medium uppercase tracking-wider leading-none mb-1">
+                      Room Type
+                    </p>
+                    <p className="text-sm font-semibold text-gray-800">
+                      {hotel.type.join(", ")}
+                    </p>
+                  </div>
+                </div>
+              )
+            )}
           </div>
-        )}
+
+          {/* Description */}
+          {(hotel.description || isFuocorosa) && (
+            <div className="mt-6">
+              <p className="text-gray-700 leading-relaxed whitespace-pre-line text-sm">
+                {isFuocorosa ? fuocorosaDescription : hotel.description}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT column: booking widget + decorative photo */}
+        <aside className="w-full lg:col-span-4 xl:col-span-3 lg:sticky lg:top-6">
+          <GuestInfoForm
+            pricePerNight={hotel.pricePerNight}
+            hotelId={hotel._id}
+          />
+        </aside>
       </div>
 
-      {/* Policies + Facilities */}
+      {/* Policies + Facilities (full width below) */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         {hotel.policies && (
-          <div className="border border-slate-300 rounded-lg p-4">
-            <h3 className="text-xl font-semibold mb-3">Hotel Policies</h3>
-            <div className="space-y-4">
+          <div className="border border-gray-200 rounded-lg bg-white p-5">
+            <h3 className="text-base font-semibold text-[#2b4463] mb-4">Hotel Policies</h3>
+            <div className="space-y-3">
               {(hotel.policies.checkInTime || hotel.policies.checkOutTime) && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {hotel.policies.checkInTime && (
-                    <div className="flex items-center gap-2 rounded-md bg-slate-50 p-2.5">
-                      <Clock className="w-4 h-4 text-gray-600" />
+                    <div className="flex items-center gap-2 rounded-md bg-slate-50 p-2.5 text-sm">
+                      <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
                       <span>
                         <strong>Check-in:</strong> {hotel.policies.checkInTime}
                       </span>
                     </div>
                   )}
                   {hotel.policies.checkOutTime && (
-                    <div className="flex items-center gap-2 rounded-md bg-slate-50 p-2.5">
-                      <Clock className="w-4 h-4 text-gray-600" />
+                    <div className="flex items-center gap-2 rounded-md bg-slate-50 p-2.5 text-sm">
+                      <Clock className="w-4 h-4 text-gray-500 flex-shrink-0" />
                       <span>
                         <strong>Check-out:</strong> {hotel.policies.checkOutTime}
                       </span>
@@ -203,48 +203,38 @@ const Detail = () => {
                 </div>
               )}
               {hotel.policies.cancellationPolicy && (
-                <div>
+                <p className="text-sm text-gray-700">
                   <strong>Cancellation:</strong> {hotel.policies.cancellationPolicy}
-                </div>
+                </p>
               )}
               {hotel.policies.petPolicy && (
-                <div>
+                <p className="text-sm text-gray-700">
                   <strong>Pet Policy:</strong> {hotel.policies.petPolicy}
-                </div>
+                </p>
               )}
               {hotel.policies.smokingPolicy && (
-                <div>
+                <p className="text-sm text-gray-700">
                   <strong>Smoking:</strong> {hotel.policies.smokingPolicy}
-                </div>
+                </p>
               )}
             </div>
           </div>
         )}
 
-        <div
-          className={`border border-slate-300 rounded-lg p-4 ${
-            !hotel.policies ? "xl:col-span-2" : ""
-          }`}
-        >
-          <h3 className="text-xl font-semibold mb-3">Room Facilities</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div className={`border border-gray-200 rounded-lg bg-white p-5 ${!hotel.policies ? "xl:col-span-2" : ""}`}>
+          <h3 className="text-base font-semibold text-[#2b4463] mb-4">Room Facilities</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {hotel.facilities.map((facility) => (
               <div
                 key={facility}
-                className="flex items-center gap-2 rounded-md bg-slate-50 p-2.5"
+                className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-sm text-gray-700"
               >
-                <div className="w-4 h-4 text-green-600">{getFacilityIcon(facility)}</div>
+                <span className="text-gray-500">{getFacilityIcon(facility)}</span>
                 <span>{facility}</span>
               </div>
             ))}
           </div>
         </div>
-      </div>
-
-      {/* Gallery - keep last in page */}
-      <div className="space-y-3">
-        <h3 className="text-2xl font-semibold">Gallery</h3>
-        <FancyboxGallery images={hotel.imageUrls} title={hotel.name} />
       </div>
     </div>
   );
