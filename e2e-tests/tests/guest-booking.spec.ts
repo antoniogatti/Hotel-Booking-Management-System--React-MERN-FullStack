@@ -4,41 +4,61 @@ const UI_URL = "http://localhost:5174";
 const API_URL = "http://localhost:5000";
 const TEST_EMAIL = "antoniogatti+palazzopintotest@gmail.com";
 
+type HotelRecord = {
+  _id: string;
+  name: string;
+  pricePerNight: number;
+  minimumNights?: number;
+  adultCount?: number;
+  childCount?: number;
+  type?: string[];
+};
+
+const getMinimumNights = (hotel: Pick<HotelRecord, "minimumNights">) =>
+  Math.max(1, hotel.minimumNights || 1);
+
+const toUiDate = (date: Date) =>
+  date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+
+const buildStay = (offsetDays: number, nights: number) => {
+  const checkIn = new Date();
+  checkIn.setDate(checkIn.getDate() + offsetDays);
+
+  const checkOut = new Date(checkIn);
+  checkOut.setDate(checkIn.getDate() + nights);
+
+  return {
+    checkIn,
+    checkOut,
+    checkInValue: checkIn.toISOString().split("T")[0],
+    checkOutValue: checkOut.toISOString().split("T")[0],
+    dateRangeValue: `${toUiDate(checkIn)} - ${toUiDate(checkOut)}`,
+  };
+};
+
 test("should complete the guest booking flow and surface a booking reference", async ({ page, request }) => {
   const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();
 
-  const hotels = (await hotelsResponse.json()) as Array<{
-    _id: string;
-    name: string;
-    pricePerNight: number;
-  }>;
+  const hotels = (await hotelsResponse.json()) as HotelRecord[];
 
   expect(hotels.length).toBeGreaterThan(0);
   const hotel = hotels[0];
+  const minimumNights = getMinimumNights(hotel);
 
   const runOffsetDays = (Math.floor(Date.now() / 60000) % 15) + 40;
-  const checkIn = new Date();
-  checkIn.setDate(checkIn.getDate() + runOffsetDays);
-  const checkOut = new Date();
-  checkOut.setDate(checkOut.getDate() + runOffsetDays + 1);
-  const checkInValue = checkIn.toISOString().split("T")[0];
-  const checkOutValue = checkOut.toISOString().split("T")[0];
+  const { dateRangeValue } = buildStay(runOffsetDays, minimumNights);
 
-  await page.goto(`${UI_URL}/`);
+  await page.goto(`${UI_URL}/detail/${hotel._id}`);
 
-  await page.locator("#hero-guests").selectOption("1");
-  await page.getByRole("button", { name: "Check Availability" }).click();
-
-  await expect(page).toHaveURL(/\/rooms|\/search/);
-  await page.getByText(hotel.name).first().click();
-  await expect(page).toHaveURL(new RegExp(`/detail/${hotel._id}`));
-
-  await page.getByPlaceholder("Check-in Date").fill(checkInValue);
-  await page.getByPlaceholder("Check-out Date").fill(checkOutValue);
+  await page.getByPlaceholder("Check In  →  Check Out").fill(dateRangeValue);
   await page.locator('input[name="adultCount"]').fill("1");
   await page.locator('input[name="childCount"]').fill("0");
-  await page.getByRole("button", { name: "Proceed to your details" }).click();
+  await page.getByRole("button", { name: "Check Availability" }).click();
   await expect(page).toHaveURL(new RegExp(`/hotel/${hotel._id}/booking`));
 
   await page.locator('input[name="firstName"]').fill("Guest");
@@ -61,41 +81,25 @@ test("should complete the guest booking flow and surface a booking reference", a
   await expect(page.getByRole("button", { name: "Booking Request Sent" })).toBeDisabled();
 });
 
-test("should complete guest booking for 2 adults for 2 nights", async ({ page, request }) => {
+test("should complete guest booking for 2 adults using the room minimum stay", async ({ page, request }) => {
   const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();
 
-  const hotels = (await hotelsResponse.json()) as Array<{
-    _id: string;
-    name: string;
-    pricePerNight: number;
-  }>;
+  const hotels = (await hotelsResponse.json()) as HotelRecord[];
 
   expect(hotels.length).toBeGreaterThan(0);
   const hotel = hotels[0];
+  const minimumNights = getMinimumNights(hotel);
 
   const runOffsetDays = (Math.floor(Date.now() / 60000) % 12) + 20;
-  const checkIn = new Date();
-  checkIn.setDate(checkIn.getDate() + runOffsetDays);
-  const checkOut = new Date();
-  checkOut.setDate(checkOut.getDate() + runOffsetDays + 2);
-  const checkInValue = checkIn.toISOString().split("T")[0];
-  const checkOutValue = checkOut.toISOString().split("T")[0];
+  const { dateRangeValue } = buildStay(runOffsetDays, Math.max(2, minimumNights));
 
-  await page.goto(`${UI_URL}/`);
+  await page.goto(`${UI_URL}/detail/${hotel._id}`);
 
-  await page.locator("#hero-guests").selectOption("2");
-  await page.getByRole("button", { name: "Check Availability" }).click();
-
-  await expect(page).toHaveURL(/\/rooms|\/search/);
-  await page.getByText(hotel.name).first().click();
-  await expect(page).toHaveURL(new RegExp(`/detail/${hotel._id}`));
-
-  await page.getByPlaceholder("Check-in Date").fill(checkInValue);
-  await page.getByPlaceholder("Check-out Date").fill(checkOutValue);
+  await page.getByPlaceholder("Check In  →  Check Out").fill(dateRangeValue);
   await page.locator('input[name="adultCount"]').fill("2");
   await page.locator('input[name="childCount"]').fill("0");
-  await page.getByRole("button", { name: "Proceed to your details" }).click();
+  await page.getByRole("button", { name: "Check Availability" }).click();
   await expect(page).toHaveURL(new RegExp(`/hotel/${hotel._id}/booking`));
 
   const uniqueEmail = `antoniogatti+2a-${Date.now()}@gmail.com`;
@@ -123,16 +127,13 @@ test("should reject a repeated guest booking request in the duplicate protection
   const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();
 
-  const hotels = (await hotelsResponse.json()) as Array<{
-    _id: string;
-    name: string;
-    type?: string[];
-  }>;
+  const hotels = (await hotelsResponse.json()) as HotelRecord[];
 
   expect(hotels.length).toBeGreaterThan(0);
   const hotel = hotels[0];
+  const minimumNights = getMinimumNights(hotel);
 
-  const baseOffset = (Math.floor(Date.now() / 60000) % 10) + 70;
+  const duplicateTestEmail = `antoniogatti+duplicate-${Date.now()}@gmail.com`;
   let payload: {
     hotelId: string;
     hotelName: string;
@@ -156,11 +157,9 @@ test("should reject a repeated guest booking request in the duplicate protection
   let firstResponse: Awaited<ReturnType<typeof request.post>> | null = null;
 
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    const runOffsetDays = baseOffset + attempt * 7;
-    const checkIn = new Date();
-    checkIn.setDate(checkIn.getDate() + runOffsetDays);
-    const checkOut = new Date();
-    checkOut.setDate(checkOut.getDate() + runOffsetDays + 2);
+    const checkIn = new Date(Date.UTC(2027, 0, 10 + attempt * 14));
+    const checkOut = new Date(checkIn);
+    checkOut.setUTCDate(checkIn.getUTCDate() + Math.max(2, minimumNights));
 
     const candidatePayload = {
       hotelId: hotel._id,
@@ -168,7 +167,7 @@ test("should reject a repeated guest booking request in the duplicate protection
       roomName: Array.isArray(hotel.type) && hotel.type.length > 0 ? hotel.type[0] : "Room",
       firstName: "Duplicate",
       lastName: "Guest",
-      email: TEST_EMAIL,
+      email: duplicateTestEmail,
       phone: "1234567890",
       city: "Brindisi",
       country: "Italy",
@@ -178,7 +177,7 @@ test("should reject a repeated guest booking request in the duplicate protection
       childCount: 0,
       checkIn: checkIn.toISOString(),
       checkOut: checkOut.toISOString(),
-      nights: 2,
+      nights: Math.max(2, minimumNights),
       totalCost: 0,
     };
 
@@ -218,18 +217,14 @@ test("should complete guest booking for 2 adults and 2 children for 4 nights in 
   const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();
 
-  const hotels = (await hotelsResponse.json()) as Array<{
-    _id: string;
-    name: string;
-    adultCount: number;
-    childCount: number;
-  }>;
+  const hotels = (await hotelsResponse.json()) as HotelRecord[];
 
   expect(hotels.length).toBeGreaterThan(0);
 
   // Pick a room that can host 2 adults and 2 children.
   const hotel = hotels.find((h) => h.adultCount >= 2 && h.childCount >= 2);
   test.skip(!hotel, "No room currently supports 2 adults and 2 children.");
+  const minimumNights = getMinimumNights(hotel!);
 
   // Build a check-in date in the week after the current week, with a rotating weekday offset.
   const now = new Date();
@@ -243,25 +238,16 @@ test("should complete guest booking for 2 adults and 2 children for 4 nights in 
   checkIn.setDate(nextWeekMonday.getDate() + weekdayOffset);
 
   const checkOut = new Date(checkIn);
-  checkOut.setDate(checkIn.getDate() + 4);
+  checkOut.setDate(checkIn.getDate() + Math.max(4, minimumNights));
 
-  const checkInValue = checkIn.toISOString().split("T")[0];
-  const checkOutValue = checkOut.toISOString().split("T")[0];
+  const dateRangeValue = `${toUiDate(checkIn)} - ${toUiDate(checkOut)}`;
 
-  await page.goto(`${UI_URL}/`);
+  await page.goto(`${UI_URL}/detail/${hotel._id}`);
 
-  await page.locator("#hero-guests").selectOption("2");
-  await page.getByRole("button", { name: "Check Availability" }).click();
-
-  await expect(page).toHaveURL(/\/rooms|\/search/);
-  await page.getByText(hotel.name).first().click();
-  await expect(page).toHaveURL(new RegExp(`/detail/${hotel._id}`));
-
-  await page.getByPlaceholder("Check-in Date").fill(checkInValue);
-  await page.getByPlaceholder("Check-out Date").fill(checkOutValue);
+  await page.getByPlaceholder("Check In  →  Check Out").fill(dateRangeValue);
   await page.locator('input[name="adultCount"]').fill("2");
   await page.locator('input[name="childCount"]').fill("2");
-  await page.getByRole("button", { name: "Proceed to your details" }).click();
+  await page.getByRole("button", { name: "Check Availability" }).click();
   await expect(page).toHaveURL(new RegExp(`/hotel/${hotel._id}/booking`));
 
   const uniqueEmail = `antoniogatti+2a2c-${Date.now()}@gmail.com`;

@@ -74,6 +74,8 @@ const Booking = () => {
     const diff = checkOut.getTime() - checkIn.getTime();
     return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }, [checkIn, checkOut]);
+  const minimumNights = hotel?.minimumNights || 1;
+  const isBelowMinimumStay = nights < minimumNights;
 
   useEffect(() => {
     sessionStorage.setItem("bookingDraft", JSON.stringify(draftValues));
@@ -102,6 +104,7 @@ const Booking = () => {
         checkOut: checkOut.toISOString(),
         adultCount: search.adultCount,
         childCount: search.childCount,
+        minimumNights,
         nights,
         pricePerNight: hotel.pricePerNight,
         totalPrice: hotel.pricePerNight * nights,
@@ -298,9 +301,15 @@ const Booking = () => {
               </p>
             )}
 
+            {isBelowMinimumStay && (
+              <p className="text-sm text-amber-700">
+                Minimum stay for this room is {minimumNights} night{minimumNights === 1 ? "" : "s"}.
+              </p>
+            )}
+
             <button
               type="submit"
-              disabled={checkOut < checkIn}
+              disabled={checkOut < checkIn || isBelowMinimumStay}
               className="w-full bg-[#ea836c] hover:bg-[#db755f] disabled:opacity-60 text-white font-semibold py-3 rounded"
             >
               Proceed to Checkout
@@ -320,6 +329,7 @@ const Booking = () => {
               <p><strong>Check In:</strong> {formatFriendlyDate(checkIn)}</p>
               <p><strong>Check Out:</strong> {formatFriendlyDate(checkOut)}</p>
               <p><strong>Nights:</strong> {nights}</p>
+              <p><strong>Minimum Stay:</strong> {minimumNights} nights</p>
               <p><strong>Guests:</strong> {search.adultCount} Adults, {search.childCount} Children</p>
               <p><strong>Room:</strong> {Array.isArray(hotel.type) && hotel.type.length > 0 ? hotel.type[0] : "Room"}</p>
             </div>

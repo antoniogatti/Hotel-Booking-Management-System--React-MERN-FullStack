@@ -13,9 +13,6 @@ import { LayoutList, LayoutGrid } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
-const fmtDate = (d: Date): string =>
-  d.toLocaleDateString("en-GB"); // "dd/mm/yyyy"
-
 // forwardRef wrapper needed by react-datepicker customInput
 const DateRangeBtn = React.forwardRef<
   HTMLButtonElement,

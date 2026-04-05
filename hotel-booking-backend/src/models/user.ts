@@ -4,7 +4,7 @@ import { UserType } from "../../../shared/types";
 
 const userSchema = new mongoose.Schema(
   {
-    email: { type: String, required: true, unique: true, index: true },
+    email: { type: String, required: true, unique: true },
     password: { type: String, required: true }, // Use random hash for OAuth users
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },

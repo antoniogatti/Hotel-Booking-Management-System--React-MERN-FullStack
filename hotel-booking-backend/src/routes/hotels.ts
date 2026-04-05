@@ -37,6 +37,9 @@ const calculateNights = (checkIn: Date, checkOut: Date) => {
   return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 };
 
+const getMinimumNights = (hotel: { minimumNights?: number }) =>
+  Math.max(1, Number(hotel.minimumNights) || 1);
+
 const findOverlappingBooking = async (params: {
   hotelId: string;
   checkIn: Date;
@@ -176,6 +179,15 @@ router.post(
         return res.status(400).json({ message: "Check-out date cannot be earlier than check-in date" });
       }
 
+      const nights = calculateNights(checkIn, checkOut);
+      const minimumNights = getMinimumNights(hotel);
+
+      if (nights < minimumNights) {
+        return res.status(400).json({
+          message: `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`,
+        });
+      }
+
       if (req.body.adultCount > hotel.adultCount || req.body.childCount > hotel.childCount) {
         return res.status(400).json({
           message: "Guest count exceeds the room capacity",
@@ -216,7 +228,6 @@ router.post(
         });
       }
 
-      const nights = calculateNights(checkIn, checkOut);
       const totalCost = hotel.pricePerNight * nights;
       const reservationNumber = await generateUniqueReservationNumber();
 
@@ -304,6 +315,14 @@ router.post(
       return res.status(400).json({ message: "Hotel not found" });
     }
 
+    const minimumNights = getMinimumNights(hotel);
+
+    if (Number(numberOfNights) < minimumNights) {
+      return res.status(400).json({
+        message: `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`,
+      });
+    }
+
     const totalCost = hotel.pricePerNight * numberOfNights;
 
     const paymentIntent = await stripe.paymentIntents.create({
@@ -357,6 +376,12 @@ router.post(
         });
       }
 
+      const hotel = await Hotel.findById(req.params.hotelId);
+
+      if (!hotel) {
+        return res.status(400).json({ message: "Hotel not found" });
+      }
+
       const checkIn = new Date(req.body.checkIn);
       const checkOut = new Date(req.body.checkOut);
 
@@ -366,6 +391,15 @@ router.post(
 
       if (checkOut <= checkIn) {
         return res.status(400).json({ message: "Check-out must be after check-in" });
+      }
+
+      const nights = calculateNights(checkIn, checkOut);
+      const minimumNights = getMinimumNights(hotel);
+
+      if (nights < minimumNights) {
+        return res.status(400).json({
+          message: `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`,
+        });
       }
 
       const overlappingBooking = await findOverlappingBooking({

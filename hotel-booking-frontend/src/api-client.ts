@@ -5,7 +5,6 @@ import {
   HotelType,
   PaymentIntentResponse,
   UserType,
-  HotelWithBookingsType,
   BookingType,
   BookingManagementRoomType,
   BookingCalendarResponseType,
@@ -222,11 +221,6 @@ export const createRoomBooking = async (formData: BookingFormData) => {
     `/api/rooms/${formData.hotelId}/bookings`,
     formData
   );
-  return response.data;
-};
-
-export const fetchMyBookings = async (): Promise<HotelWithBookingsType[]> => {
-  const response = await axiosInstance.get("/api/my-bookings");
   return response.data;
 };
 

@@ -69,9 +69,9 @@ const BookingForm = ({ currentUser, paymentIntent }: Props) => {
           type: "SUCCESS",
         });
 
-        // Navigate to My Bookings page after a short delay
+        // Return to the home page after a short delay.
         setTimeout(() => {
-          navigate("/my-bookings");
+          navigate("/");
         }, 1500);
       },
       onError: () => {

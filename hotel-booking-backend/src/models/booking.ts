@@ -42,7 +42,7 @@ export interface IBooking extends Document {
 
 const bookingSchema = new mongoose.Schema(
   {
-    reservationNumber: { type: String, index: true },
+    reservationNumber: { type: String },
     userId: { type: String, required: true, index: true },
     hotelId: { type: String, required: true, index: true },
     firstName: { type: String, required: true },

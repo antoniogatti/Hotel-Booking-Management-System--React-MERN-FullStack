@@ -19,7 +19,6 @@ import Search from "./pages/Search";
 import Detail from "./pages/Detail";
 import Booking from "./pages/Booking";
 import Checkout from "./pages/Checkout";
-import MyBookings from "./pages/MyBookings";
 import Home from "./pages/Home";
 import ApiDocs from "./pages/ApiDocs";
 import ApiStatus from "./pages/ApiStatus";
@@ -33,11 +32,21 @@ import BookingCheckIn from "./pages/BookingCheckIn";
 import BookingDashboard from "./pages/BookingDashboard";
 import BookingDetails from "./pages/BookingDetails";
 import VacancyDashboard from "./pages/VacancyDashboard";
+import RoomLanding from "./pages/RoomLanding";
 import { siteConfig } from "./config/siteConfig";
+import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
 
 const BRAND_NAME = "Palazzo Pinto B&B";
 
 const getPageTitle = (pathname: string): string => {
+  if (pathname.startsWith("/rooms/")) {
+    const roomSlug = pathname.replace("/rooms/", "");
+
+    if (isCustomRoomSlug(roomSlug)) {
+      return `${BRAND_NAME} | ${roomPageCatalog[roomSlug].pageName}`;
+    }
+  }
+
   if (pathname === "/") return `${BRAND_NAME} | Home`;
   if (pathname === "/search") return `${BRAND_NAME} | Search Rooms`;
   if (pathname === "/rooms") return `${BRAND_NAME} | Rooms`;
@@ -62,7 +71,6 @@ const getPageTitle = (pathname: string): string => {
   if (pathname.startsWith("/booking/")) return `${BRAND_NAME} | Booking Details`;
   if (pathname === "/vacancy-management") return `${BRAND_NAME} | Vacancy Management`;
   if (pathname === "/manage-bookings") return `${BRAND_NAME} | Manage Bookings`;
-  if (pathname === "/my-bookings") return `${BRAND_NAME} | My Bookings`;
   if (pathname.startsWith("/hotel/") && pathname.endsWith("/booking")) {
     return `${BRAND_NAME} | Booking Details`;
   }
@@ -126,6 +134,14 @@ const App = () => {
           element={
             <Layout>
               <Detail />
+            </Layout>
+          }
+        />
+        <Route
+          path="/rooms/:roomSlug"
+          element={
+            <Layout>
+              <RoomLanding />
             </Layout>
           }
         />
@@ -208,14 +224,6 @@ const App = () => {
             ) : (
               <Navigate to="/" />
             )
-          }
-        />
-        <Route
-          path="/my-bookings"
-          element={
-            <Layout>
-              <MyBookings />
-            </Layout>
           }
         />
         <Route

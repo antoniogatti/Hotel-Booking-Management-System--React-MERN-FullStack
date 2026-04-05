@@ -48,5 +48,9 @@
     "swagger-ui-express": "^5.0.1",
     "ts-node": "^10.9.1",
     "typescript": "^5.2.2"
+  },
+  "overrides": {
+    "@apidevtools/swagger-parser": "12.1.0",
+    "@apidevtools/json-schema-ref-parser": "15.3.5"
   }
 }

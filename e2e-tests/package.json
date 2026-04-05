@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
-  "scripts": {},
+  "scripts": {
+    "test": "playwright test",
+    "test:pages-live": "playwright test tests/pages-live.spec.ts --project=chromium",
+    "test:pages-live:all": "playwright test tests/pages-live.spec.ts",
+    "test:room-routing": "playwright test tests/room-routing.spec.ts --project=chromium"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",

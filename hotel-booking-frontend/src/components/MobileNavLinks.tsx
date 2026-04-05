@@ -3,7 +3,6 @@ import { Button } from "./ui/button";
 import {
   FileText,
   Activity,
-  Calendar,
   BarChart3,
   LogIn,
   Hotel,
@@ -28,10 +27,6 @@ const MobileNavLinks = () => {
       >
         <Hotel className="h-4 w-4" />
         {siteConfig.singlePropertyMode ? "Rooms" : "Hotels"}
-      </Link>
-      <Link to="/my-bookings" className={linkClass}>
-        <Calendar className="h-4 w-4" />
-        My Bookings
       </Link>
       <Link to="/contact-us" className={linkClass}>
         <Mail className="h-4 w-4" />

@@ -1,5 +1,6 @@
 ﻿import { Link } from "react-router-dom";
 import { HotelType } from "../../../shared/types";
+import { getRoomSlugForHotel, roomCatalog } from "../../../shared/roomCatalog";
 import {
   Wifi,
   Car,
@@ -11,6 +12,12 @@ import {
   Plane,
   Building2,
   ChevronRight,
+  CookingPot,
+  Wind,
+  Tv,
+  Refrigerator,
+  Thermometer,
+  BedDouble,
 } from "lucide-react";
 
 type Props = {
@@ -19,7 +26,27 @@ type Props = {
 };
 
 const SearchResultsCard = ({ hotel, viewMode = "list" }: Props) => {
-  const detailPath = `/detail/${hotel._id}`;
+  const roomSlug = getRoomSlugForHotel(hotel);
+  const detailPath = roomSlug ? `/rooms/${roomSlug}` : `/detail/${hotel._id}`;
+  const summaryText = roomSlug ? roomCatalog[roomSlug].shortDescription : hotel.description;
+
+  const getRoomServiceIcon = (service: string) => {
+    const iconMap: Record<string, React.ElementType> = {
+      "Wi-Fi": Wifi,
+      "Hair Dryer": Wind,
+      Breakfast: UtensilsCrossed,
+      "Coffee Maker": Coffee,
+      "Mini Fridge": Refrigerator,
+      Fridge: Refrigerator,
+      TV: Tv,
+      "Air Conditioner / Heater": Thermometer,
+      Kitchen: CookingPot,
+      "Private Balcony": Building2,
+      "Ground Floor": Building2,
+    };
+
+    return iconMap[service] || BedDouble;
+  };
 
   const getFacilityIcon = (facility: string) => {
     const iconMap: Record<string, React.ElementType> = {
@@ -34,6 +61,18 @@ const SearchResultsCard = ({ hotel, viewMode = "list" }: Props) => {
     };
     return iconMap[facility] || Building2;
   };
+
+  const cardAmenities = roomSlug
+    ? roomCatalog[roomSlug].services.slice(0, 4).map((service) => ({
+        key: service,
+        label: service,
+        Icon: getRoomServiceIcon(service),
+      }))
+    : hotel.facilities.slice(0, 4).map((facility) => ({
+        key: facility,
+        label: facility,
+        Icon: getFacilityIcon(facility),
+      }));
 
   if (viewMode === "grid") {
     return (
@@ -59,19 +98,18 @@ const SearchResultsCard = ({ hotel, viewMode = "list" }: Props) => {
             {hotel.name}
           </Link>
 
-          <p className="text-sm text-gray-500 line-clamp-3 flex-1 mb-3">
-            {hotel.description}
+          <p className="text-sm text-gray-500 line-clamp-4 flex-1 mb-3">
+            {summaryText}
           </p>
 
           {/* Facility icons */}
-          {hotel.facilities.length > 0 && (
+          {cardAmenities.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-4">
-              {hotel.facilities.slice(0, 5).map((facility) => {
-                const Icon = getFacilityIcon(facility);
+              {cardAmenities.map(({ key, label, Icon }) => {
                 return (
                   <span
-                    key={facility}
-                    title={facility}
+                    key={key}
+                    title={label}
                     className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
                   >
                     <Icon className="w-3.5 h-3.5" />
@@ -103,11 +141,11 @@ const SearchResultsCard = ({ hotel, viewMode = "list" }: Props) => {
 
   // ── List view (default) ──
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col sm:flex-row">
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col sm:flex-row sm:min-h-[184px]">
       {/* Image */}
       <Link
         to={detailPath}
-        className="relative flex-shrink-0 overflow-hidden h-52 sm:h-auto sm:w-52"
+        className="relative flex-shrink-0 overflow-hidden h-52 sm:h-[184px] sm:w-52"
       >
         <img
           src={hotel.imageUrls[0]}
@@ -119,7 +157,7 @@ const SearchResultsCard = ({ hotel, viewMode = "list" }: Props) => {
       {/* Main content */}
       <div className="flex flex-1 flex-col sm:flex-row min-w-0">
         {/* Text */}
-        <div className="flex-1 p-4 min-w-0">
+        <div className="flex flex-1 min-w-0 flex-col p-4">
           <Link
             to={detailPath}
             className="text-lg font-bold text-[#2b4463] hover:text-[#ea836c] transition-colors leading-snug block mb-1.5"
@@ -127,19 +165,18 @@ const SearchResultsCard = ({ hotel, viewMode = "list" }: Props) => {
             {hotel.name}
           </Link>
 
-          <p className="text-sm text-gray-500 line-clamp-4 mb-3">
-            {hotel.description}
+          <p className="text-sm leading-6 text-gray-500 line-clamp-3 min-h-[72px] mb-3">
+            {summaryText}
           </p>
 
           {/* Facility icons */}
-          {hotel.facilities.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {hotel.facilities.slice(0, 6).map((facility) => {
-                const Icon = getFacilityIcon(facility);
+          {cardAmenities.length > 0 && (
+            <div className="mt-auto flex flex-wrap gap-1.5">
+              {cardAmenities.map(({ key, label, Icon }) => {
                 return (
                   <span
-                    key={facility}
-                    title={facility}
+                    key={key}
+                    title={label}
                     className="inline-flex items-center justify-center w-7 h-7 rounded-md bg-gray-100 text-gray-500 hover:bg-gray-200 transition-colors"
                   >
                     <Icon className="w-3.5 h-3.5" />

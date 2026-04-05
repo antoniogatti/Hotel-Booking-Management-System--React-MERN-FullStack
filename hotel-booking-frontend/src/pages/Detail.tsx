@@ -115,7 +115,7 @@ const Detail = () => {
                 <p className="text-xs text-gray-400 font-medium uppercase tracking-wider leading-none mb-1">
                   Booking Nights
                 </p>
-                <p className="text-sm font-semibold text-gray-800">1 Min.</p>
+                <p className="text-sm font-semibold text-gray-800">{hotel.minimumNights || 1} Min.</p>
               </div>
             </div>
 
@@ -172,6 +172,7 @@ const Detail = () => {
           <GuestInfoForm
             pricePerNight={hotel.pricePerNight}
             hotelId={hotel._id}
+            minimumNights={hotel.minimumNights || 1}
           />
         </aside>
       </div>

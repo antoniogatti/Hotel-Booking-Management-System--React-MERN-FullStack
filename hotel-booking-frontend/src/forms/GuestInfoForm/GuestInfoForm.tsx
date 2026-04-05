@@ -8,6 +8,7 @@ import { User, Baby } from "lucide-react";
 type Props = {
   hotelId: string;
   pricePerNight: number;
+  minimumNights: number;
 };
 
 type GuestInfoFormData = {
@@ -17,7 +18,7 @@ type GuestInfoFormData = {
   childCount: number;
 };
 
-const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
+const GuestInfoForm = ({ hotelId, pricePerNight, minimumNights }: Props) => {
   const search = useSearchContext();
   const navigate = useNavigate();
 
@@ -48,6 +49,7 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
     numberOfNights = Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }
   const totalPrice = pricePerNight * numberOfNights;
+  const isBelowMinimumStay = !!checkIn && !!checkOut && numberOfNights < minimumNights;
 
   const minDate = new Date();
   minDate.setHours(0, 0, 0, 0);
@@ -70,6 +72,15 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
       return;
     }
 
+    const nights = Math.max(
+      1,
+      Math.ceil((normalizedCheckOut.getTime() - normalizedCheckIn.getTime()) / (1000 * 60 * 60 * 24))
+    );
+
+    if (nights < minimumNights) {
+      return;
+    }
+
     search.saveSearchValues(
       "",
       normalizedCheckIn,
@@ -88,6 +99,7 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
         <span className="text-sm text-gray-500">from </span>
         <span className="text-lg font-bold text-gray-900">€{pricePerNight}</span>
         <span className="text-sm text-gray-500"> / night</span>
+        <p className="mt-1 text-xs text-gray-400">Minimum stay: {minimumNights} night{minimumNights === 1 ? "" : "s"}</p>
       </div>
 
       {/* Card */}
@@ -192,11 +204,17 @@ const GuestInfoForm = ({ hotelId, pricePerNight }: Props) => {
         </p>
       )}
 
+      {isBelowMinimumStay && (
+        <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          Minimum stay for this room is {minimumNights} night{minimumNights === 1 ? "" : "s"}.
+        </p>
+      )}
+
       {/* CTA */}
       <form onSubmit={handleSubmit(onSubmit)}>
         <button
           type="submit"
-          disabled={!checkIn || !checkOut}
+          disabled={!checkIn || !checkOut || isBelowMinimumStay}
           className="mt-4 w-full bg-[#ea836c] hover:bg-[#d9725d] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg text-sm tracking-wide uppercase transition-colors"
         >
           Check Availability

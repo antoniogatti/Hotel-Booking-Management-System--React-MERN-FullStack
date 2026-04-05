@@ -28,6 +28,7 @@ type CheckoutState = {
     checkOut: string;
     adultCount: number;
     childCount: number;
+    minimumNights: number;
     nights: number;
     pricePerNight: number;
     totalPrice: number;
@@ -133,6 +134,8 @@ const Checkout = () => {
   }
 
   const { guestDetails, bookingDetails } = state;
+  const minimumNights = bookingDetails.minimumNights || 1;
+  const isBelowMinimumStay = bookingDetails.nights < minimumNights;
 
   const formattedDates = useMemo(() => {
     const checkIn = new Date(bookingDetails.checkIn);
@@ -144,6 +147,13 @@ const Checkout = () => {
   }, [bookingDetails.checkIn, bookingDetails.checkOut]);
 
   const handleSendBookingRequest = () => {
+    if (isBelowMinimumStay) {
+      setSubmissionError(
+        `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`
+      );
+      return;
+    }
+
     sendRequest({
       hotelId: bookingDetails.hotelId,
       firstName: guestDetails.firstName,
@@ -186,6 +196,7 @@ const Checkout = () => {
           </div>
           <div className="space-y-3">
             <p><strong>Guests:</strong> {bookingDetails.adultCount} Adults, {bookingDetails.childCount} Children</p>
+            <p><strong>Minimum Stay:</strong> {minimumNights} nights</p>
             <p><strong>Location:</strong> {guestDetails.city}, {guestDetails.country}</p>
             <p><strong>Nationality:</strong> {guestDetails.nationality}</p>
             <p><strong>Total Price:</strong> EUR {bookingDetails.totalPrice}</p>
@@ -214,6 +225,12 @@ const Checkout = () => {
           </div>
         )}
 
+        {isBelowMinimumStay && !submissionError && (
+          <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            Minimum stay for this room is {minimumNights} night{minimumNights === 1 ? "" : "s"}.
+          </div>
+        )}
+
         {reservationNumber && (
           <div className="mb-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4">
             <p className="text-sm text-emerald-700">Your booking request has been sent successfully.</p>
@@ -229,7 +246,7 @@ const Checkout = () => {
         <button
           type="button"
           onClick={handleSendBookingRequest}
-          disabled={isLoading || !!reservationNumber}
+          disabled={isLoading || !!reservationNumber || isBelowMinimumStay}
           className="w-full bg-[#ea836c] hover:bg-[#db755f] disabled:opacity-70 text-white font-semibold py-3 rounded"
         >
           {isLoading ? "Sending..." : reservationNumber ? "Booking Request Sent" : "Send Booking Request"}

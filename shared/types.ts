@@ -34,6 +34,9 @@ export type UserType = {
 export type HotelType = {
   _id: string;
   userId: string;
+  slug?: string;
+  originalUrl?: string;
+  minimumNights?: number;
   name: string;
   city: string;
   country: string;

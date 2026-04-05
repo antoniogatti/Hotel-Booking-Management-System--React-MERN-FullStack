@@ -2,18 +2,10 @@ import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import mongoose from "mongoose";
+import { roomCatalog } from "../../../shared/roomCatalog";
+import Booking from "../models/booking";
+import BookingDayStatus from "../models/booking-day-status";
 import Hotel from "../models/hotel";
-
-type RoomSeed = {
-  name: string;
-  folder: string;
-  description: string;
-  pricePerNight: number;
-  adultCount: number;
-  childCount: number;
-  type: string[];
-  facilities: string[];
-};
 
 const PALAZZO_BASE = {
   userId: "palazzopintobnb-owner",
@@ -45,54 +37,9 @@ const PALAZZO_BASE = {
   starRating: 4,
 } as const;
 
-const rooms: RoomSeed[] = [
-  {
-    name: "Malvasia - Double Room",
-    folder: "malvasia",
-    description:
-      "In the comfort of a spacious queen-size bed and a private balcony, MALVASIA offers all essentials for a couple getaway or business trip.",
-    pricePerNight: 100,
-    adultCount: 2,
-    childCount: 0,
-    type: ["Boutique", "Romantic"],
-    facilities: ["Free WiFi", "Non-Smoking Rooms"],
-  },
-  {
-    name: "Verdeca - Double Room",
-    folder: "verdeca",
-    description:
-      "VERDECA is a refined double room with queen-size bed and private balcony, designed for a calm and comfortable stay.",
-    pricePerNight: 110,
-    adultCount: 2,
-    childCount: 0,
-    type: ["Boutique", "Romantic"],
-    facilities: ["Free WiFi", "Non-Smoking Rooms"],
-  },
-  {
-    name: "Aleatico - King Studio with sofa bed",
-    folder: "aleatico",
-    description:
-      "ALEATICO apartment features equipped kitchen, dining area, living room with sofa bed, private bathroom, and modern appliances for independent stays.",
-    pricePerNight: 130,
-    adultCount: 4,
-    childCount: 0,
-    type: ["Boutique", "Self Catering", "Family"],
-    facilities: ["Free WiFi", "Family Rooms", "Non-Smoking Rooms"],
-  },
-  {
-    name: "Fuocorosa - Apartment",
-    folder: "fuocorosa",
-    description:
-      "In the comfort of a spacious and well-furnished apartment, everyone can find their ideal space to dedicate precious time to themselves. In our FUOCOROSA apartment, with its contemporary style and authentic furnishings, you will find all the comforts needed for a perfect vacation. FUOCOROSA is located entirely on the ground floor with no stairs, making it easily accessible for everyone. The apartment includes a fully equipped kitchen, perfect for preparing delicious meals independently. The cozy dining room and the living room with a comfortable sofa bed offer ideal spaces for relaxing and socializing, comfortably accommodating up to four people. The bedroom features a large double bed, ensuring a restful sleep. The private bathroom is equipped with a shower, soft towels, a hairdryer, and a courtesy kit, ensuring a total comfort experience. Our guests can take advantage of modern appliances such as the refrigerator, dishwasher, washing machine, and iron, making the stay even more convenient. A TV completes the list of comforts that this cozy apartment offers, ensuring moments of entertainment and relaxation.",
-    pricePerNight: 140,
-    adultCount: 4,
-    childCount: 0,
-    type: ["Boutique", "Self Catering", "Family"],
-    facilities: ["Free WiFi", "Parking", "Family Rooms", "Non-Smoking Rooms"],
-  },
-];
+const rooms = Object.values(roomCatalog);
 
-const getImages = (folder: string): string[] => {
+const getImages = (folder: string, preferredImages: string[]): string[] => {
   const imagesDir = path.resolve(
     process.cwd(),
     `../hotel-booking-frontend/public/${folder}`
@@ -102,11 +49,83 @@ const getImages = (folder: string): string[] => {
     return [];
   }
 
-  return fs
+  const availableImages = fs
     .readdirSync(imagesDir)
     .filter((fileName) => /\.(png|jpe?g|webp)$/i.test(fileName))
     .sort((a, b) => a.localeCompare(b))
     .map((fileName) => `/${folder}/${fileName}`);
+
+  const preferredSet = new Set(preferredImages);
+  const orderedPreferredImages = preferredImages.filter((image) =>
+    availableImages.includes(image)
+  );
+  const remainingImages = availableImages.filter(
+    (image) => !preferredSet.has(image)
+  );
+
+  return [...orderedPreferredImages, ...remainingImages];
+};
+
+const pickCanonicalRoom = async (
+  candidates: Array<InstanceType<typeof Hotel>>,
+  targetSlug: string
+) => {
+  if (candidates.length === 1) {
+    return candidates[0];
+  }
+
+  const sluggedCandidate = candidates.find(
+    (candidate) => candidate.slug === targetSlug
+  );
+
+  if (sluggedCandidate) {
+    return sluggedCandidate;
+  }
+
+  const candidatesWithBookingCounts = await Promise.all(
+    candidates.map(async (candidate) => ({
+      candidate,
+      bookingsCount: await Booking.countDocuments({ hotelId: String(candidate._id) }),
+    }))
+  );
+
+  candidatesWithBookingCounts.sort((left, right) => {
+    if (right.bookingsCount !== left.bookingsCount) {
+      return right.bookingsCount - left.bookingsCount;
+    }
+
+    if (Boolean(right.candidate.slug) !== Boolean(left.candidate.slug)) {
+      return Number(Boolean(right.candidate.slug)) - Number(Boolean(left.candidate.slug));
+    }
+
+    return (
+      new Date(left.candidate.createdAt ?? 0).getTime() -
+      new Date(right.candidate.createdAt ?? 0).getTime()
+    );
+  });
+
+  return candidatesWithBookingCounts[0].candidate;
+};
+
+const mergeDuplicateRooms = async (
+  canonicalRoomId: string,
+  duplicateRoomIds: string[]
+) => {
+  if (duplicateRoomIds.length === 0) {
+    return;
+  }
+
+  await Booking.updateMany(
+    { hotelId: { $in: duplicateRoomIds } },
+    { $set: { hotelId: canonicalRoomId } }
+  );
+
+  await BookingDayStatus.updateMany(
+    { hotelId: { $in: duplicateRoomIds } },
+    { $set: { hotelId: canonicalRoomId } }
+  );
+
+  await Hotel.deleteMany({ _id: { $in: duplicateRoomIds } });
 };
 
 const run = async () => {
@@ -118,17 +137,22 @@ const run = async () => {
   await mongoose.connect(connectionString);
 
   for (const room of rooms) {
-    const images = getImages(room.folder);
+    const images = getImages(room.folder, room.images);
 
-    const existing = await Hotel.findOne({
-      name: room.name,
+    const existingMatches = await Hotel.find({
       city: PALAZZO_BASE.city,
       country: PALAZZO_BASE.country,
+      $or: [{ slug: room.slug }, { name: room.hotelName }],
     });
+
+    const existing =
+      existingMatches.length > 0
+        ? await pickCanonicalRoom(existingMatches, room.slug)
+        : null;
 
     if (!existing && images.length === 0) {
       console.log(
-        `[SKIP] ${room.name} - add images in hotel-booking-frontend/public/${room.folder}`
+        `[SKIP] ${room.hotelName} - add images in hotel-booking-frontend/public/${room.folder}`
       );
       continue;
     }
@@ -137,11 +161,14 @@ const run = async () => {
 
     const payload = {
       ...PALAZZO_BASE,
-      name: room.name,
+      slug: room.slug,
+      originalUrl: room.originalUrl,
+      minimumNights: room.minimumNights,
+      name: room.hotelName,
       description: room.description,
       type: room.type,
-      adultCount: room.adultCount,
-      childCount: room.childCount,
+      adultCount: room.maxAdults,
+      childCount: room.maxChildren,
       facilities: room.facilities,
       pricePerNight: room.pricePerNight,
       imageUrls,
@@ -149,15 +176,20 @@ const run = async () => {
       updatedAt: new Date(),
     };
 
-    const saved = await Hotel.findOneAndUpdate(
-      {
-        name: room.name,
-        city: PALAZZO_BASE.city,
-        country: PALAZZO_BASE.country,
-      },
-      payload,
-      { upsert: true, new: true, setDefaultsOnInsert: true }
-    );
+    let saved;
+
+    if (existing) {
+      Object.assign(existing, payload);
+      saved = await existing.save();
+
+      const duplicateRoomIds = existingMatches
+        .filter((candidate) => String(candidate._id) !== String(saved._id))
+        .map((candidate) => String(candidate._id));
+
+      await mergeDuplicateRooms(String(saved._id), duplicateRoomIds);
+    } else {
+      saved = await Hotel.create(payload);
+    }
 
     console.log(
       `[OK] ${saved.name} | EUR ${saved.pricePerNight} | images=${saved.imageUrls.length}`

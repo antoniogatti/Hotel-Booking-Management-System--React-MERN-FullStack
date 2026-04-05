@@ -88,11 +88,6 @@ const ApiDocs = () => {
           description: "Create booking",
         },
         {
-          method: "GET",
-          path: "/api/my-bookings",
-          description: "Get user's bookings",
-        },
-        {
           method: "POST",
           path: "/api/rooms/:id/bookings/payment-intent",
           description: "Create payment intent",
