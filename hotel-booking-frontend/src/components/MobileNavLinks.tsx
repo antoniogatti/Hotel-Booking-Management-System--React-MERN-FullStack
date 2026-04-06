@@ -7,6 +7,7 @@ import {
   LogIn,
   Hotel,
   Mail,
+  MapPin,
 } from "lucide-react";
 import UsernameMenu from "./UsernameMenu";
 import useAppContext from "../hooks/useAppContext";
@@ -31,6 +32,10 @@ const MobileNavLinks = () => {
       <Link to="/contact-us" className={linkClass}>
         <Mail className="h-4 w-4" />
         Contact Us
+      </Link>
+      <Link to="/reach-us" className={linkClass}>
+        <MapPin className="h-4 w-4" />
+        Reach Us
       </Link>
 
       {isOwnerOrAdmin && (

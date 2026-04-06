@@ -27,6 +27,7 @@ import AuthCallback from "./pages/AuthCallback";
 import PrivacyCookiePolicy from "./pages/PrivacyCookiePolicy";
 import TermsConditions from "./pages/TermsConditions";
 import ContactUs from "./pages/ContactUs";
+import ReachUs from "./pages/ReachUs";
 import ManageBookings from "./pages/ManageBookings";
 import BookingCheckIn from "./pages/BookingCheckIn";
 import BookingDashboard from "./pages/BookingDashboard";
@@ -54,6 +55,7 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/api-docs") return `${BRAND_NAME} | API Documentation`;
   if (pathname === "/api-status") return `${BRAND_NAME} | API Status`;
   if (pathname === "/contact-us") return `${BRAND_NAME} | Contact Us`;
+  if (pathname === "/reach-us") return `${BRAND_NAME} | Reach Us`;
   if (pathname === "/privacy-cookie-policy") {
     return `${BRAND_NAME} | Privacy and Cookie Policy`;
   }
@@ -182,6 +184,14 @@ const App = () => {
           element={
             <Layout>
               <ContactUs />
+            </Layout>
+          }
+        />
+        <Route
+          path="/reach-us"
+          element={
+            <Layout>
+              <ReachUs />
             </Layout>
           }
         />

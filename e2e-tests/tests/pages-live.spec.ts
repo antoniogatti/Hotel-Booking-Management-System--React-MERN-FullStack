@@ -14,7 +14,8 @@ const staticPages = [
   { path: "/api-docs", heading: "API Documentation" },
   { path: "/privacy-cookie-policy", heading: "Privacy and Cookie Policy" },
   { path: "/terms-conditions", heading: "Terms and Conditions" },
-  { path: "/contact-us", heading: "Reach Us" },
+  { path: "/contact-us", heading: "Contact Us" },
+  { path: "/reach-us", heading: "Reach Us" },
 ] as const;
 
 for (const pageCase of staticPages) {
