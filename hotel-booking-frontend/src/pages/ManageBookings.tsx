@@ -368,6 +368,15 @@ const ManageBookings = () => {
       return;
     }
 
+    if (isBookingComManagedRoom) {
+      showToast({
+        title:
+          "Manual day closures are disabled for Booking.com-managed rooms. Use Booking.com availability or the export feed instead.",
+        type: "ERROR",
+      });
+      return;
+    }
+
     const reason = closeReason.trim();
     if (close && !reason) {
       showToast({
@@ -665,7 +674,8 @@ const ManageBookings = () => {
                 </div>
               )}
 
-              {selectedDayInfo?.status !== "Requested" &&
+              {!isBookingComManagedRoom &&
+                selectedDayInfo?.status !== "Requested" &&
                 selectedDayInfo?.status !== "Booked" &&
                 selectedDayInfo?.status !== "Imported" && (
                   <>
