@@ -254,6 +254,37 @@ export const fetchRoomBookingCalendar = async (
   return response.data;
 };
 
+export const saveBookingComRoomConfig = async (payload: {
+  hotelId: string;
+  importUrl: string;
+  syncEnabled: boolean;
+  exportEnabled: boolean;
+}) => {
+  const response = await axiosInstance.put(
+    `/api/integrations/booking-com/rooms/${payload.hotelId}/config`,
+    {
+      importUrl: payload.importUrl,
+      syncEnabled: payload.syncEnabled,
+      exportEnabled: payload.exportEnabled,
+    }
+  );
+  return response.data;
+};
+
+export const regenerateBookingComExportToken = async (hotelId: string) => {
+  const response = await axiosInstance.post(
+    `/api/integrations/booking-com/rooms/${hotelId}/export-token/regenerate`
+  );
+  return response.data;
+};
+
+export const syncBookingComCalendars = async (payload?: { hotelId?: string }) => {
+  const response = await axiosInstance.post("/api/integrations/booking-com/sync", {
+    hotelId: payload?.hotelId,
+  });
+  return response.data;
+};
+
 export const updateRoomDayStatus = async (payload: {
   hotelId: string;
   date: string;

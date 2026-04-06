@@ -65,6 +65,15 @@ const hotelSchema = new mongoose.Schema<HotelType>(
     occupancyRate: { type: Number, default: 0 },
     isActive: { type: Boolean, default: true },
     isFeatured: { type: Boolean, default: false },
+    bookingComIcal: {
+      importUrl: { type: String, default: "" },
+      syncEnabled: { type: Boolean, default: false },
+      exportEnabled: { type: Boolean, default: false },
+      exportToken: { type: String, default: "" },
+      lastSyncAt: { type: Date },
+      lastSyncStatus: { type: String, default: "idle" },
+      lastSyncError: { type: String, default: "" },
+    },
     // Audit fields
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },

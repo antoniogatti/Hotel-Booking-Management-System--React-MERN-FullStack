@@ -3,6 +3,11 @@ import Hotel from "../models/hotel";
 import Booking from "../models/booking";
 import BookingDayStatus from "../models/booking-day-status";
 import User from "../models/user";
+import {
+  findOverlappingImportedEvent,
+  getImportedUnavailableHotelIds,
+  isBookingComManagedRoom,
+} from "../lib/booking-com-ical";
 import { BookingType, HotelSearchResponse } from "../../../shared/types";
 import { body, param, validationResult } from "express-validator";
 import { randomBytes } from "crypto";
@@ -86,7 +91,7 @@ const getAvailableHotelsForStay = async <THotel extends { _id: unknown }>(params
   const stayStart = getDayStart(checkInDate);
   const stayEnd = getDayStart(checkOutDate);
 
-  const [bookedHotelIds, closedHotelIds] = await Promise.all([
+  const [bookedHotelIds, closedHotelIds, importedHotelIds] = await Promise.all([
     Booking.distinct("hotelId", {
       hotelId: { $in: hotelIds },
       status: { $in: ACTIVE_BOOKING_STATUSES },
@@ -98,11 +103,17 @@ const getAvailableHotelsForStay = async <THotel extends { _id: unknown }>(params
       status: "closed",
       date: { $gte: stayStart, $lt: stayEnd },
     }),
+    getImportedUnavailableHotelIds({
+      hotelIds,
+      checkIn: checkInDate,
+      checkOut: checkOutDate,
+    }),
   ]);
 
   const unavailableHotelIds = new Set<string>([
     ...bookedHotelIds.map(String),
     ...closedHotelIds.map(String),
+    ...importedHotelIds.map(String),
   ]);
 
   return hotelsMeetingStayRules.filter(
@@ -115,12 +126,30 @@ const findOverlappingBooking = async (params: {
   checkIn: Date;
   checkOut: Date;
 }) => {
-  return Booking.findOne({
+  const booking = await Booking.findOne({
     hotelId: params.hotelId,
     status: { $in: ["pending", "confirmed", "arrived", "completed"] },
     checkIn: { $lt: params.checkOut },
     checkOut: { $gt: params.checkIn },
   }).select("_id reservationNumber status checkIn checkOut");
+
+  if (booking) {
+    return booking;
+  }
+
+  const importedEvent = await findOverlappingImportedEvent(params);
+
+  if (!importedEvent) {
+    return null;
+  }
+
+  return {
+    _id: importedEvent._id,
+    reservationNumber: importedEvent.externalUid,
+    status: "imported",
+    checkIn: importedEvent.startDate,
+    checkOut: importedEvent.endDate,
+  };
 };
 
 router.get("/search", async (req: Request, res: Response) => {
@@ -244,6 +273,13 @@ router.post(
 
       if (!hotel) {
         return res.status(404).json({ message: "Hotel not found" });
+      }
+
+      if (isBookingComManagedRoom(hotel)) {
+        return res.status(409).json({
+          message:
+            "Direct booking requests are disabled for this room because Booking.com calendar import is the active source of truth.",
+        });
       }
 
       const checkIn = new Date(req.body.checkIn);
@@ -394,6 +430,13 @@ router.post(
       return res.status(400).json({ message: "Hotel not found" });
     }
 
+    if (isBookingComManagedRoom(hotel)) {
+      return res.status(409).json({
+        message:
+          "Direct payments are disabled for this room because Booking.com calendar import is the active source of truth.",
+      });
+    }
+
     const minimumNights = getMinimumNights(hotel);
 
     if (Number(numberOfNights) < minimumNights) {
@@ -459,6 +502,13 @@ router.post(
 
       if (!hotel) {
         return res.status(400).json({ message: "Hotel not found" });
+      }
+
+      if (isBookingComManagedRoom(hotel)) {
+        return res.status(409).json({
+          message:
+            "Direct bookings are disabled for this room because Booking.com calendar import is the active source of truth.",
+        });
       }
 
       const checkIn = new Date(req.body.checkIn);

@@ -1,5 +1,24 @@
 # Version History
 
+## 1.7.0 - 2026-04-06
+
+### Booking.com Calendar Sync
+- Added Booking.com iCal import support with room-level configuration, manual sync, and recurring background sync.
+- Added Booking.com external event storage and availability blocking so imported dates appear in admin calendars and prevent overlapping local bookings.
+- Added tokenized local iCal export feeds so Booking.com can pull local closures and reservations without re-import loops.
+- Added a dedicated Booking.com Sync admin panel for import URLs, export URL generation, token regeneration, and copy/paste workflow.
+
+### Booking Management UX
+- Redesigned the booking management calendar to use Booking.com-style horizontal stay bars across weekly rows.
+- Added imported Booking.com entries to day details and table views.
+- Greyed out past dates and highlighted today with a red border for faster calendar scanning.
+
+### Data Integrity
+- Fixed Booking.com DATE-only iCal normalization so imported stays align with the exact source date ranges.
+
+### Deployment
+- Updated deployment build version marker to `1.7.0`.
+
 ## 1.6.0 - 2026-03-18
 
 ### API Route Alignment

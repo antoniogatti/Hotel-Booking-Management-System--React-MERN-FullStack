@@ -7,6 +7,13 @@ import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
 import BookingDayStatus from "../models/booking-day-status";
 import {
+  BOOKING_COM_SOURCE,
+  BOOKING_COM_STATUS_LABEL,
+  findOverlappingImportedEvent,
+  getImportedCalendarEvents,
+  isBookingComManagedRoom,
+} from "../lib/booking-com-ical";
+import {
   sendBookingDecisionEmails,
   sendCheckInNotificationEmail,
 } from "../lib/contact-mail";
@@ -42,7 +49,9 @@ const parseMonthRange = (month: string) => {
 };
 
 const getAccessibleHotel = async (hotelId: string, req: Request) => {
-  const hotel = await Hotel.findById(hotelId).select("_id userId name city country");
+  const hotel = await Hotel.findById(hotelId).select(
+    "_id userId name city country bookingComIcal slug"
+  );
 
   if (!hotel) {
     return { error: { status: 404, message: "Hotel not found" } };
@@ -58,6 +67,7 @@ const getAccessibleHotel = async (hotelId: string, req: Request) => {
 const toBookingCalendarStatus = (status: string | undefined) => {
   if (status === "pending") return "Requested";
   if (status === "confirmed" || status === "arrived" || status === "completed") return "Booked";
+  if (status === "imported") return BOOKING_COM_STATUS_LABEL;
   if (status === "cancelled" || status === "refunded") return "Available";
   return "Available";
 };
@@ -101,7 +111,7 @@ router.get(
 
       const hotels = await Hotel.find(hotelQuery)
         .sort({ name: 1 })
-        .select("_id name city country userId");
+        .select("_id name city country userId bookingComIcal");
 
       res.status(200).json(
         hotels.map((hotel) => ({
@@ -109,6 +119,7 @@ router.get(
           name: hotel.name,
           city: hotel.city,
           country: hotel.country,
+          bookingComIcal: hotel.bookingComIcal,
         }))
       );
     } catch (error) {
@@ -163,13 +174,20 @@ router.get(
         date: { $gte: start, $lt: end },
       }).select("date note");
 
+      const importedEvents = await getImportedCalendarEvents({
+        hotelId,
+        start,
+        end,
+      });
+
       const dayMap = new Map<
         string,
         {
           date: string;
-          status: "Available" | "Requested" | "Booked" | "Closed";
+          status: "Available" | "Requested" | "Booked" | "Imported" | "Closed";
           requestedCount: number;
           bookedCount: number;
+          importedCount: number;
           closed: boolean;
           closedReason?: string;
         }
@@ -182,6 +200,7 @@ router.get(
           status: "Available",
           requestedCount: 0,
           bookedCount: 0,
+          importedCount: 0,
           closed: false,
           closedReason: undefined,
         });
@@ -226,6 +245,28 @@ router.get(
         }
       });
 
+      importedEvents.forEach((event) => {
+        const effectiveStart = event.startDate < start ? start : toUtcStartOfDay(event.startDate);
+        const effectiveEnd = event.endDate > end ? end : toUtcStartOfDay(event.endDate);
+
+        for (
+          let cursor = new Date(effectiveStart);
+          cursor < effectiveEnd;
+          cursor = new Date(cursor.getTime() + 86400000)
+        ) {
+          const key = formatDayKey(cursor);
+          const target = dayMap.get(key);
+          if (!target || target.closed) {
+            continue;
+          }
+
+          target.importedCount += 1;
+          if (target.status === "Available") {
+            target.status = "Imported";
+          }
+        }
+      });
+
       const bookingRows = bookings.map((booking) => ({
         _id: booking._id,
         reservationNumber: booking.reservationNumber,
@@ -240,13 +281,37 @@ router.get(
         adultCount: booking.adultCount,
         childCount: booking.childCount,
         createdAt: booking.createdAt,
+        source: "local",
+      }));
+
+      const importedRows = importedEvents.map((event) => ({
+        _id: String(event._id),
+        reservationNumber: event.externalUid,
+        firstName: "Booking.com",
+        lastName: "Imported block",
+        email: "Guest details are not available through Booking.com iCal",
+        phone: undefined,
+        checkIn: event.startDate,
+        checkOut: event.endDate,
+        status: BOOKING_COM_STATUS_LABEL,
+        totalCost: 0,
+        adultCount: 0,
+        childCount: 0,
+        createdAt: event.createdAt,
+        source: BOOKING_COM_SOURCE,
+        sourceLabel: "Booking.com",
+        summary: event.summary,
+        externalUid: event.externalUid,
+        dtStamp: event.dtStamp,
       }));
 
       res.status(200).json({
         room: accessCheck.hotel,
         month,
         days: Array.from(dayMap.values()),
-        bookings: bookingRows,
+        bookings: [...bookingRows, ...importedRows].sort(
+          (left, right) => new Date(left.checkIn).getTime() - new Date(right.checkIn).getTime()
+        ),
       });
     } catch (error) {
       console.log(error);
@@ -284,6 +349,13 @@ router.post(
       const status = req.body.status as "closed" | "available";
       const date = toUtcStartOfDay(req.body.date);
       const note = typeof req.body.note === "string" ? req.body.note.trim() : "";
+
+      if (isBookingComManagedRoom(accessCheck.hotel as any)) {
+        return res.status(409).json({
+          message:
+            "Manual day closures are disabled for this room because Booking.com calendar import is the active source of truth.",
+        });
+      }
 
       if (status === "closed" && !note) {
         return res.status(400).json({ message: "A comment is required when closing a day." });
@@ -366,6 +438,22 @@ router.post(
             bookingId: overlappingConfirmedBooking._id,
             reservationNumber: overlappingConfirmedBooking.reservationNumber,
             conflictStatus: overlappingConfirmedBooking.status,
+          });
+        }
+
+        const overlappingImportedEvent = await findOverlappingImportedEvent({
+          hotelId: booking.hotelId,
+          checkIn: booking.checkIn,
+          checkOut: booking.checkOut,
+        });
+
+        if (overlappingImportedEvent) {
+          return res.status(409).json({
+            message:
+              "This request cannot be confirmed because Booking.com has already blocked overlapping dates for this room.",
+            bookingId: overlappingImportedEvent._id,
+            reservationNumber: overlappingImportedEvent.externalUid,
+            conflictStatus: "imported",
           });
         }
       }

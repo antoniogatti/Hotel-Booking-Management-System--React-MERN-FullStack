@@ -1,6 +1,6 @@
 {
   "name": "booking-backend",
-  "version": "0.2.0",
+  "version": "1.7.0",
   "description": "booking mern app backend",
   "main": "./src/index.ts",
   "scripts": {
@@ -12,7 +12,10 @@
     "start:prod:local": "cross-env DOTENV_CONFIG_PATH=.env.production NODE_ENV=production node dist/hotel-booking-backend/src/index.js",
     "e2e": "cross-env DOTENV_CONFIG_PATH=.env.e2e nodemon",
     "seed:fuocorosa": "ts-node src/scripts/seed-fuocorosa.ts",
-    "seed:palazzo-rooms": "ts-node src/scripts/seed-palazzopinto-rooms.ts"
+    "seed:palazzo-rooms": "ts-node src/scripts/seed-palazzopinto-rooms.ts",
+    "setup:bookingcom-feeds": "ts-node src/scripts/configure-booking-com-feeds.ts",
+    "sync:bookingcom": "ts-node src/scripts/sync-booking-com-ical.ts",
+    "reset:booking-master": "ts-node src/scripts/reset-booking-master-data.ts"
   },
   "author": "Arnob Mahmud",
   "license": "ISC",
@@ -42,6 +45,7 @@
     "mongoose": "^8.0.0",
     "morgan": "^1.10.1",
     "multer": "^1.4.5-lts.1",
+    "node-ical": "^0.26.0",
     "nodemon": "^3.0.1",
     "stripe": "^14.8.0",
     "swagger-jsdoc": "^6.2.8",

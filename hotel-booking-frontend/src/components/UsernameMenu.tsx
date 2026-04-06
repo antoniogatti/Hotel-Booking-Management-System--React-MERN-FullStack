@@ -9,7 +9,7 @@ import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import * as apiClient from "../api-client";
-import { LogOut, Building2, CalendarClock, BarChart3 } from "lucide-react";
+import { LogOut, Building2, CalendarClock, BarChart3, RefreshCw } from "lucide-react";
 import useAppContext from "../hooks/useAppContext";
 
 const getAvatarUrl = () => {
@@ -88,6 +88,21 @@ const UsernameMenu = () => {
                 Manage Rooms
               </Link>
             </DropdownMenuItem>
+            {userRole === "admin" && (
+              <DropdownMenuItem
+                onClick={handleMenuClick}
+                asChild
+                className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
+              >
+                <Link
+                  to="/booking-com-sync"
+                  className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Booking.com Sync
+                </Link>
+              </DropdownMenuItem>
+            )}
             {userRole === "admin" && (
               <DropdownMenuItem
                 onClick={handleMenuClick}

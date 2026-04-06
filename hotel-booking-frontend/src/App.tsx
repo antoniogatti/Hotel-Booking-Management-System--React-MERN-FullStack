@@ -29,6 +29,7 @@ import TermsConditions from "./pages/TermsConditions";
 import ContactUs from "./pages/ContactUs";
 import ReachUs from "./pages/ReachUs";
 import ManageBookings from "./pages/ManageBookings";
+import BookingComSyncAdmin from "./pages/BookingComSyncAdmin";
 import BookingCheckIn from "./pages/BookingCheckIn";
 import BookingDashboard from "./pages/BookingDashboard";
 import BookingDetails from "./pages/BookingDetails";
@@ -72,6 +73,7 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/booking-dashboard") return `${BRAND_NAME} | Booking Dashboard`;
   if (pathname.startsWith("/booking/")) return `${BRAND_NAME} | Booking Details`;
   if (pathname === "/vacancy-management") return `${BRAND_NAME} | Vacancy Management`;
+  if (pathname === "/booking-com-sync") return `${BRAND_NAME} | Booking.com Sync`;
   if (pathname === "/manage-bookings") return `${BRAND_NAME} | Manage Bookings`;
   if (pathname.startsWith("/hotel/") && pathname.endsWith("/booking")) {
     return `${BRAND_NAME} | Booking Details`;
@@ -266,6 +268,18 @@ const App = () => {
             userRole === "admin" || userRole === "hotel_owner" ? (
               <Layout>
                 <BookingDetails />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/booking-com-sync"
+          element={
+            userRole === "admin" ? (
+              <Layout>
+                <BookingComSyncAdmin />
               </Layout>
             ) : (
               <Navigate to="/" />

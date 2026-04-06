@@ -13,12 +13,14 @@ import bookingsManagementRoutes from "./routes/bookings";
 import healthRoutes from "./routes/health";
 import businessInsightsRoutes from "./routes/business-insights";
 import contactRoutes from "./routes/contact";
+import bookingComSyncRoutes from "./routes/booking-com-sync";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./swagger";
 import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
+import { startBookingComSyncScheduler } from "./lib/booking-com-ical";
 
 // Environment Variables Validation
 const requiredEnvVars = [
@@ -49,6 +51,7 @@ const connectDB = async () => {
     await mongoose.connect(process.env.MONGODB_CONNECTION_STRING as string);
     console.log("✅ MongoDB connected successfully");
     console.log(`📦 Database: ${mongoose.connection.db.databaseName}`);
+    startBookingComSyncScheduler();
   } catch (error) {
     console.error("❌ MongoDB connection error:", error);
     console.error("💡 Please check your MONGODB_CONNECTION_STRING");
@@ -211,6 +214,7 @@ app.use("/api/my-hotels", myHotelRoutes);
 app.use("/api/rooms", hotelRoutes);
 app.use("/api/my-bookings", bookingRoutes);
 app.use("/api/bookings", bookingsManagementRoutes);
+app.use("/api/integrations/booking-com", bookingComSyncRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/business-insights", businessInsightsRoutes);
 app.use("/api/contact", contactRoutes);

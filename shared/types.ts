@@ -94,6 +94,15 @@ export type HotelType = {
   occupancyRate?: number;
   isActive?: boolean;
   isFeatured?: boolean;
+  bookingComIcal?: {
+    importUrl?: string;
+    syncEnabled?: boolean;
+    exportEnabled?: boolean;
+    exportToken?: string;
+    lastSyncAt?: Date;
+    lastSyncStatus?: string;
+    lastSyncError?: string;
+  };
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -147,6 +156,7 @@ export type BookingCalendarDayStatus =
   | "Available"
   | "Requested"
   | "Booked"
+  | "Imported"
   | "Closed";
 
 export type BookingManagementRoomType = {
@@ -154,6 +164,15 @@ export type BookingManagementRoomType = {
   name: string;
   city: string;
   country: string;
+  bookingComIcal?: {
+    importUrl?: string;
+    syncEnabled?: boolean;
+    exportEnabled?: boolean;
+    exportToken?: string;
+    lastSyncAt?: Date;
+    lastSyncStatus?: string;
+    lastSyncError?: string;
+  };
 };
 
 export type BookingCalendarDayType = {
@@ -161,6 +180,7 @@ export type BookingCalendarDayType = {
   status: BookingCalendarDayStatus;
   requestedCount: number;
   bookedCount: number;
+  importedCount?: number;
   closed: boolean;
   closedReason?: string;
 };
@@ -179,6 +199,11 @@ export type BookingCalendarBookingRowType = {
   adultCount: number;
   childCount: number;
   createdAt?: Date;
+  source?: "local" | "booking_com";
+  sourceLabel?: string;
+  summary?: string;
+  externalUid?: string;
+  dtStamp?: Date;
 };
 
 export type BookingCalendarResponseType = {
