@@ -1,6 +1,7 @@
 import express, { Request, Response } from "express";
 import Hotel from "../models/hotel";
 import Booking from "../models/booking";
+import BookingDayStatus from "../models/booking-day-status";
 import User from "../models/user";
 import { BookingType, HotelSearchResponse } from "../../../shared/types";
 import { body, param, validationResult } from "express-validator";
@@ -40,6 +41,75 @@ const calculateNights = (checkIn: Date, checkOut: Date) => {
 const getMinimumNights = (hotel: { minimumNights?: number }) =>
   Math.max(1, Number(hotel.minimumNights) || 1);
 
+const ACTIVE_BOOKING_STATUSES = ["pending", "confirmed", "arrived", "completed"] as const;
+
+const getDayStart = (date: Date) => {
+  const value = new Date(date);
+  value.setHours(0, 0, 0, 0);
+  return value;
+};
+
+const getAvailableHotelsForStay = async <THotel extends { _id: unknown }>(params: {
+  hotels: THotel[];
+  checkIn?: string;
+  checkOut?: string;
+  minimumNights?: Array<{ _id: unknown; minimumNights?: number }>;
+}) => {
+  const { hotels, checkIn, checkOut } = params;
+
+  if (!checkIn || !checkOut || hotels.length === 0) {
+    return hotels;
+  }
+
+  const checkInDate = new Date(checkIn);
+  const checkOutDate = new Date(checkOut);
+
+  if (
+    Number.isNaN(checkInDate.getTime()) ||
+    Number.isNaN(checkOutDate.getTime()) ||
+    checkOutDate <= checkInDate
+  ) {
+    return [];
+  }
+
+  const requestedNights = calculateNights(checkInDate, checkOutDate);
+  const hotelsMeetingStayRules = hotels.filter((hotel) => {
+    const minimumNights = getMinimumNights(hotel as { minimumNights?: number });
+    return requestedNights >= minimumNights;
+  });
+
+  if (hotelsMeetingStayRules.length === 0) {
+    return [];
+  }
+
+  const hotelIds = hotelsMeetingStayRules.map((hotel) => String(hotel._id));
+  const stayStart = getDayStart(checkInDate);
+  const stayEnd = getDayStart(checkOutDate);
+
+  const [bookedHotelIds, closedHotelIds] = await Promise.all([
+    Booking.distinct("hotelId", {
+      hotelId: { $in: hotelIds },
+      status: { $in: ACTIVE_BOOKING_STATUSES },
+      checkIn: { $lt: checkOutDate },
+      checkOut: { $gt: checkInDate },
+    }),
+    BookingDayStatus.distinct("hotelId", {
+      hotelId: { $in: hotelIds },
+      status: "closed",
+      date: { $gte: stayStart, $lt: stayEnd },
+    }),
+  ]);
+
+  const unavailableHotelIds = new Set<string>([
+    ...bookedHotelIds.map(String),
+    ...closedHotelIds.map(String),
+  ]);
+
+  return hotelsMeetingStayRules.filter(
+    (hotel) => !unavailableHotelIds.has(String(hotel._id))
+  );
+};
+
 const findOverlappingBooking = async (params: {
   hotelId: string;
   checkIn: Date;
@@ -68,6 +138,9 @@ router.get("/search", async (req: Request, res: Response) => {
       case "pricePerNightDesc":
         sortOptions = { pricePerNight: -1 };
         break;
+      default:
+        sortOptions = { pricePerNight: 1 };
+        break;
     }
 
     const pageSize = 5;
@@ -76,12 +149,18 @@ router.get("/search", async (req: Request, res: Response) => {
     );
     const skip = (pageNumber - 1) * pageSize;
 
-    const hotels = await Hotel.find(query)
+    const matchedHotels = await Hotel.find(query)
       .sort(sortOptions)
-      .skip(skip)
-      .limit(pageSize);
+      .lean();
 
-    const total = await Hotel.countDocuments(query);
+    const availableHotels = await getAvailableHotelsForStay({
+      hotels: matchedHotels,
+      checkIn: req.query.checkIn?.toString(),
+      checkOut: req.query.checkOut?.toString(),
+    });
+
+    const total = availableHotels.length;
+    const hotels = availableHotels.slice(skip, skip + pageSize);
 
     const response: HotelSearchResponse = {
       data: hotels,

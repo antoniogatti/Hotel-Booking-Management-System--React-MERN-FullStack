@@ -29,7 +29,9 @@ export const AppContext = React.createContext<AppContext | undefined>(
   undefined
 );
 
-const stripePromise = loadStripe(STRIPE_PUB_KEY);
+const stripePromise = STRIPE_PUB_KEY
+  ? loadStripe(STRIPE_PUB_KEY)
+  : Promise.resolve(null);
 
 export const AppContextProvider = ({
   children,
@@ -42,86 +44,26 @@ export const AppContextProvider = ({
   );
   const { toast } = useToast();
 
-  // Simple check for stored tokens without API calls
   const checkStoredAuth = () => {
     const localToken = localStorage.getItem("session_id");
     const userId = localStorage.getItem("user_id");
 
-    // Check if we have both token and user ID
-    const hasToken = !!localToken;
-    const hasUserId = !!userId;
-
-    if (hasToken && hasUserId) {
-      console.log("JWT authentication detected - token and user ID found");
-    }
-
-    return hasToken;
+    return !!localToken && !!userId;
   };
 
-  // Always run validation query - let it handle token checking internally
   const { isError, isLoading, data } = useQuery(
     "validateToken",
     apiClient.validateToken,
     {
       retry: false,
-      refetchOnWindowFocus: false, // Don't refetch on focus
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      // Always enabled - let validateToken handle missing tokens
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
       enabled: true,
-      // Add fallback for JWT authentication
-      onError: (error: any) => {
-        // If validateToken fails, check if we have a token in localStorage
-        const storedToken = localStorage.getItem("session_id");
-        const storedUserId = localStorage.getItem("user_id");
-
-        if (storedToken && error.response?.status === 401) {
-          console.log(
-            "JWT token found but validation failed - possible token expiration"
-          );
-
-          // If we also have a user ID, we can be more confident it's a valid session
-          if (storedUserId) {
-            console.log("JWT session confirmed - using localStorage fallback");
-          }
-        }
-      },
     }
   );
 
-  // Debug logging to understand the state
-  console.log("Auth Debug:", {
-    isLoading,
-    isError,
-    hasData: !!data,
-    hasStoredToken: checkStoredAuth(),
-    hasUserId: !!localStorage.getItem("user_id"),
-    data,
-  });
-
-  // Simple logic: logged in if we have valid data OR stored token as fallback
-  const isLoggedIn =
-    (!isLoading && !isError && !!data) || (checkStoredAuth() && isError); // Use stored token only if validation failed
-
-  // Additional fallback: if we just logged in and have a token, consider logged in
-  const justLoggedIn = checkStoredAuth() && !isLoading && !data && !isError;
-
-  // Enhanced JWT authentication detection and fallback
-  const isJWTFallback = () => {
-    // Check if we have a token but validation failed (typical JWT fallback behavior)
-    const hasStoredToken = checkStoredAuth();
-    const hasUserId = !!localStorage.getItem("user_id");
-    const isFallback = hasStoredToken && isError && !data && hasUserId;
-
-    if (isFallback) {
-      console.log(
-        "JWT fallback mode detected - using localStorage authentication"
-      );
-    }
-
-    return isFallback;
-  };
-
-  const finalIsLoggedIn = isLoggedIn || justLoggedIn || isJWTFallback();
+  const hasStoredAuth = checkStoredAuth();
+  const finalIsLoggedIn = (!isLoading && !!data) || (hasStoredAuth && isError);
 
   const resolvedRole =
     (data as { role?: "user" | "hotel_owner" | "admin" } | undefined)
@@ -139,13 +81,6 @@ export const AppContextProvider = ({
   if (userRole) {
     localStorage.setItem("user_role", userRole);
   }
-
-  console.log(
-    "Final isLoggedIn:",
-    finalIsLoggedIn,
-    "JWT Fallback:",
-    isJWTFallback()
-  );
 
   const showToast = (toastMessage: ToastMessage) => {
     const variant =

@@ -15,7 +15,7 @@ const Layout = ({ children }: Props) => {
   const isHomePage = location.pathname === "/";
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col min-h-screen overflow-x-hidden">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[60] focus:bg-white focus:text-[#2b4463] focus:px-4 focus:py-2 focus:rounded-md focus:shadow"
@@ -31,7 +31,7 @@ const Layout = ({ children }: Props) => {
         {isHomePage ? (
           <div>{children}</div>
         ) : (
-          <div className="w-full px-2 sm:px-6 lg:px-8 py-10">{children}</div>
+          <div className="w-full px-3 sm:px-5 lg:px-8 py-6 sm:py-10">{children}</div>
         )}
       </main>
       <Footer />

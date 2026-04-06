@@ -50,6 +50,7 @@ const HomeSlideshowHero = () => {
   const [checkIn, setCheckIn] = useState<Date | null>(initialCheckIn);
   const [checkOut, setCheckOut] = useState<Date | null>(initialCheckOut);
   const [guests, setGuests] = useState<number>(Math.max(1, search.adultCount));
+  const [calendarMonthsShown, setCalendarMonthsShown] = useState(2);
 
   useEffect(() => {
     if (slides.length <= 1) return;
@@ -60,6 +61,17 @@ const HomeSlideshowHero = () => {
 
     return () => window.clearInterval(timer);
   }, [slides.length]);
+
+  useEffect(() => {
+    const updateCalendarLayout = () => {
+      setCalendarMonthsShown(window.innerWidth < 768 ? 1 : 2);
+    };
+
+    updateCalendarLayout();
+    window.addEventListener("resize", updateCalendarLayout);
+
+    return () => window.removeEventListener("resize", updateCalendarLayout);
+  }, []);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -159,7 +171,7 @@ const HomeSlideshowHero = () => {
             startDate={checkIn}
             endDate={checkOut}
             minDate={minDate}
-            monthsShown={2}
+            monthsShown={calendarMonthsShown}
             shouldCloseOnSelect={false}
             placeholderText="Check In -> Check Out"
             className="h-12 w-full rounded-sm border border-[#d9ddd3] px-3 text-sm text-[#2b4463] outline-none focus:border-[#ea836c] focus-visible:ring-2 focus-visible:ring-[#aab09a]"

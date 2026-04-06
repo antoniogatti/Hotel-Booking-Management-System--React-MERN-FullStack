@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMutation } from "react-query";
 import * as apiClient from "../api-client";
 import useAppContext from "../hooks/useAppContext";
+import { getCancellationPolicyMessage } from "../lib/cancellation-policy";
 import { formatFriendlyDate } from "../lib/utils";
 
 type CheckoutState = {
@@ -146,6 +147,11 @@ const Checkout = () => {
     };
   }, [bookingDetails.checkIn, bookingDetails.checkOut]);
 
+  const cancellationMessage = useMemo(
+    () => getCancellationPolicyMessage(bookingDetails.checkIn),
+    [bookingDetails.checkIn]
+  );
+
   const handleSendBookingRequest = () => {
     if (isBelowMinimumStay) {
       setSubmissionError(
@@ -216,6 +222,9 @@ const Checkout = () => {
           <h2 className="text-xl font-semibold text-slate-800">Booking Request</h2>
           <p className="text-slate-600 mt-1">
             Thanks for your booking request. Our staff will contact you soon for confirmation.
+          </p>
+          <p className="mt-2 text-sm text-slate-500">
+            {cancellationMessage}
           </p>
         </div>
 

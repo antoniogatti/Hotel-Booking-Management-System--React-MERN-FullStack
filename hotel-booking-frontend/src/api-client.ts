@@ -27,6 +27,15 @@ export const fetchCurrentUser = async (): Promise<UserType> => {
   return response.data;
 };
 
+const clearStoredAuth = () => {
+  localStorage.removeItem("session_id");
+  localStorage.removeItem("user_id");
+  localStorage.removeItem("user_email");
+  localStorage.removeItem("user_name");
+  localStorage.removeItem("user_image");
+  localStorage.removeItem("user_role");
+};
+
 export const register = async (formData: RegisterFormData) => {
   const response = await axiosInstance.post("/api/users/register", formData);
   return response.data;
@@ -39,13 +48,11 @@ export const signIn = async (formData: SignInFormData) => {
   const token = response.data?.token;
   if (token) {
     localStorage.setItem("session_id", token);
-    console.log("JWT token stored in localStorage for incognito compatibility");
   }
 
   // Store user info for incognito mode fallback and profile avatar
   if (response.data?.userId) {
     localStorage.setItem("user_id", response.data.userId);
-    console.log("User ID stored for incognito mode fallback");
   }
   if (response.data?.user) {
     const { email, firstName, lastName, role } = response.data.user;
@@ -57,36 +64,36 @@ export const signIn = async (formData: SignInFormData) => {
 
   // Force validate token after successful login to update React Query cache
   try {
-    const validationResult = await validateToken();
-    console.log("Token validation after login:", validationResult);
+    await validateToken();
 
     // Invalidate and refetch the validateToken query to update the UI
     queryClient.invalidateQueries("validateToken");
 
     // Force a refetch to ensure the UI updates
     await queryClient.refetchQueries("validateToken");
-  } catch (error) {
-    console.log("Token validation failed after login, but continuing...");
-
-    // Even if validation fails, if we have a token stored, consider it a success for incognito mode
-    if (localStorage.getItem("session_id")) {
-      console.log("Incognito mode detected - using stored token as fallback");
-    }
+  } catch {
+    // Keep login flow resilient if the validation check is temporarily unavailable.
   }
 
   return response.data;
 };
 
 export const validateToken = async () => {
+  const token = localStorage.getItem("session_id");
+
+  if (!token) {
+    return null;
+  }
+
   try {
     const response = await axiosInstance.get("/api/auth/validate-token");
     return response.data;
   } catch (error: any) {
     if (error.response?.status === 401) {
-      // Not logged in, throw error so React Query knows it failed
-      throw new Error("Token invalid");
+      clearStoredAuth();
+      return null;
     }
-    // For any other error (network, etc.), also throw
+
     throw new Error("Token validation failed");
   }
 };
@@ -94,13 +101,7 @@ export const validateToken = async () => {
 export const signOut = async () => {
   const response = await axiosInstance.post("/api/auth/logout");
 
-  // Clear localStorage (JWT tokens and user info)
-  localStorage.removeItem("session_id");
-  localStorage.removeItem("user_id");
-  localStorage.removeItem("user_email");
-  localStorage.removeItem("user_name");
-  localStorage.removeItem("user_image");
-  localStorage.removeItem("user_role");
+  clearStoredAuth();
 
   return response.data;
 };

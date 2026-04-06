@@ -173,6 +173,8 @@ const Detail = () => {
             pricePerNight={hotel.pricePerNight}
             hotelId={hotel._id}
             minimumNights={hotel.minimumNights || 1}
+            maxAdults={hotel.adultCount}
+            maxChildren={hotel.childCount}
           />
         </aside>
       </div>

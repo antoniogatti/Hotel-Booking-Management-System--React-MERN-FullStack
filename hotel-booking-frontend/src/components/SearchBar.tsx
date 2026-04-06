@@ -39,9 +39,21 @@ const SearchBar = () => {
   const [checkOut, setCheckOut] = useState<Date | null>(initialCheckOut);
   const [adultCount, setAdultCount] = useState<number>(search.adultCount);
   const [childCount, setChildCount] = useState<number>(search.childCount);
+  const [calendarMonthsShown, setCalendarMonthsShown] = useState(2);
   const hasFetchedRef = useRef(false);
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
   const [isInitialMount, setIsInitialMount] = useState(true);
+
+  useEffect(() => {
+    const updateCalendarLayout = () => {
+      setCalendarMonthsShown(window.innerWidth < 768 ? 1 : 2);
+    };
+
+    updateCalendarLayout();
+    window.addEventListener("resize", updateCalendarLayout);
+
+    return () => window.removeEventListener("resize", updateCalendarLayout);
+  }, []);
 
   // Fetch hotel places on mount
   // You can replace this fetch with context if you already have hotel data
@@ -312,7 +324,7 @@ const SearchBar = () => {
               minDate={minDate}
               maxDate={maxDate}
               filterDate={(date) => date >= minDate}
-              monthsShown={2}
+              monthsShown={calendarMonthsShown}
               shouldCloseOnSelect={false}
               placeholderText="Check In -> Check Out"
               dateFormat="dd/MM/yyyy"

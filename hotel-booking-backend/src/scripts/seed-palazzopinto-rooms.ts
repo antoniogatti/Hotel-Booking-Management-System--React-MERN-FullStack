@@ -19,7 +19,7 @@ const PALAZZO_BASE = {
   policies: {
     checkInTime: "14:00",
     checkOutTime: "10:00",
-    cancellationPolicy: "Please refer to current booking terms on official website.",
+    cancellationPolicy: "Free cancellation up to 7 days before arrival. Bookings made within 7 days of check-in are non-refundable.",
     petPolicy: "Not specified",
     smokingPolicy: "Non-smoking rooms",
   },

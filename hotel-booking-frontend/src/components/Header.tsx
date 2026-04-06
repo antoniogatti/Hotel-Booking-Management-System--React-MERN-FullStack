@@ -62,7 +62,7 @@ const Header = () => {
         <div className="flex justify-between items-center h-full">
           <button
             onClick={handleLogoClick}
-            className="flex items-center space-x-2 group"
+            className="flex min-w-0 items-center space-x-2 group"
             aria-label={`${siteConfig.brand.shortName} home`}
           >
             <img
@@ -70,7 +70,7 @@ const Header = () => {
               alt={siteConfig.brand.fullName}
               className="h-12 w-auto object-contain rounded-md bg-[#f8f6f1] px-2 py-1 shadow-soft group-hover:shadow-medium transition-all duration-300"
             />
-            <span className="text-[#2b4463] font-serif text-xl sm:text-2xl font-semibold tracking-[0.02em] leading-none">
+            <span className="truncate text-[#2b4463] font-serif text-lg sm:text-2xl font-semibold tracking-[0.02em] leading-none max-w-[58vw] sm:max-w-none">
               {siteConfig.brand.shortName}
             </span>
           </button>
