@@ -1,5 +1,4 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
-import Cookies from "js-cookie";
 
 // Define base URL based on environment
 const getBaseURL = () => {
@@ -23,6 +22,15 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   metadata?: { retryCount: number };
 }
 
+const clearStoredProfile = () => {
+  localStorage.removeItem("session_id");
+  localStorage.removeItem("user_id");
+  localStorage.removeItem("user_email");
+  localStorage.removeItem("user_name");
+  localStorage.removeItem("user_image");
+  localStorage.removeItem("user_role");
+};
+
 // Create axios instance with consistent configuration
 const axiosInstance = axios.create({
   baseURL: getBaseURL(),
@@ -33,19 +41,8 @@ const axiosInstance = axios.create({
   timeout: 30000, // 30 second timeout
 });
 
-// Request interceptor to add Authorization header with JWT token
 axiosInstance.interceptors.request.use((config: CustomAxiosRequestConfig) => {
-  // Get JWT token from localStorage (no more cookie dependency)
-  const token = localStorage.getItem("session_id");
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-    console.log("Using JWT token from localStorage for authentication");
-  }
-
-  // Add retry count to track retries
   config.metadata = { retryCount: 0 };
-
   return config;
 });
 
@@ -55,11 +52,8 @@ axiosInstance.interceptors.response.use(
   async (error) => {
     const { config } = error;
 
-    // Handle 401 errors by clearing session
     if (error.response?.status === 401) {
-      Cookies.remove("session_id");
-      localStorage.removeItem("session_id");
-      // Don't redirect automatically - let components handle it
+      clearStoredProfile();
     }
 
     // Handle rate limiting (429) with retry logic

@@ -1,5 +1,21 @@
 # Version History
 
+## 1.8.0 - 2026-04-08
+
+### Security and Authentication Hardening
+- Moved browser authentication to secure cookie validation, added OAuth state verification, and stabilized the frontend auth callback flow.
+- Restricted admin-only frontend surfaces and removed public business-insights access from the active application flow.
+- Added structured backend logging, upload validation, and broader audit coverage for hotel, booking, and check-in mutations.
+
+### Booking Flow Simplification
+- Removed Stripe-based payment handling and finalized the booking-request-only model across frontend, backend, shared types, tests, and documentation.
+- Removed legacy payment fields and UI remnants from booking management views and backend booking storage.
+
+### Azure Rollout Preparation
+- Added production Bicep and rollout artifacts for the secure backend, Key Vault, monitoring, and Static Web Apps transition path.
+- Added persisted-role assignment tooling and production role manifests for explicit admin setup.
+- Reduced rollout-script inputs by auto-discovering non-secret Azure values from the active subscription and existing resource group.
+
 ## 1.7.1 - 2026-04-07
 
 ### Homepage Staff Section

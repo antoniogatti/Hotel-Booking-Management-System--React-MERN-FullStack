@@ -10,6 +10,8 @@ import {
   syncAllBookingComRooms,
   syncBookingComRoom,
 } from "../lib/booking-com-ical";
+import { recordAuditEvent } from "../lib/audit-log";
+import { logError } from "../lib/logger";
 
 const router = express.Router();
 
@@ -145,7 +147,10 @@ router.get("/export/:hotelId/:token.ics", async (req: Request, res: Response) =>
     res.setHeader("Cache-Control", "public, max-age=300");
     return res.status(200).send(lines.join("\r\n"));
   } catch (error) {
-    console.log(error);
+    logError("Unable to generate Booking.com export feed", error, {
+      route: "booking-com-sync.export",
+      hotelId: req.params.hotelId,
+    });
     return res.status(500).send("Unable to generate calendar feed");
   }
 });
@@ -210,12 +215,30 @@ router.put(
         { new: true }
       ).select("_id name slug bookingComIcal");
 
+      await recordAuditEvent({
+        action: "integration.booking-com.config-updated",
+        entityType: "integration",
+        entityId: String(hotel?._id || req.params.hotelId),
+        hotelId: String(req.params.hotelId),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          syncEnabled: Boolean(req.body.syncEnabled),
+          exportEnabled,
+          hasImportUrl: Boolean(importUrl),
+        },
+      });
+
       return res.status(200).json({
         hotel,
         exportFeedUrl: buildExportFeedUrl(req, String(hotel?._id || req.params.hotelId), hotel?.bookingComIcal?.exportToken),
       });
     } catch (error) {
-      console.log(error);
+      logError("Unable to save Booking.com sync configuration", error, {
+        route: "booking-com-sync.config",
+        hotelId: req.params.hotelId,
+      });
       return res.status(500).json({ message: "Unable to save Booking.com sync configuration" });
     }
   }
@@ -251,12 +274,28 @@ router.post(
         { new: true }
       ).select("_id name slug bookingComIcal");
 
+      await recordAuditEvent({
+        action: "integration.booking-com.export-token-regenerated",
+        entityType: "integration",
+        entityId: String(hotel?._id || req.params.hotelId),
+        hotelId: String(req.params.hotelId),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          exportEnabled: true,
+        },
+      });
+
       return res.status(200).json({
         hotel,
         exportFeedUrl: buildExportFeedUrl(req, String(hotel?._id || req.params.hotelId), exportToken),
       });
     } catch (error) {
-      console.log(error);
+      logError("Unable to regenerate Booking.com export token", error, {
+        route: "booking-com-sync.regenerate-export-token",
+        hotelId: req.params.hotelId,
+      });
       return res.status(500).json({ message: "Unable to regenerate Booking.com export token" });
     }
   }
@@ -293,7 +332,10 @@ router.post(
       const results = await syncAllBookingComRooms();
       return res.status(200).json({ results });
     } catch (error: any) {
-      console.log(error);
+      logError("Booking.com sync request failed", error, {
+        route: "booking-com-sync.sync",
+        hotelId: typeof req.body.hotelId === "string" ? req.body.hotelId : undefined,
+      });
       return res.status(500).json({
         message: error instanceof Error ? error.message : "Unable to sync Booking.com calendars",
       });

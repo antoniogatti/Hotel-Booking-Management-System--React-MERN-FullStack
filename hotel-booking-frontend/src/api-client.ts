@@ -3,13 +3,11 @@ import { SignInFormData } from "./pages/SignIn";
 import {
   HotelSearchResponse,
   HotelType,
-  PaymentIntentResponse,
   UserType,
   BookingType,
   BookingManagementRoomType,
   BookingCalendarResponseType,
 } from "../../shared/types";
-import { BookingFormData } from "./forms/BookingForm/BookingForm";
 import { queryClient } from "./main";
 
 export { getApiBaseUrl };
@@ -44,13 +42,6 @@ export const register = async (formData: RegisterFormData) => {
 export const signIn = async (formData: SignInFormData) => {
   const response = await axiosInstance.post("/api/auth/login", formData);
 
-  // Store JWT token from response body in localStorage
-  const token = response.data?.token;
-  if (token) {
-    localStorage.setItem("session_id", token);
-  }
-
-  // Store user info for incognito mode fallback and profile avatar
   if (response.data?.userId) {
     localStorage.setItem("user_id", response.data.userId);
   }
@@ -79,14 +70,30 @@ export const signIn = async (formData: SignInFormData) => {
 };
 
 export const validateToken = async () => {
-  const token = localStorage.getItem("session_id");
-
-  if (!token) {
-    return null;
-  }
-
   try {
     const response = await axiosInstance.get("/api/auth/validate-token");
+
+    if (response.data?.userId) {
+      localStorage.setItem("user_id", response.data.userId);
+    }
+    if (response.data?.email) {
+      localStorage.setItem("user_email", response.data.email);
+    }
+    if (response.data?.firstName || response.data?.lastName) {
+      const name = [response.data.firstName, response.data.lastName]
+        .filter(Boolean)
+        .join(" ");
+      if (name) {
+        localStorage.setItem("user_name", name);
+      }
+    }
+    if (response.data?.image) {
+      localStorage.setItem("user_image", response.data.image);
+    }
+    if (response.data?.role) {
+      localStorage.setItem("user_role", response.data.role);
+    }
+
     return response.data;
   } catch (error: any) {
     if (error.response?.status === 401) {
@@ -206,25 +213,6 @@ export const fetchHotelById = async (hotelId: string): Promise<HotelType> => {
   return response.data;
 };
 
-export const createPaymentIntent = async (
-  hotelId: string,
-  numberOfNights: string
-): Promise<PaymentIntentResponse> => {
-  const response = await axiosInstance.post(
-    `/api/rooms/${hotelId}/bookings/payment-intent`,
-    { numberOfNights }
-  );
-  return response.data;
-};
-
-export const createRoomBooking = async (formData: BookingFormData) => {
-  const response = await axiosInstance.post(
-    `/api/rooms/${formData.hotelId}/bookings`,
-    formData
-  );
-  return response.data;
-};
-
 export const fetchHotelBookings = async (
   hotelId: string
 ): Promise<BookingType[]> => {
@@ -319,17 +307,17 @@ export const processRequestedBooking = async (payload: {
 
 // Business Insights API functions (public endpoints - no auth required)
 export const fetchBusinessInsightsDashboard = async () => {
-  const response = await axiosInstance.get("/api/business-insights/dashboard/public");
+  const response = await axiosInstance.get("/api/business-insights/dashboard");
   return response.data;
 };
 
 export const fetchBusinessInsightsForecast = async () => {
-  const response = await axiosInstance.get("/api/business-insights/forecast/public");
+  const response = await axiosInstance.get("/api/business-insights/forecast");
   return response.data;
 };
 
 export const fetchBusinessInsightsPerformance = async () => {
-  const response = await axiosInstance.get("/api/business-insights/system-stats/public");
+  const response = await axiosInstance.get("/api/business-insights/system-stats");
   return response.data;
 };
 

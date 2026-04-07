@@ -4,6 +4,7 @@ import User from "../models/user";
 import Booking from "../models/booking";
 import mongoose from "mongoose";
 import verifyToken from "../middleware/auth";
+import requireRole from "../middleware/requireRole";
 
 const router = express.Router();
 
@@ -175,19 +176,7 @@ const getDashboardData = async () => {
   };
 };
 
-router.get("/dashboard/public", async (req: Request, res: Response) => {
-  try {
-    const businessInsightsData = await getDashboardData();
-    res.status(200).json(businessInsightsData);
-  } catch (error) {
-    res.status(500).json({
-      error: "Failed to fetch business insights data",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-});
-
-router.get("/dashboard", verifyToken, async (req: Request, res: Response) => {
+router.get("/dashboard", verifyToken, requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const businessInsightsData = await getDashboardData();
     res.status(200).json(businessInsightsData);
@@ -283,19 +272,7 @@ const getForecastData = async () => {
   };
 };
 
-router.get("/forecast/public", async (req: Request, res: Response) => {
-  try {
-    const forecastData = await getForecastData();
-    res.status(200).json(forecastData);
-  } catch (error) {
-    res.status(500).json({
-      error: "Failed to generate forecasts",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-});
-
-router.get("/forecast", verifyToken, async (req: Request, res: Response) => {
+router.get("/forecast", verifyToken, requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const forecastData = await getForecastData();
     res.status(200).json(forecastData);
@@ -336,19 +313,7 @@ const getSystemStatsData = async () => {
   };
 };
 
-router.get("/system-stats/public", async (req: Request, res: Response) => {
-  try {
-    const performanceData = await getSystemStatsData();
-    res.status(200).json(performanceData);
-  } catch (error) {
-    res.status(500).json({
-      error: "Failed to fetch performance metrics",
-      message: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-});
-
-router.get("/system-stats", verifyToken, async (req: Request, res: Response) => {
+router.get("/system-stats", verifyToken, requireRole("admin"), async (req: Request, res: Response) => {
   try {
     const performanceData = await getSystemStatsData();
     res.status(200).json(performanceData);

@@ -1,6 +1,7 @@
 import * as nodeIcal from "node-ical";
 import Hotel from "../models/hotel";
 import ExternalCalendarEvent from "../models/external-calendar-event";
+import { logError, logInfo } from "./logger";
 
 export const BOOKING_COM_SOURCE = "booking_com" as const;
 export const BOOKING_COM_STATUS_LABEL = "Imported" as const;
@@ -293,10 +294,15 @@ const runScheduledSync = async () => {
   try {
     const results = await syncAllBookingComRooms();
     if (results.length > 0) {
-      console.log("[Booking.com iCal] Sync cycle completed", results);
+      logInfo("Booking.com sync cycle completed", {
+        roomCount: results.length,
+        activated: results.reduce((sum, result) => sum + result.activated, 0),
+        deactivated: results.reduce((sum, result) => sum + result.deactivated, 0),
+        fetched: results.reduce((sum, result) => sum + result.fetched, 0),
+      });
     }
   } catch (error) {
-    console.log("[Booking.com iCal] Scheduled sync failed", error);
+    logError("Booking.com scheduled sync failed", error);
   } finally {
     syncInProgress = false;
   }
@@ -310,7 +316,7 @@ export const startBookingComSyncScheduler = () => {
   const enabled = String(process.env.BOOKING_COM_SYNC_ENABLED || "true").toLowerCase() !== "false";
 
   if (!enabled) {
-    console.log("[Booking.com iCal] Scheduler disabled by environment");
+    logInfo("Booking.com scheduler disabled by environment");
     return;
   }
 
@@ -327,5 +333,7 @@ export const startBookingComSyncScheduler = () => {
     void runScheduledSync();
   }, BOOKING_COM_SYNC_INTERVAL_MS);
 
-  console.log("[Booking.com iCal] Scheduler started (every 2 hours)");
+  logInfo("Booking.com scheduler started", {
+    intervalMs: BOOKING_COM_SYNC_INTERVAL_MS,
+  });
 };

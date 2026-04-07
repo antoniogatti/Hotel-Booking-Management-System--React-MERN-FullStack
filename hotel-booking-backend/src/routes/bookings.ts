@@ -19,6 +19,8 @@ import {
   sendCheckInNotificationEmail,
 } from "../lib/contact-mail";
 import { body, param, query, validationResult } from "express-validator";
+import { recordAuditEvent } from "../lib/audit-log";
+import { logError } from "../lib/logger";
 
 const router = express.Router();
 
@@ -152,7 +154,11 @@ router.get(
         }))
       );
     } catch (error) {
-      console.log(error);
+      logError("Unable to fetch booking rooms", error, {
+        route: "bookings.rooms",
+        actorId: req.userId,
+        actorRole: req.userRole,
+      });
       res.status(500).json({ message: "Unable to fetch rooms" });
     }
   }
@@ -348,7 +354,10 @@ router.get(
         ),
       });
     } catch (error) {
-      console.log(error);
+      logError("Unable to fetch booking room calendar", error, {
+        route: "bookings.calendar",
+        hotelId: req.params.hotelId,
+      });
       res.status(500).json({ message: "Unable to fetch room calendar" });
     }
   }
@@ -404,9 +413,27 @@ router.post(
         await BookingDayStatus.deleteOne({ hotelId, date });
       }
 
+      await recordAuditEvent({
+        action: status === "closed" ? "booking.day-status.closed" : "booking.day-status.reopened",
+        entityType: "booking_day_status",
+        entityId: `${hotelId}:${date.toISOString().slice(0, 10)}`,
+        hotelId,
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          date: date.toISOString(),
+          note,
+          status,
+        },
+      });
+
       return res.status(200).json({ message: "Day status updated successfully" });
     } catch (error) {
-      console.log(error);
+      logError("Unable to update booking day status", error, {
+        route: "bookings.day-status",
+        hotelId: req.params.hotelId,
+      });
       return res.status(500).json({ message: "Unable to update day status" });
     }
   }
@@ -494,6 +521,21 @@ router.post(
 
       await booking.save();
 
+      await recordAuditEvent({
+        action: action === "confirm" ? "booking.confirmed" : "booking.rejected",
+        entityType: "booking",
+        entityId: String(booking._id),
+        hotelId: String(booking.hotelId),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          reservationNumber: booking.reservationNumber,
+          reason: req.body.reason || undefined,
+          status: booking.status,
+        },
+      });
+
       let notificationsSent = true;
       let warning: string | undefined;
 
@@ -513,7 +555,10 @@ router.post(
       } catch (emailError) {
         notificationsSent = false;
         warning = "Booking decision saved, but notifications could not be sent immediately.";
-        console.log("Booking decision email delivery failed", emailError);
+        logError("Booking decision email delivery failed", emailError, {
+          route: "bookings.decision",
+          bookingId: String(booking._id),
+        });
       }
 
       return res.status(200).json({
@@ -526,7 +571,10 @@ router.post(
         warning,
       });
     } catch (error) {
-      console.log(error);
+      logError("Unable to process booking decision", error, {
+        route: "bookings.decision",
+        bookingId: req.params.id,
+      });
       return res.status(500).json({ message: "Unable to process booking decision" });
     }
   }
@@ -541,7 +589,11 @@ router.get("/", verifyToken, requireRole("admin"), async (req: Request, res: Res
 
     res.status(200).json(bookings);
   } catch (error) {
-    console.log(error);
+    logError("Unable to fetch bookings", error, {
+      route: "bookings.list",
+      actorId: req.userId,
+      actorRole: req.userRole,
+    });
     res.status(500).json({ message: "Unable to fetch bookings" });
   }
 });
@@ -571,7 +623,10 @@ router.get(
 
       res.status(200).json(bookings);
     } catch (error) {
-      console.log(error);
+      logError("Unable to fetch hotel bookings", error, {
+        route: "bookings.hotel",
+        hotelId: req.params.hotelId,
+      });
       res.status(500).json({ message: "Unable to fetch hotel bookings" });
     }
   }
@@ -610,7 +665,10 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
 
     res.status(200).json(booking);
   } catch (error) {
-    console.log(error);
+    logError("Unable to fetch booking", error, {
+      route: "bookings.detail",
+      bookingId: req.params.id,
+    });
     res.status(500).json({ message: "Unable to fetch booking" });
   }
 });
@@ -662,58 +720,11 @@ router.patch(
 
       res.status(200).json(booking);
     } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "Unable to update booking" });
-    }
-  }
-);
-
-// Update payment status
-router.patch(
-  "/:id/payment",
-  verifyToken,
-  requireRole("hotel_owner", "admin"),
-  [
-    body("paymentStatus")
-      .isIn(["pending", "paid", "failed", "refunded"])
-      .withMessage("Invalid payment status"),
-  ],
-  async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    try {
-      const { paymentStatus, paymentMethod } = req.body;
-
-      const existingBooking = await Booking.findById(req.params.id);
-      if (!existingBooking) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
-
-      const hotel = await Hotel.findById(existingBooking.hotelId);
-      if (!hotel) {
-        return res.status(404).json({ message: "Hotel not found" });
-      }
-
-      if (req.userRole !== "admin" && hotel.userId !== req.userId) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const updateData: any = { paymentStatus };
-      if (paymentMethod) {
-        updateData.paymentMethod = paymentMethod;
-      }
-
-      const booking = await Booking.findByIdAndUpdate(req.params.id, updateData, {
-        new: true,
+      logError("Unable to update booking", error, {
+        route: "bookings.status",
+        bookingId: req.params.id,
       });
-
-      res.status(200).json(booking);
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "Unable to update payment status" });
+      res.status(500).json({ message: "Unable to update booking" });
     }
   }
 );
@@ -743,9 +754,27 @@ router.delete("/:id", verifyToken, requireRole("admin"), async (req: Request, re
       },
     });
 
+    await recordAuditEvent({
+      action: "booking.deleted",
+      entityType: "booking",
+      entityId: String(booking._id),
+      hotelId: String(booking.hotelId),
+      actorId: req.userId,
+      actorRole: req.userRole,
+      req,
+      metadata: {
+        reservationNumber: booking.reservationNumber,
+        status: booking.status,
+        totalCost: booking.totalCost,
+      },
+    });
+
     res.status(200).json({ message: "Booking deleted successfully" });
   } catch (error) {
-    console.log(error);
+    logError("Unable to delete booking", error, {
+      route: "bookings.delete",
+      bookingId: req.params.id,
+    });
     res.status(500).json({ message: "Unable to delete booking" });
   }
 });
@@ -854,6 +883,22 @@ router.post(
 
         await importedEvent.save();
 
+        await recordAuditEvent({
+          action: "booking.check-in.submitted",
+          entityType: "external_booking",
+          entityId: String(importedEvent._id),
+          hotelId: String(importedEvent.hotelId),
+          actorId: req.userId,
+          actorRole: req.userRole,
+          req,
+          metadata: {
+            reservationNumber: importedEvent.externalUid,
+            source: "booking_com",
+            documentCount: mergedDocuments.length,
+            checkedInAt: importedEvent.checkInInfo?.checkedInAt,
+          },
+        });
+
         return res.status(200).json({
           message: "Imported booking details and check-in submitted successfully",
           booking: toImportedEventResponse(importedEvent, accessCheck.hotel),
@@ -914,6 +959,22 @@ router.post(
 
       await booking.save();
 
+      await recordAuditEvent({
+        action: "booking.check-in.submitted",
+        entityType: "booking",
+        entityId: String(booking._id),
+        hotelId: String(booking.hotelId),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          reservationNumber: booking.reservationNumber,
+          documentCount: mergedDocuments.length,
+          checkedInAt: booking.checkInInfo?.checkedInAt,
+          status: booking.status,
+        },
+      });
+
       let notificationsSent = true;
       let warning: string | undefined;
 
@@ -939,7 +1000,10 @@ router.post(
       } catch (emailError) {
         notificationsSent = false;
         warning = "Check-in saved, but admin notification email could not be sent.";
-        console.log("Check-in notification email failed", emailError);
+        logError("Check-in notification email failed", emailError, {
+          route: "bookings.check-in",
+          bookingId: String(booking._id),
+        });
       }
 
       return res.status(200).json({
@@ -949,7 +1013,10 @@ router.post(
         warning,
       });
     } catch (error) {
-      console.log(error);
+      logError("Unable to submit check-in", error, {
+        route: "bookings.check-in",
+        bookingId: req.params.id,
+      });
       return res.status(500).json({ message: "Unable to submit check-in" });
     }
   }
@@ -1153,7 +1220,10 @@ router.get(
         bookings: detailedBookings.slice(0, 100), // Limit to 100 for API response
       });
     } catch (error) {
-      console.log(error);
+      logError("Unable to fetch booking dashboard summary", error, {
+        route: "bookings.dashboard-summary",
+        hotelId: req.query.hotelId,
+      });
       res.status(500).json({ message: "Unable to fetch booking dashboard summary" });
     }
   }

@@ -21,55 +21,58 @@ import morgan from "morgan";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
 import { startBookingComSyncScheduler } from "./lib/booking-com-ical";
+import { logError, logInfo, logWarn } from "./lib/logger";
+
+const isProduction = process.env.NODE_ENV === "production";
+const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
 
 // Environment Variables Validation
 const requiredEnvVars = [
   "MONGODB_CONNECTION_STRING",
   "JWT_SECRET_KEY",
-  "STRIPE_API_KEY",
 ];
 
 const missingEnvVars = requiredEnvVars.filter((envVar) => !process.env[envVar]);
 
 if (missingEnvVars.length > 0) {
-  console.error("❌ Missing required environment variables:");
-  missingEnvVars.forEach((envVar) => console.error(`   - ${envVar}`));
+  logError("Missing required environment variables", undefined, {
+    variables: missingEnvVars,
+  });
   process.exit(1);
 }
 
-console.log("✅ All required environment variables are present");
-console.log(`🌍 Environment: ${process.env.NODE_ENV || "development"}`);
-console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || "Not set"}`);
-console.log(
-  `🔗 Backend URL: ${process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`}`
-);
+logInfo("Environment configuration validated", {
+  environment: process.env.NODE_ENV || "development",
+  frontendUrl: process.env.FRONTEND_URL || "not-set",
+  backendUrl: process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`,
+});
 
 // MongoDB Connection with Error Handling
 const connectDB = async () => {
   try {
-    console.log("📡 Attempting to connect to MongoDB...");
+    logInfo("Attempting MongoDB connection");
     await mongoose.connect(process.env.MONGODB_CONNECTION_STRING as string);
-    console.log("✅ MongoDB connected successfully");
-    console.log(`📦 Database: ${mongoose.connection.db.databaseName}`);
+    logInfo("MongoDB connected successfully", {
+      database: mongoose.connection.db.databaseName,
+    });
     startBookingComSyncScheduler();
   } catch (error) {
-    console.error("❌ MongoDB connection error:", error);
-    console.error("💡 Please check your MONGODB_CONNECTION_STRING");
+    logError("MongoDB connection failed", error);
     process.exit(1);
   }
 };
 
 // Handle MongoDB connection events
 mongoose.connection.on("disconnected", () => {
-  console.warn("⚠️  MongoDB disconnected. Attempting to reconnect...");
+  logWarn("MongoDB disconnected. Driver will attempt to reconnect.");
 });
 
 mongoose.connection.on("error", (error) => {
-  console.error("❌ MongoDB connection error:", error);
+  logError("MongoDB connection emitted an error", error);
 });
 
 mongoose.connection.on("reconnected", () => {
-  console.log("✅ MongoDB reconnected successfully");
+  logInfo("MongoDB reconnected successfully");
 });
 
 connectDB();
@@ -82,7 +85,7 @@ app.use(helmet());
 // Trust proxy for production (fixes rate limiting issues)
 app.set("trust proxy", 1);
 
-// Rate limiting - more lenient for payment endpoints
+// Rate limiting for API endpoints
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 200, // Increased limit for general requests
@@ -91,23 +94,34 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Special limiter for payment endpoints
-const paymentLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 50, // Higher limit for payment requests
-  message: "Too many payment requests, please try again later.",
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 app.use("/api/", generalLimiter);
-app.use("/api/rooms/*/bookings/payment-intent", paymentLimiter);
 
 // Compression middleware
 app.use(compression());
 
 // Logging middleware
-app.use(morgan("combined"));
+app.use(
+  morgan((tokens, req, res) => {
+    const status = Number(tokens.status(req, res) || 0);
+    const responseTime = Number(tokens["response-time"](req, res) || 0);
+    const contentLength = Number(tokens.res(req, res, "content-length") || 0) || undefined;
+
+    return JSON.stringify({
+      timestamp: new Date().toISOString(),
+      level: status >= 500 ? "error" : status >= 400 ? "warn" : "info",
+      message: "http_request",
+      context: {
+        method: req.method,
+        path: req.path,
+        status,
+        durationMs: responseTime,
+        contentLength,
+        ip: tokens["remote-addr"](req, res) || undefined,
+        userAgent: tokens["user-agent"](req, res) || undefined,
+      },
+    });
+  })
+);
 
 const configuredOrigins = [
   process.env.FRONTEND_URL,
@@ -117,42 +131,46 @@ const configuredOrigins = [
     .filter(Boolean),
 ];
 
-const defaultOrigins = [
+const defaultOrigins = isProduction
+  ? []
+  : [
   "http://localhost:5174",
   "http://localhost:5173",
   "http://localhost:5175",
   "http://localhost:5176",
-  "https://mern-booking-hotel.netlify.app",
-  "https://hotel-mern-booking.vercel.app",
 ];
 
 const allowedOrigins = new Set(
   [...configuredOrigins, ...defaultOrigins]
     .filter((origin): origin is string => Boolean(origin))
-    .map((origin) => origin.replace(/\/$/, ""))
+    .map(normalizeOrigin)
 );
+
+const corsOriginHandler: cors.CorsOptions["origin"] = (origin, callback) => {
+  if (!origin) {
+    return callback(null, true);
+  }
+
+  if (allowedOrigins.has(normalizeOrigin(origin))) {
+    return callback(null, true);
+  }
+
+  if (!isProduction) {
+    logWarn("CORS blocked origin", { origin });
+  }
+
+  return callback(new Error("Not allowed by CORS"));
+};
+
+if (isProduction && allowedOrigins.size === 0) {
+  logWarn("No production CORS origins configured", {
+    expectedSettings: ["FRONTEND_URL", "FRONTEND_URLS"],
+  });
+}
+
 app.use(
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      // Allow all Netlify and Vercel preview URLs
-      if (origin.includes("netlify.app") || origin.includes("vercel.app")) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.has(origin.replace(/\/$/, ""))) {
-        return callback(null, true);
-      }
-
-      // Log blocked origins in development
-      if (process.env.NODE_ENV === "development") {
-        console.log("CORS blocked origin:", origin);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
-    },
+    origin: corsOriginHandler,
     credentials: true,
     optionsSuccessStatus: 204,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -168,21 +186,7 @@ app.use(
 app.options(
   "*",
   cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-
-      // Allow all Netlify and Vercel preview URLs
-      if (origin.includes("netlify.app") || origin.includes("vercel.app")) {
-        return callback(null, true);
-      }
-
-      if (allowedOrigins.has(origin.replace(/\/$/, ""))) {
-        return callback(null, true);
-      }
-
-      return callback(new Error("Not allowed by CORS"));
-    },
+    origin: corsOriginHandler,
     credentials: true,
     optionsSuccessStatus: 204,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -220,14 +224,18 @@ app.use("/api/business-insights", businessInsightsRoutes);
 app.use("/api/contact", contactRoutes);
 
 // Swagger API Documentation
-app.use(
-  "/api-docs",
-  swaggerUi.serve,
-  swaggerUi.setup(specs, {
-    customCss: ".swagger-ui .topbar { display: none }",
-    customSiteTitle: "Palazzo Pinto B&B API Documentation",
-  })
-);
+const swaggerEnabled = !isProduction || process.env.ENABLE_SWAGGER === "true";
+
+if (swaggerEnabled) {
+  app.use(
+    "/api-docs",
+    swaggerUi.serve,
+    swaggerUi.setup(specs, {
+      customCss: ".swagger-ui .topbar { display: none }",
+      customSiteTitle: "Palazzo Pinto B&B API Documentation",
+    })
+  );
+}
 
 // Dynamic Port Configuration (for Coolify/VPS and local development)
 const PORT = process.env.PORT || 5000;
@@ -236,36 +244,36 @@ const backendBaseUrl =
   process.env.BACKEND_URL?.replace(/\/$/, "") || `http://localhost:${PORT}`;
 
 const server = app.listen(PORT, () => {
-  console.log("🚀 ============================================");
-  console.log(`✅ Server running on port ${PORT}`);
-  console.log(`🌐 Local: http://localhost:${PORT}`);
-  console.log(`🔗 Public: ${backendBaseUrl}`);
-  console.log(`📚 API Docs: ${backendBaseUrl}/api-docs`);
-  console.log(`💚 Health Check: ${backendBaseUrl}/api/health`);
-  console.log("🚀 ============================================");
+  logInfo("Backend server started", {
+    port: Number(PORT),
+    localUrl: `http://localhost:${PORT}`,
+    publicUrl: backendBaseUrl,
+    apiDocsUrl: swaggerEnabled ? `${backendBaseUrl}/api-docs` : undefined,
+    healthUrl: `${backendBaseUrl}/api/health`,
+  });
 });
 
 // Graceful Shutdown Handler
 const gracefulShutdown = (signal: string) => {
-  console.log(`\n⚠️  ${signal} received. Starting graceful shutdown...`);
+  logWarn("Shutdown signal received", { signal });
 
   server.close(async () => {
-    console.log("🔒 HTTP server closed");
+    logInfo("HTTP server closed");
 
     try {
       await mongoose.connection.close();
-      console.log("🔒 MongoDB connection closed");
-      console.log("✅ Graceful shutdown completed");
+      logInfo("MongoDB connection closed");
+      logInfo("Graceful shutdown completed");
       process.exit(0);
     } catch (error) {
-      console.error("❌ Error during shutdown:", error);
+      logError("Error during graceful shutdown", error, { signal });
       process.exit(1);
     }
   });
 
   // Force shutdown after 30 seconds
   setTimeout(() => {
-    console.error("⚠️  Forced shutdown after timeout");
+    logError("Forced shutdown after timeout", undefined, { signal, timeoutMs: 30000 });
     process.exit(1);
   }, 30000);
 };
@@ -276,12 +284,14 @@ process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 // Handle uncaught exceptions
 process.on("uncaughtException", (error) => {
-  console.error("❌ Uncaught Exception:", error);
+  logError("Uncaught exception", error);
   gracefulShutdown("UNCAUGHT_EXCEPTION");
 });
 
 // Handle unhandled promise rejections
 process.on("unhandledRejection", (reason, promise) => {
-  console.error("❌ Unhandled Rejection at:", promise, "reason:", reason);
+  logError("Unhandled promise rejection", reason, {
+    promise: String(promise),
+  });
   gracefulShutdown("UNHANDLED_REJECTION");
 });

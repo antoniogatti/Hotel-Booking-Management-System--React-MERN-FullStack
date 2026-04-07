@@ -79,8 +79,8 @@ Create a `.env` file in the root directory:
 # API Configuration
 VITE_API_BASE_URL=http://localhost:5000
 
-# Payment Processing
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your-stripe-publishable-key
+# Auth & API
+VITE_API_BASE_URL=http://localhost:5000
 
 # Optional: Analytics (not used in this project yet)
 VITE_GOOGLE_ANALYTICS_ID=GA_MEASUREMENT_ID
@@ -134,8 +134,6 @@ hotel-booking-frontend/
 │   │   ├── AppContext.tsx       # Global app context
 │   │   └── SearchContext.tsx   # Search state context
 │   ├── forms/                  # Form components
-│   │   ├── BookingForm/
-│   │   │   └── BookingForm.tsx # Hotel booking form
 │   │   ├── GuestInfoForm/
 │   │   │   └── GuestInfoForm.tsx # Guest information form
 │   │   └── ManageHotelForm/
@@ -208,7 +206,6 @@ hotel-booking-frontend/
 
 ### **Payment & Media**
 
-- **Stripe React**: Payment processing integration
 - **SharePoint**: Document management (via backend)
 
 ### **Development Tools**
@@ -321,7 +318,7 @@ Modal for viewing detailed booking information.
 
 | Route                  | Component                | Description                      | Auth Required |
 | ---------------------- | ------------------------ | -------------------------------- | ------------- |
-| `/booking/:hotelId`    | `Booking.tsx`            | Booking confirmation and payment | ✅            |
+| `/booking/:hotelId`    | `Booking.tsx`            | Booking request submission | ✅            |
 | `/my-bookings`         | `MyBookings.tsx`         | User's booking history           | ✅            |
 | `/my-hotels`           | `MyHotels.tsx`           | Hotel management for owners      | ✅            |
 | `/add-hotel`           | `AddHotel.tsx`           | Add new hotel listing            | ✅            |
@@ -512,44 +509,21 @@ export const searchHotels = async (
 
 ---
 
-## 💳 Payment Integration
+## 📩 Booking Requests
 
-### **Stripe Payment Flow**
-
-```typescript
-// Stripe payment integration
-import { loadStripe } from "@stripe/stripe-js";
-import { Elements } from "@stripe/react-stripe-js";
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-
-// Payment form component
-const PaymentForm = ({ clientSecret }: { clientSecret: string }) => {
-  return (
-    <Elements stripe={stripePromise} options={{ clientSecret }}>
-      <CheckoutForm />
-    </Elements>
-  );
-};
-```
-
-### **Payment Processing**
+### **Booking Request Flow**
 
 ```typescript
-// Payment intent creation
-const createPaymentIntent = async (hotelId: string, numberOfNights: string) => {
-  const response = await fetch(
-    `${API_BASE_URL}/api/hotels/${hotelId}/bookings/payment-intent`,
-    {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ numberOfNights }),
-    },
-  );
+const submitBookingRequest = async (hotelId: string, bookingRequest: BookingRequest) => {
+  const response = await fetch(`${API_BASE_URL}/api/rooms/${hotelId}/booking-request`, {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(bookingRequest),
+  });
 
   if (!response.ok) {
-    throw new Error("Error creating payment intent");
+    throw new Error("Error submitting booking request");
   }
 
   return response.json();
@@ -573,7 +547,7 @@ const createPaymentIntent = async (hotelId: string, numberOfNights: string) => {
 - **Seamless Flow**: From search to booking confirmation
 - **Guest Management**: Adult and child count tracking
 - **Date Selection**: Calendar picker with availability check
-- **Payment Security**: Stripe integration with PCI compliance
+- **Request Review**: Admin confirmation after request submission
 - **Confirmation**: Email notifications and booking history
 
 ### **Hotel Management**
@@ -609,7 +583,6 @@ const createPaymentIntent = async (hotelId: string, numberOfNights: string) => {
 
 3. **Environment Variables**
    - Set `VITE_API_BASE_URL` to your production backend URL
-   - Configure `VITE_STRIPE_PUBLISHABLE_KEY` for payments
 
 4. **SPA Configuration**
 
@@ -625,7 +598,6 @@ const createPaymentIntent = async (hotelId: string, numberOfNights: string) => {
 
 - [ ] Environment variables configured
 - [ ] Backend API deployed and accessible
-- [ ] Stripe keys configured for production
 - [ ] CORS settings updated for production domain
 - [ ] Performance optimization enabled
 - [ ] Error monitoring configured
@@ -761,12 +733,7 @@ const apiClient = {
 ### **Third-Party Integrations**
 
 ```typescript
-// Stripe integration
-import { loadStripe } from "@stripe/stripe-js";
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-
-// SharePoint document upload
+// SharePoint/media helper
 const optimizedImageUrl = (url: string, width: number) => {
   return url.replace("/upload/", `/upload/w_${width},c_fill/`);
 };

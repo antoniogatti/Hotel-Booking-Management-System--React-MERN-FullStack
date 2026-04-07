@@ -2,10 +2,7 @@ import React, { useState } from "react";
 import LoadingSpinner from "../components/LoadingSpinner";
 import { useQuery } from "react-query";
 import * as apiClient from "../api-client";
-import { loadStripe, Stripe } from "@stripe/stripe-js";
 import { useToast } from "../hooks/use-toast";
-
-const STRIPE_PUB_KEY = import.meta.env.VITE_STRIPE_PUB_KEY || "";
 
 type ToastMessage = {
   title: string;
@@ -18,7 +15,6 @@ export type AppContext = {
   isLoggedIn: boolean;
   userRole: "user" | "hotel_owner" | "admin" | null;
   isOwnerOrAdmin: boolean;
-  stripePromise: Promise<Stripe | null>;
   showGlobalLoading: (message?: string) => void;
   hideGlobalLoading: () => void;
   isGlobalLoading: boolean;
@@ -28,10 +24,6 @@ export type AppContext = {
 export const AppContext = React.createContext<AppContext | undefined>(
   undefined
 );
-
-const stripePromise = STRIPE_PUB_KEY
-  ? loadStripe(STRIPE_PUB_KEY)
-  : Promise.resolve(null);
 
 export const AppContextProvider = ({
   children,
@@ -44,13 +36,6 @@ export const AppContextProvider = ({
   );
   const { toast } = useToast();
 
-  const checkStoredAuth = () => {
-    const localToken = localStorage.getItem("session_id");
-    const userId = localStorage.getItem("user_id");
-
-    return !!localToken && !!userId;
-  };
-
   const { isError, isLoading, data } = useQuery(
     "validateToken",
     apiClient.validateToken,
@@ -62,25 +47,17 @@ export const AppContextProvider = ({
     }
   );
 
-  const hasStoredAuth = checkStoredAuth();
-  const finalIsLoggedIn = (!isLoading && !!data) || (hasStoredAuth && isError);
+  const authData = data as
+    | { role?: "user" | "hotel_owner" | "admin" }
+    | null
+    | undefined;
 
-  const resolvedRole =
-    (data as { role?: "user" | "hotel_owner" | "admin" } | undefined)
-      ?.role ||
-    (localStorage.getItem("user_role") as
-      | "user"
-      | "hotel_owner"
-      | "admin"
-      | null);
+  const finalIsLoggedIn = !isLoading && !!authData && !isError;
+  const resolvedRole = authData?.role ?? null;
 
   const userRole = finalIsLoggedIn ? resolvedRole || "user" : null;
   const isOwnerOrAdmin =
     userRole === "hotel_owner" || userRole === "admin";
-
-  if (userRole) {
-    localStorage.setItem("user_role", userRole);
-  }
 
   const showToast = (toastMessage: ToastMessage) => {
     const variant =
@@ -115,7 +92,6 @@ export const AppContextProvider = ({
         isLoggedIn: finalIsLoggedIn,
         userRole,
         isOwnerOrAdmin,
-        stripePromise,
         showGlobalLoading,
         hideGlobalLoading,
         isGlobalLoading,

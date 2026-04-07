@@ -15,8 +15,6 @@ export interface IBooking extends Document {
   checkOut: Date;
   totalCost: number;
   status: "pending" | "confirmed" | "arrived" | "cancelled" | "completed" | "refunded";
-  paymentStatus: "pending" | "paid" | "failed" | "refunded";
-  paymentMethod: string;
   specialRequests: string;
   cancellationReason: string;
   refundAmount: number;
@@ -60,13 +58,6 @@ const bookingSchema = new mongoose.Schema(
       default: "pending",
       index: true,
     },
-    paymentStatus: {
-      type: String,
-      enum: ["pending", "paid", "failed", "refunded"],
-      default: "pending",
-      index: true,
-    },
-    paymentMethod: { type: String },
     specialRequests: { type: String },
     cancellationReason: { type: String },
     refundAmount: { type: Number, default: 0 },
@@ -104,7 +95,6 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.index({ userId: 1, createdAt: -1 });
 bookingSchema.index({ hotelId: 1, checkIn: 1 });
 bookingSchema.index({ status: 1, createdAt: -1 });
-bookingSchema.index({ paymentStatus: 1, createdAt: -1 });
 bookingSchema.index({ checkIn: 1, status: 1 });
 bookingSchema.index({ reservationNumber: 1 }, { unique: true, sparse: true });
 bookingSchema.index({ hotelId: 1, email: 1, checkIn: 1, checkOut: 1, createdAt: -1 });

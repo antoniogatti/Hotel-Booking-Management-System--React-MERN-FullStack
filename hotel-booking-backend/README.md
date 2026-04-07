@@ -17,14 +17,13 @@ A production-ready, scalable backend API for Palazzo Pinto B&B. Built with Node.
 
 ### **What This Backend Provides**
 
-This backend serves as the **core API engine** for a comprehensive hotel booking platform. It handles all server-side operations including user authentication, hotel management, booking processing, payment integration, and business analytics.
+This backend serves as the **core API engine** for a comprehensive hotel booking platform. It handles all server-side operations including user authentication, hotel management, booking requests, and business analytics.
 
 ### **Core Responsibilities**
 
 - **🔐 Authentication & Authorization**: JWT-based secure user management
 - **🏨 Hotel Management**: CRUD operations for hotel listings and details
-- **📅 Booking System**: Real-time booking creation and management
-- **💳 Payment Processing**: Stripe integration for secure transactions
+- **📅 Booking System**: Real-time booking requests and management
 - **📊 Analytics Engine**: Business insights and performance metrics
 - ** Security**: Rate limiting, CORS, input validation, and data protection
 
@@ -38,8 +37,8 @@ This backend serves as the **core API engine** for a comprehensive hotel booking
          │                       │                       │
          ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Multer        │    │   Stripe        │    │  SharePoint     │
-│  (File Upload)  │    │  (Payments)     │    │  (Documents)    │
+│   Multer        │    │ Booking Flow    │    │  SharePoint     │
+│  (File Upload)  │    │ (Requests/ICS)  │    │  (Documents)    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -100,8 +99,6 @@ CONTACT_MAIL_INBOX=info@palazzopintobnb.com
 CONTACT_MAIL_SUBJECT_PREFIX=[PalazzoPinto][ContactForm]
 CONTACT_MAIL_CONFIRMATION_SUBJECT=Message Sent - Confirmation
 
-# Stripe (Payment Processing)
-STRIPE_API_KEY=sk_test_your-stripe-secret-key
 ```
 
 ---
@@ -163,10 +160,10 @@ hotel-booking-backend/
 - **Multer**: File upload middleware
 - **SharePoint**: Document storage and management
 
-### **Payment Processing**
+### **Booking Operations**
 
-- **Stripe**: Payment gateway integration
-- **Stripe Node.js SDK**: Official Stripe library
+- **Booking Requests**: Pending guest requests with duplicate protection
+- **Booking.com ICS Sync**: Imported reservations merged into room availability
 
 ### **Development & Monitoring**
 
@@ -373,7 +370,6 @@ interface BookingType {
   checkOut: Date;
   totalCost: number;
   status: "pending" | "confirmed" | "cancelled" | "completed";
-  paymentStatus: "pending" | "paid" | "failed";
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -426,40 +422,31 @@ const validateHotel = [
 
 ---
 
-## 💳 Payment Integration
-
-### **Stripe Payment Flow**
+## 📩 Booking Request Handling
 
 ```typescript
-// Create payment intent
-export const createPaymentIntent = async (req: Request, res: Response) => {
-  try {
-    const { numberOfNights } = req.body;
-    const hotelId = req.params.hotelId;
+export const submitBookingRequest = async (req: Request, res: Response) => {
+  const { hotelId } = req.params;
+  const existingRecentBooking = await Booking.findOne({
+    hotelId,
+    email: req.body.email?.trim().toLowerCase(),
+    checkIn: req.body.checkIn,
+    checkOut: req.body.checkOut,
+    status: { $in: ["pending", "confirmed"] },
+  }).sort({ createdAt: -1 });
 
-    const hotel = await Hotel.findById(hotelId);
-    if (!hotel) {
-      return res.status(404).json({ message: "Hotel not found" });
-    }
-
-    const totalCost = hotel.pricePerNight * numberOfNights;
-
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: totalCost * 100, // Convert to cents
-      currency: "usd",
-      metadata: {
-        hotelId,
-        userId: req.userId,
-      },
-    });
-
-    res.json({
-      paymentIntentId: paymentIntent.id,
-      clientSecret: paymentIntent.client_secret,
-    });
-  } catch (error) {
-    res.status(500).json({ message: "Error creating payment intent" });
+  if (existingRecentBooking) {
+    return res.status(409).json({ message: "Booking request already submitted recently" });
   }
+
+  const booking = await Booking.create({
+    hotelId,
+    status: "pending",
+    totalCost: calculateTotalCost(req.body),
+    ...req.body,
+  });
+
+  return res.status(200).json({ bookingId: booking._id, status: booking.status });
 };
 ```
 
@@ -532,7 +519,6 @@ export const getAnalyticsDashboard = async (req: Request, res: Response) => {
 - [ ] Environment variables configured
 - [ ] MongoDB Atlas cluster set up
 - [ ] SharePoint document library setup
-- [ ] Stripe production keys
 - [ ] CORS settings updated for production domain
 - [ ] Rate limiting configured
 - [ ] Error monitoring enabled
@@ -669,7 +655,7 @@ const apiClient = {
 
 ### **✅ Business Ready**
 
-- **Payment Processing**: Complete Stripe integration
+- **Booking Operations**: Request intake, approval workflow, and calendar visibility
 - **Analytics**: Real-time business insights
 - **Multi-tenant**: Supports multiple hotel owners
 - **Audit Trail**: Complete booking and transaction history

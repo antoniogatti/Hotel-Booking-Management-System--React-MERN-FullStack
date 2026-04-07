@@ -1,0 +1,96 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "italynorth"
+    },
+    "namePrefix": {
+      "value": "palazzopinto"
+    },
+    "backendPlanName": {
+      "value": "palazzopinto-api-b1-plan"
+    },
+    "backendAppName": {
+      "value": "palazzopinto-api-secure"
+    },
+    "keyVaultName": {
+      "value": "palazzopintokv"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "palazzopinto-logs"
+    },
+    "applicationInsightsName": {
+      "value": "palazzopinto-appi"
+    },
+    "frontendUrl": {
+      "value": "https://palazzopinto-web-2603151048.azurewebsites.net"
+    },
+    "frontendAdditionalOrigins": {
+      "value": []
+    },
+    "entraTenantId": {
+      "value": "f0b2f579-2f09-4daf-839f-abf49b0d8dcc"
+    },
+    "mongoConnectionStringSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/mongodb-connection-string"
+    },
+    "jwtSecretKeySecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/jwt-secret-key"
+    },
+    "cloudinaryCloudNameSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/cloudinary-cloud-name"
+    },
+    "cloudinaryApiKeySecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/cloudinary-api-key"
+    },
+    "cloudinaryApiSecretSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/cloudinary-api-secret"
+    },
+    "entraClientIdSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/ms-entra-client-id"
+    },
+    "entraClientSecretSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/ms-entra-client-secret"
+    },
+    "backendExtraAppSettings": {
+      "value": [
+        {
+          "name": "ENABLE_SWAGGER",
+          "value": "false"
+        },
+        {
+          "name": "BOOKING_COM_SYNC_ENABLED",
+          "value": "true"
+        },
+        {
+          "name": "BOOKING_COM_SYNC_RUN_ON_STARTUP",
+          "value": "true"
+        },
+        {
+          "name": "CONTACT_MAIL_SENDER",
+          "value": "info@palazzopintobnb.com"
+        },
+        {
+          "name": "CONTACT_MAIL_INBOX",
+          "value": "info@palazzopintobnb.com"
+        },
+        {
+          "name": "CONTACT_MAIL_SUBJECT_PREFIX",
+          "value": "[PalazzoPinto][ContactForm]"
+        },
+        {
+          "name": "CONTACT_MAIL_CONFIRMATION_SUBJECT",
+          "value": "Message Sent - Confirmation"
+        }
+      ]
+    },
+    "tags": {
+      "value": {
+        "environment": "production",
+        "application": "hotel-booking",
+        "resourceGroup": "PalazzoPintoBnB"
+      }
+    }
+  }
+}

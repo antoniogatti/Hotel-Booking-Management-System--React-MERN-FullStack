@@ -152,17 +152,25 @@ const App = () => {
         <Route
           path="/api-docs"
           element={
-            <Layout>
-              <ApiDocs />
-            </Layout>
+            userRole === "admin" ? (
+              <Layout>
+                <ApiDocs />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
           }
         />
         <Route
           path="/api-status"
           element={
-            <Layout>
-              <ApiStatus />
-            </Layout>
+            userRole === "admin" ? (
+              <Layout>
+                <ApiStatus />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
           }
         />
         <Route
@@ -200,9 +208,13 @@ const App = () => {
         <Route
           path="/business-insights"
           element={
-            <Layout>
-              <AnalyticsDashboard />
-            </Layout>
+            userRole === "admin" ? (
+              <Layout>
+                <AnalyticsDashboard />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
           }
         />
         <Route

@@ -3,7 +3,7 @@ import User from "../models/user";
 import jwt from "jsonwebtoken";
 import { check, validationResult } from "express-validator";
 import verifyToken from "../middleware/auth";
-import { normalizeEmail, resolveRoleForEmail } from "../lib/user-role";
+import { defaultAppRole, normalizeEmail } from "../lib/user-role";
 
 const router = express.Router();
 
@@ -44,7 +44,6 @@ router.post(
 
     try {
       const normalizedEmail = normalizeEmail(req.body.email);
-      const computedRole = resolveRoleForEmail(normalizedEmail);
 
       let user = await User.findOne({
         email: normalizedEmail,
@@ -57,7 +56,7 @@ router.post(
       user = new User({
         ...req.body,
         email: normalizedEmail,
-        role: computedRole,
+        role: defaultAppRole,
       });
       await user.save();
 

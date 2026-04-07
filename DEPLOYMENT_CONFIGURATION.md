@@ -50,8 +50,7 @@ az webapp config appsettings set \
   BACKEND_URL="https://palazzopinto-api-2603151048.azurewebsites.net" \
   MS_ENTRA_CLIENT_ID="<entra-client-id>" \
   MS_ENTRA_CLIENT_SECRET="<entra-client-secret>" \
-  MS_ENTRA_TENANT_ID="<tenant-id-or-common>" \
-  STRIPE_API_KEY="<stripe-secret-key>"
+  MS_ENTRA_TENANT_ID="<tenant-id-or-common>"
 ```
 
 ### Frontend production settings

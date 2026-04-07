@@ -145,7 +145,7 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 - **Privacy Compliance**: GDPR-ready data handling
 - **Rate Limiting**: Protection against abuse and DDoS
 - **Input Validation**: Comprehensive data sanitization
-- **Secure Payments**: PCI-compliant payment processing
+- **Secure Booking Requests**: Server-side validation and protected admin workflows
 
 #### 📱 **User Experience:**
 
@@ -185,7 +185,7 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 - ✅ Core booking functionality
 - ✅ Hotel management system
 - ✅ Basic analytics dashboard
-- ✅ Payment integration
+- ✅ Booking request workflow
 
 #### **Phase 2 (Planned):**
 
@@ -279,7 +279,7 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 
 - **Real-time Availability**: Check-in/check-out date validation
 - **Guest Management**: Adult and child count tracking
-- **Payment Integration**: Stripe payment processing
+- **Booking Requests**: Guest request submission with duplicate protection
 - **Booking Status**: Pending, confirmed, cancelled, completed, refunded
 - **Booking History**: Complete booking logs and analytics
 
@@ -323,7 +323,6 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 - **Shadcn UI** - Modern component library
 - **Lucide React** - Beautiful icons
 - **React Hook Form** - Form validation and handling
-- **Stripe React** - Payment processing
 
 ### Backend
 
@@ -336,7 +335,6 @@ This project serves as a **comprehensive hotel booking ecosystem** that bridges 
 - **bcryptjs** - Password hashing
 - **Multer** - File upload handling
 - **SharePoint** - Document management and storage
-- **Stripe** - Payment processing
 - **Swagger** - API documentation
 - **Helmet** - Security middleware
 - **Morgan** - HTTP request logger
@@ -483,10 +481,10 @@ MONGODB_CONNECTION_STRING=mongodb://localhost:27017/hotel-booking
 JWT_SECRET=your-super-secret-jwt-key-here
 JWT_EXPIRES_IN=7d
 
-# SharePoint Configuration (for document storage)
-# Stripe Configuration (for payments)
-STRIPE_SECRET_KEY=sk_test_your-stripe-secret-key
-STRIPE_PUBLISHABLE_KEY=pk_test_your-stripe-publishable-key
+# Microsoft Entra OAuth / Graph
+MS_ENTRA_CLIENT_ID=your-microsoft-client-id
+MS_ENTRA_CLIENT_SECRET=your-microsoft-client-secret
+MS_ENTRA_TENANT_ID=your-tenant-id-or-common
 
 # Frontend URL (for CORS)
 FRONTEND_URL=http://localhost:5174
@@ -506,9 +504,6 @@ Create a `.env` file in the `hotel-booking-frontend` directory:
 # API Configuration
 VITE_API_BASE_URL=http://localhost:7002
 
-# Stripe Configuration
-VITE_STRIPE_PUBLISHABLE_KEY=pk_test_your-stripe-publishable-key
-
 # Optional: Analytics (not used in this project yet)
 VITE_GOOGLE_ANALYTICS_ID=GA_MEASUREMENT_ID
 ```
@@ -522,13 +517,7 @@ VITE_GOOGLE_ANALYTICS_ID=GA_MEASUREMENT_ID
 3. Get connection string from "Connect" button
 4. Replace `<password>` with your database password
 
-#### 2. Stripe Setup
-
-1. Create account at [Stripe](https://stripe.com/)
-2. Go to Developers → API Keys
-3. Copy Publishable Key and Secret Key (use test keys for development)
-
-#### 4. JWT Secret
+#### 2. JWT Secret
 
 Generate a secure random string:
 
@@ -854,8 +843,6 @@ interface BookingType {
   checkOut: Date;
   totalCost: number;
   status: "pending" | "confirmed" | "cancelled" | "completed" | "refunded";
-  paymentStatus: "pending" | "paid" | "failed" | "refunded";
-  paymentMethod?: string;
   specialRequests?: string;
   cancellationReason?: string;
   refundAmount?: number;
@@ -919,38 +906,36 @@ const requireRole = (roles: string[]) => {
 
 ---
 
-## 💳 Payment Integration
+## 📩 Booking Request Flow
 
-### Stripe Integration
-
-The application integrates with Stripe for secure payment processing:
+Guests now submit a booking request instead of completing a payment flow in-app.
 
 ```typescript
-// Create payment intent
-const paymentIntent = await stripe.paymentIntents.create({
-  amount: totalCost * 100, // Convert to cents
-  currency: "usd",
-  metadata: {
-    hotelId,
-    userId,
-    bookingId,
-  },
-});
+const submitBookingRequest = async (hotelId: string, payload: BookingRequest) => {
+  const response = await fetch(`${API_BASE_URL}/api/rooms/${hotelId}/booking-request`, {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
 
-// Payment confirmation
-const confirmPayment = await stripe.paymentIntents.confirm(paymentIntentId, {
-  payment_method: paymentMethodId,
-});
+  if (!response.ok) {
+    throw new Error("Unable to submit booking request");
+  }
+
+  return response.json();
+};
 ```
 
-### Payment Flow
+### Booking Request Lifecycle
 
-1. User selects hotel and dates
-2. System calculates total cost
-3. Stripe payment intent is created
-4. User completes payment
-5. Booking is confirmed
-6. Confirmation email is sent
+1. Guest selects room and stay dates.
+2. The API checks availability and recent duplicates.
+3. A pending booking request is saved.
+4. Notification emails are sent to the guest and property inbox.
+5. Admin or hotel staff review and confirm or reject the request.
 
 ---
 
@@ -1157,7 +1142,6 @@ npm run build
 
 1. **Environment variables:**
    - Set `VITE_API_BASE_URL` to your production backend URL
-   - Configure Stripe keys for production
 
 ### Production Checklist
 
@@ -1221,7 +1205,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Modern React**: Hooks, Context API, React Query
 - **Database Design**: MongoDB schema design and relationships
 - **Authentication**: JWT-based authentication system
-- **Payment Integration**: Stripe payment processing
+- **Booking Workflows**: Availability checks, booking requests, and admin review
 - **File Upload**: SharePoint document management
 - **API Design**: RESTful API with Swagger documentation
 - **State Management**: Server and client state management
@@ -1255,7 +1239,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [Vite](https://vitejs.dev/) - Fast build tool
 - [Shadcn UI](https://ui.shadcn.com/) - Component library
 - [React Query](https://tanstack.com/query/latest) - Data fetching
-- [Stripe](https://stripe.com/docs) - Payment processing
 
 ### Best Practices
 

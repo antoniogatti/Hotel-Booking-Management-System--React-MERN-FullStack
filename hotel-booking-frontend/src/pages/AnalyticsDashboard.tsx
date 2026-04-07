@@ -137,9 +137,6 @@ const AnalyticsDashboard = () => {
     }
   );
 
-  // Debug logging
-  console.log("Frontend Business Insights Data:", analyticsData);
-
   const { data: forecastData } = useQueryWithLoading<ForecastData>(
     "business-insights-forecast",
     fetchBusinessInsightsForecast,
@@ -151,9 +148,6 @@ const AnalyticsDashboard = () => {
     }
   );
 
-  // Debug logging
-  console.log("Frontend Forecast Data:", forecastData);
-
   const { data: performanceData } = useQueryWithLoading<PerformanceData>(
     "business-insights-performance",
     fetchBusinessInsightsPerformance,
@@ -164,9 +158,6 @@ const AnalyticsDashboard = () => {
       loadingMessage: "Loading performance data...",
     }
   );
-
-  // Debug logging
-  console.log("Frontend Performance Data:", performanceData);
 
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 

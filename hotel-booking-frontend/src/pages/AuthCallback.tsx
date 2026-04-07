@@ -1,61 +1,81 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "react-query";
+import * as apiClient from "../api-client";
 import useAppContext from "../hooks/useAppContext";
 import { Loader2 } from "lucide-react";
+
+const wait = (ms: number) =>
+  new Promise((resolve) => window.setTimeout(resolve, ms));
 
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { showToast } = useAppContext();
+  const hasProcessedRef = useRef(false);
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    const userId = searchParams.get("userId");
-    const error = searchParams.get("error");
-    const provider = searchParams.get("provider");
-    const email = searchParams.get("email");
-    const firstName = searchParams.get("firstName");
-    const lastName = searchParams.get("lastName");
-    const image = searchParams.get("image");
-    const role = searchParams.get("role");
-
-    if (error) {
-      showToast({
-        title: "Sign-in failed",
-        description:
-          error === "oauth_config"
-            ? "Social sign-in is not configured."
-            : error === "token_exchange"
-            ? "Could not complete social sign-in."
-            : "Something went wrong. Please try again.",
-        type: "ERROR",
-      });
-      navigate("/sign-in");
+    if (hasProcessedRef.current) {
       return;
     }
 
-    if (token && userId) {
-      localStorage.setItem("session_id", token);
-      localStorage.setItem("user_id", userId);
-      if (email) localStorage.setItem("user_email", email);
-      const name = [firstName, lastName].filter(Boolean).join(" ") || email;
-      if (name) localStorage.setItem("user_name", name);
-      if (image) localStorage.setItem("user_image", image);
-      if (role) localStorage.setItem("user_role", role);
+    hasProcessedRef.current = true;
 
-      queryClient.invalidateQueries("validateToken");
-      showToast({
-        title: "Signed in successfully",
-        description: `Welcome! You have been signed in with ${provider === "microsoft" ? "Microsoft" : "Google"}.`,
-        type: "SUCCESS",
-      });
-      navigate("/");
-      window.location.reload();
-    } else {
-      navigate("/sign-in");
-    }
+    const error = searchParams.get("error");
+    const provider = searchParams.get("provider");
+
+    void (async () => {
+      if (error) {
+        showToast({
+          title: "Sign-in failed",
+          description:
+            error === "oauth_config"
+              ? "Social sign-in is not configured."
+              : error === "token_exchange"
+              ? "Could not complete social sign-in."
+              : error === "oauth_state"
+              ? "The sign-in session could not be verified. Please try again."
+              : "Something went wrong. Please try again.",
+          type: "ERROR",
+        });
+        navigate("/sign-in");
+        return;
+      }
+
+      try {
+        let result: Awaited<ReturnType<typeof apiClient.validateToken>> = null;
+
+        for (let attempt = 0; attempt < 5; attempt++) {
+          result = await apiClient.validateToken();
+          if (result) {
+            break;
+          }
+
+          await wait(250);
+        }
+
+        if (!result) {
+          throw new Error("session_missing");
+        }
+
+        await queryClient.invalidateQueries("validateToken");
+
+        showToast({
+          title: "Signed in successfully",
+          description: `Welcome! You have been signed in with ${provider === "microsoft" ? "Microsoft" : "your provider"}.`,
+          type: "SUCCESS",
+        });
+        navigate("/");
+      } catch {
+        showToast({
+          title: "Sign-in failed",
+          description: "Your session could not be established. Please try again.",
+          type: "ERROR",
+        });
+        navigate("/sign-in");
+      }
+    })();
   }, [searchParams, navigate, queryClient, showToast]);
 
   return (

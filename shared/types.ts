@@ -124,8 +124,6 @@ export type BookingType = {
   checkOut: Date;
   totalCost: number;
   status?: "pending" | "confirmed" | "arrived" | "cancelled" | "completed" | "refunded";
-  paymentStatus?: "pending" | "paid" | "failed" | "refunded";
-  paymentMethod?: string;
   specialRequests?: string;
   cancellationReason?: string;
   refundAmount?: number;
@@ -144,12 +142,6 @@ export type HotelSearchResponse = {
     page: number;
     pages: number;
   };
-};
-
-export type PaymentIntentResponse = {
-  paymentIntentId: string;
-  clientSecret: string;
-  totalCost: number;
 };
 
 export type BookingCalendarDayStatus =

@@ -83,14 +83,14 @@ const ApiDocs = () => {
       icon: <Code className="w-5 h-5" />,
       endpoints: [
         {
-          method: "POST",
-          path: "/api/rooms/:id/bookings",
-          description: "Create booking",
+          method: "GET",
+          path: "/api/rooms/:hotelId/availability",
+          description: "Check room availability",
         },
         {
           method: "POST",
-          path: "/api/rooms/:id/bookings/payment-intent",
-          description: "Create payment intent",
+          path: "/api/rooms/:hotelId/booking-request",
+          description: "Submit booking request",
         },
       ],
     },

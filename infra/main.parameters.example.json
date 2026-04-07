@@ -1,0 +1,68 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "location": {
+      "value": "westeurope"
+    },
+    "namePrefix": {
+      "value": "palazzopinto"
+    },
+    "backendPlanName": {
+      "value": "palazzopinto-api-b1-plan"
+    },
+    "backendAppName": {
+      "value": "palazzopinto-api-secure"
+    },
+    "keyVaultName": {
+      "value": "palazzopintokv"
+    },
+    "logAnalyticsWorkspaceName": {
+      "value": "palazzopinto-logs"
+    },
+    "applicationInsightsName": {
+      "value": "palazzopinto-appi"
+    },
+    "frontendUrl": {
+      "value": "https://your-frontend-hostname.azurestaticapps.net"
+    },
+    "frontendAdditionalOrigins": {
+      "value": [
+        "https://palazzopinto-web-2603151048.azurewebsites.net"
+      ]
+    },
+    "entraTenantId": {
+      "value": "00000000-0000-0000-0000-000000000000"
+    },
+    "mongoConnectionStringSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/mongodb-connection-string/<version>"
+    },
+    "jwtSecretKeySecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/jwt-secret-key/<version>"
+    },
+    "cloudinaryCloudNameSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/cloudinary-cloud-name/<version>"
+    },
+    "cloudinaryApiKeySecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/cloudinary-api-key/<version>"
+    },
+    "cloudinaryApiSecretSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/cloudinary-api-secret/<version>"
+    },
+    "entraClientIdSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/ms-entra-client-id/<version>"
+    },
+    "entraClientSecretSecretUri": {
+      "value": "https://palazzopintokv.vault.azure.net/secrets/ms-entra-client-secret/<version>"
+    },
+    "backendExtraAppSettings": {
+      "value": []
+    },
+    "tags": {
+      "value": {
+        "environment": "production",
+        "application": "hotel-booking"
+      }
+    }
+  }
+}

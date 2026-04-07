@@ -5,8 +5,69 @@ import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
 import { body } from "express-validator";
 import { HotelType } from "../../../shared/types";
+import { recordAuditEvent } from "../lib/audit-log";
+import { logError } from "../lib/logger";
 
 const router = express.Router();
+
+class UploadValidationError extends Error {
+  statusCode: number;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "UploadValidationError";
+    this.statusCode = 400;
+  }
+}
+
+const allowedImageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+const detectImageMimeType = (buffer: Buffer) => {
+  if (buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "image/jpeg";
+  }
+
+  if (
+    buffer.length >= 8 &&
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return "image/png";
+  }
+
+  if (
+    buffer.length >= 12 &&
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  return null;
+};
+
+const validateUploadedImages = (files: Express.Multer.File[]) => {
+  files.forEach((file) => {
+    if (!allowedImageMimeTypes.has(file.mimetype)) {
+      throw new UploadValidationError(
+        `Unsupported file type for ${file.originalname}. Allowed types: JPEG, PNG, WEBP.`
+      );
+    }
+
+    const detectedMimeType = detectImageMimeType(file.buffer);
+    if (!detectedMimeType || detectedMimeType !== file.mimetype) {
+      throw new UploadValidationError(
+        `File signature validation failed for ${file.originalname}.`
+      );
+    }
+  });
+};
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -14,7 +75,46 @@ const upload = multer({
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB
   },
+  fileFilter: (_req, file, cb) => {
+    if (!allowedImageMimeTypes.has(file.mimetype)) {
+      cb(new UploadValidationError("Only JPEG, PNG, and WEBP images are allowed."));
+      return;
+    }
+
+    cb(null, true);
+  },
 });
+
+const hotelImageUpload = (req: Request, res: Response, next: express.NextFunction) => {
+  upload.array("imageFiles", 6)(req, res, (error) => {
+    if (!error) {
+      next();
+      return;
+    }
+
+    if (error instanceof multer.MulterError) {
+      const message =
+        error.code === "LIMIT_FILE_SIZE"
+          ? "Each image must be 5MB or smaller."
+          : "Image upload failed validation.";
+
+      res.status(400).json({ message });
+      return;
+    }
+
+    if (error instanceof UploadValidationError) {
+      res.status(error.statusCode).json({ message: error.message });
+      return;
+    }
+
+    next(error);
+  });
+};
+
+const getUploadedFiles = (req: Request) => {
+  const files = (req as Request & { files?: Express.Multer.File[] }).files;
+  return Array.isArray(files) ? files : [];
+};
 
 router.post(
   "/",
@@ -38,7 +138,7 @@ router.post(
       .isArray()
       .withMessage("Facilities are required"),
   ],
-  upload.array("imageFiles", 6),
+  hotelImageUpload,
   async (req: Request, res: Response) => {
     try {
       const singlePropertyMode =
@@ -55,7 +155,8 @@ router.post(
         }
       }
 
-      const imageFiles = (req as any).files as any[];
+      const imageFiles = getUploadedFiles(req);
+      validateUploadedImages(imageFiles);
       const newHotel: HotelType = req.body;
 
       // Ensure type is always an array
@@ -87,9 +188,29 @@ router.post(
       const hotel = new Hotel(newHotel);
       await hotel.save();
 
+      await recordAuditEvent({
+        action: "hotel.created",
+        entityType: "hotel",
+        entityId: String(hotel._id),
+        hotelId: String(hotel._id),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          name: hotel.name,
+          city: hotel.city,
+          country: hotel.country,
+          imageCount: hotel.imageUrls.length,
+        },
+      });
+
       res.status(201).send(hotel);
     } catch (e) {
-      console.log(e);
+      if (e instanceof UploadValidationError) {
+        return res.status(e.statusCode).json({ message: e.message });
+      }
+
+      logError("Unable to create hotel", e, { route: "my-hotels.create" });
       res.status(500).json({ message: "Something went wrong" });
     }
   }
@@ -131,13 +252,9 @@ router.put(
   "/:hotelId",
   verifyToken,
   requireRole("hotel_owner", "admin"),
-  upload.array("imageFiles"),
+  hotelImageUpload,
   async (req: Request, res: Response) => {
     try {
-      console.log("Request body:", req.body);
-      console.log("Hotel ID:", req.params.hotelId);
-      console.log("User ID:", req.userId);
-
       // First, find the existing hotel
       const existingHotel = await Hotel.findOne({
         _id: req.params.hotelId,
@@ -181,8 +298,6 @@ router.put(
         smokingPolicy: req.body["policies.smokingPolicy"] || "",
       };
 
-      console.log("Update data:", updateData);
-
       // Update the hotel
       const updatedHotel = await Hotel.findByIdAndUpdate(
         req.params.hotelId,
@@ -195,8 +310,9 @@ router.put(
       }
 
       // Handle image uploads if any
-      const files = (req as any).files as any[];
+      const files = getUploadedFiles(req);
       if (files && files.length > 0) {
+        validateUploadedImages(files);
         const updatedImageUrls = await uploadImages(files);
         updatedHotel.imageUrls = [
           ...updatedImageUrls,
@@ -209,12 +325,32 @@ router.put(
         await updatedHotel.save();
       }
 
+      await recordAuditEvent({
+        action: "hotel.updated",
+        entityType: "hotel",
+        entityId: String(updatedHotel._id),
+        hotelId: String(updatedHotel._id),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          name: updatedHotel.name,
+          city: updatedHotel.city,
+          country: updatedHotel.country,
+          imageCount: updatedHotel.imageUrls.length,
+        },
+      });
+
       res.status(200).json(updatedHotel);
     } catch (error) {
-      console.error("Error updating hotel:", error);
-      console.error("Request body:", req.body);
-      console.error("Hotel ID:", req.params.hotelId);
-      console.error("User ID:", req.userId);
+      if (error instanceof UploadValidationError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+
+      logError("Unable to update hotel", error, {
+        route: "my-hotels.update",
+        hotelId: req.params.hotelId,
+      });
       res.status(500).json({
         message: "Something went wrong",
         error: error instanceof Error ? error.message : "Unknown error",

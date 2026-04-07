@@ -65,21 +65,6 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
     }
   };
 
-  const getPaymentStatusColor = (paymentStatus: string | undefined) => {
-    switch (paymentStatus) {
-      case "paid":
-        return "bg-green-100 text-green-800 border-green-200";
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "failed":
-        return "bg-red-100 text-red-800 border-red-200";
-      case "refunded":
-        return "bg-purple-100 text-purple-800 border-purple-200";
-      default:
-        return "bg-gray-100 text-gray-800 border-gray-200";
-    }
-  };
-
   const getDateCategory = (checkIn: Date) => {
     const today = new Date();
     const checkInDate = new Date(checkIn);
@@ -249,12 +234,16 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-gray-600">
-                      Total Revenue
+                      Confirmed Value
                     </p>
                     <p className="text-2xl font-bold text-gray-900">
                       
                       {bookings
-                        .filter((b: BookingType) => b.paymentStatus === "paid")
+                        .filter((b: BookingType) =>
+                          ["confirmed", "arrived", "completed"].includes(
+                            b.status || ""
+                          )
+                        )
                         .reduce(
                           (sum: number, b: BookingType) =>
                             sum + (b.totalCost || 0),
@@ -313,8 +302,8 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
                 <div className="bg-blue-50 rounded-lg p-4 max-w-md">
                   <p className="text-sm text-blue-700">
                     When guests make bookings for this hotel, they will appear
-                    here with all their details, special requests, and payment
-                    information.
+                    here with all their details, booking value, and special
+                    requests.
                   </p>
                 </div>
               </div>
@@ -386,13 +375,6 @@ const BookingLogModal: React.FC<BookingLogModalProps> = ({
                                   className={getStatusColor(booking.status)}
                                 >
                                   {booking.status}
-                                </Badge>
-                                <Badge
-                                  className={getPaymentStatusColor(
-                                    booking.paymentStatus
-                                  )}
-                                >
-                                  {booking.paymentStatus}
                                 </Badge>
                               </div>
                             </div>

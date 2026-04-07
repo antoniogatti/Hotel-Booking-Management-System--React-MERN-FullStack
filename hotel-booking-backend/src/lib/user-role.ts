@@ -1,23 +1,14 @@
 export type AppRole = "user" | "hotel_owner" | "admin";
 
-export const OWNER_DOMAIN = "palazzopintobnb.com";
-export const ADMIN_EMAIL = "info@palazzopintobnb.com";
-
 export const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
-export const resolveRoleForEmail = (email: string): AppRole => {
-  const normalized = normalizeEmail(email);
+export const defaultAppRole: AppRole = "user";
 
-  if (normalized === ADMIN_EMAIL) {
-    return "admin";
-  }
+export const isAppRole = (value: unknown): value is AppRole =>
+  value === "user" || value === "hotel_owner" || value === "admin";
 
-  if (normalized.endsWith(`@${OWNER_DOMAIN}`)) {
-    return "hotel_owner";
-  }
-
-  return "user";
-};
+export const resolvePersistedRole = (value: unknown): AppRole =>
+  isAppRole(value) ? value : defaultAppRole;
 
 export const isOwnerOrAdmin = (role?: string) =>
   role === "hotel_owner" || role === "admin";

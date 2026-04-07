@@ -10,11 +10,9 @@ import {
 import { BookingType, HotelSearchResponse } from "../../../shared/types";
 import { body, param, validationResult } from "express-validator";
 import { randomBytes } from "crypto";
-import Stripe from "stripe";
 import verifyToken from "../middleware/auth";
 import { sendBookingRequestEmails } from "../lib/contact-mail";
-
-const stripe = new Stripe(process.env.STRIPE_API_KEY as string);
+import { recordAuditEvent } from "../lib/audit-log";
 
 const router = express.Router();
 const DUPLICATE_BOOKING_WINDOW_MS = 30 * 60 * 1000;
@@ -479,11 +477,27 @@ router.post(
         totalCost,
         specialRequests: req.body.specialRequests || "",
         status: "pending",
-        paymentStatus: "pending",
       };
 
       const newBooking = new Booking(bookingRequest);
       await newBooking.save();
+
+      await recordAuditEvent({
+        action: "booking.requested",
+        entityType: "booking",
+        entityId: String(newBooking._id),
+        hotelId: String(hotelId),
+        actorId: newBooking.userId,
+        actorEmail: normalizedEmail,
+        req,
+        metadata: {
+          reservationNumber,
+          checkIn: checkIn.toISOString(),
+          checkOut: checkOut.toISOString(),
+          totalCost,
+          status: newBooking.status,
+        },
+      });
 
       let emailsSent = true;
       let warning: string | undefined;
@@ -533,157 +547,12 @@ router.post(
 );
 
 router.post(
-  "/:hotelId/bookings/payment-intent",
-  verifyToken,
-  async (req: Request, res: Response) => {
-    const { numberOfNights } = req.body;
-    const hotelId = req.params.hotelId;
-
-    const hotel = await Hotel.findById(hotelId);
-    if (!hotel) {
-      return res.status(400).json({ message: "Hotel not found" });
-    }
-
-    const minimumNights = getMinimumNights(hotel);
-
-    if (Number(numberOfNights) < minimumNights) {
-      return res.status(400).json({
-        message: `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`,
-      });
-    }
-
-    const totalCost = hotel.pricePerNight * numberOfNights;
-
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount: totalCost * 100,
-      currency: "gbp",
-      metadata: {
-        hotelId,
-        userId: req.userId,
-      },
-    });
-
-    if (!paymentIntent.client_secret) {
-      return res.status(500).json({ message: "Error creating payment intent" });
-    }
-
-    const response = {
-      paymentIntentId: paymentIntent.id,
-      clientSecret: paymentIntent.client_secret.toString(),
-      totalCost,
-    };
-
-    res.send(response);
-  }
-);
-
-router.post(
   "/:hotelId/bookings",
   verifyToken,
   async (req: Request, res: Response) => {
-    try {
-      const paymentIntentId = req.body.paymentIntentId;
-
-      const paymentIntent = await stripe.paymentIntents.retrieve(
-        paymentIntentId as string
-      );
-
-      if (!paymentIntent) {
-        return res.status(400).json({ message: "payment intent not found" });
-      }
-
-      if (
-        paymentIntent.metadata.hotelId !== req.params.hotelId ||
-        paymentIntent.metadata.userId !== req.userId
-      ) {
-        return res.status(400).json({ message: "payment intent mismatch" });
-      }
-
-      if (paymentIntent.status !== "succeeded") {
-        return res.status(400).json({
-          message: `payment intent not succeeded. Status: ${paymentIntent.status}`,
-        });
-      }
-
-      const hotel = await Hotel.findById(req.params.hotelId);
-
-      if (!hotel) {
-        return res.status(400).json({ message: "Hotel not found" });
-      }
-
-      const checkIn = new Date(req.body.checkIn);
-      const checkOut = new Date(req.body.checkOut);
-
-      if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
-        return res.status(400).json({ message: "Invalid booking dates" });
-      }
-
-      if (checkOut <= checkIn) {
-        return res.status(400).json({ message: "Check-out must be after check-in" });
-      }
-
-      const nights = calculateNights(checkIn, checkOut);
-      const minimumNights = getMinimumNights(hotel);
-
-      if (nights < minimumNights) {
-        return res.status(400).json({
-          message: `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`,
-        });
-      }
-
-      const overlappingBooking = await findOverlappingBooking({
-        hotelId: req.params.hotelId,
-        checkIn,
-        checkOut,
-      });
-
-      if (overlappingBooking) {
-        return res.status(409).json({
-          message:
-            "This room is not available for the selected dates because there is already a booking/request in the same period.",
-          bookingId: overlappingBooking._id,
-          reservationNumber: overlappingBooking.reservationNumber,
-          conflictStatus: overlappingBooking.status,
-        });
-      }
-
-      const reservationNumber = await generateUniqueReservationNumber();
-
-      const newBooking: BookingType = {
-        ...req.body,
-        reservationNumber,
-        userId: req.userId,
-        hotelId: req.params.hotelId,
-        createdAt: new Date(), // Add booking creation timestamp
-        status: "confirmed", // Set initial status
-        paymentStatus: "paid", // Set payment status since payment succeeded
-      };
-
-      // Create booking in separate collection
-      const booking = new Booking(newBooking);
-      await booking.save();
-
-      // Update hotel analytics
-      await Hotel.findByIdAndUpdate(req.params.hotelId, {
-        $inc: {
-          totalBookings: 1,
-          totalRevenue: newBooking.totalCost,
-        },
-      });
-
-      // Update user analytics
-      await User.findByIdAndUpdate(req.userId, {
-        $inc: {
-          totalBookings: 1,
-          totalSpent: newBooking.totalCost,
-        },
-      });
-
-      res.status(200).send();
-    } catch (error) {
-      console.log(error);
-      res.status(500).json({ message: "something went wrong" });
-    }
+    return res.status(410).json({
+      message: "Direct paid bookings have been removed. Use the booking request flow instead.",
+    });
   }
 );
 

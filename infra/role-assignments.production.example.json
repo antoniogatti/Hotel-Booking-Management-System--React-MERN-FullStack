@@ -1,0 +1,10 @@
+[
+  {
+    "email": "info@palazzopintobnb.com",
+    "role": "admin"
+  },
+  {
+    "email": "owner@example.com",
+    "role": "hotel_owner"
+  }
+]
