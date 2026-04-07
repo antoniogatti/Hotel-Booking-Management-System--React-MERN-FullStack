@@ -6,6 +6,7 @@ import User from "../models/user";
 import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
 import BookingDayStatus from "../models/booking-day-status";
+import ExternalCalendarEvent from "../models/external-calendar-event";
 import {
   BOOKING_COM_SOURCE,
   BOOKING_COM_STATUS_LABEL,
@@ -99,6 +100,34 @@ const calculateCityTax = (booking: {
   const guests = Math.max(1, booking.adultCount + booking.childCount);
   return Number((taxableDays * guests * 2.5).toFixed(2));
 };
+
+const toImportedEventResponse = (event: any, hotel?: any) => ({
+  _id: String(event._id),
+  reservationNumber: event.externalUid,
+  isImported: true,
+  firstName: event.firstName || "",
+  lastName: event.lastName || "",
+  email: event.email || "",
+  phone: event.phone || "",
+  city: hotel?.city || "",
+  country: hotel?.country || "",
+  adultCount: Number(event.adultCount || 0),
+  childCount: Number(event.childCount || 0),
+  nationality: event.nationality || "",
+  checkIn: event.startDate,
+  checkOut: event.endDate,
+  totalCost: Number(event.totalCost || 0),
+  specialRequests: event.specialRequests || "",
+  checkInInfo: event.checkInInfo,
+  status: "imported",
+  source: BOOKING_COM_SOURCE,
+  sourceLabel: "Booking.com",
+  summary: event.summary,
+  externalUid: event.externalUid,
+  dtStamp: event.dtStamp,
+  createdAt: event.createdAt,
+  updatedAt: event.updatedAt,
+});
 
 // List rooms available for bookings management (admin: all, owner: own rooms)
 router.get(
@@ -270,6 +299,7 @@ router.get(
       const bookingRows = bookings.map((booking) => ({
         _id: booking._id,
         reservationNumber: booking.reservationNumber,
+        isImported: false,
         firstName: booking.firstName,
         lastName: booking.lastName,
         email: booking.email,
@@ -287,22 +317,26 @@ router.get(
       const importedRows = importedEvents.map((event) => ({
         _id: String(event._id),
         reservationNumber: event.externalUid,
-        firstName: "Booking.com",
-        lastName: "Imported block",
-        email: "Guest details are not available through Booking.com iCal",
-        phone: undefined,
+        isImported: true,
+        firstName: event.firstName || "",
+        lastName: event.lastName || "",
+        email: event.email || "",
+        phone: event.phone || undefined,
         checkIn: event.startDate,
         checkOut: event.endDate,
         status: BOOKING_COM_STATUS_LABEL,
-        totalCost: 0,
-        adultCount: 0,
-        childCount: 0,
+        totalCost: Number(event.totalCost || 0),
+        adultCount: Number(event.adultCount || 0),
+        childCount: Number(event.childCount || 0),
         createdAt: event.createdAt,
         source: BOOKING_COM_SOURCE,
         sourceLabel: "Booking.com",
         summary: event.summary,
         externalUid: event.externalUid,
         dtStamp: event.dtStamp,
+        nationality: event.nationality || undefined,
+        specialRequests: event.specialRequests || undefined,
+        checkedInAt: event.checkInInfo?.checkedInAt,
       }));
 
       res.status(200).json({
@@ -552,7 +586,17 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
     );
 
     if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
+      const importedEvent = await ExternalCalendarEvent.findById(req.params.id);
+      if (!importedEvent) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const accessCheck = await getAccessibleHotel(importedEvent.hotelId, req);
+      if (accessCheck.error) {
+        return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+      }
+
+      return res.status(200).json(toImportedEventResponse(importedEvent, accessCheck.hotel));
     }
 
     const hotel = await Hotel.findById(booking.hotelId);
@@ -730,7 +774,91 @@ router.post(
     try {
       const booking = await Booking.findById(req.params.id);
       if (!booking) {
-        return res.status(404).json({ message: "Booking not found" });
+        const importedEvent = await ExternalCalendarEvent.findById(req.params.id);
+        if (!importedEvent) {
+          return res.status(404).json({ message: "Booking not found" });
+        }
+
+        const accessCheck = await getAccessibleHotel(importedEvent.hotelId, req);
+        if (accessCheck.error) {
+          return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+        }
+
+        const firstName = String(req.body.firstName || importedEvent.firstName || "").trim();
+        const lastName = String(req.body.lastName || importedEvent.lastName || "").trim();
+        const email = String(req.body.email || importedEvent.email || "").trim();
+        const phone = String(req.body.phone || importedEvent.phone || "").trim();
+        const nationality = String(req.body.nationality || importedEvent.nationality || "").trim();
+        const bookingChannel = String(req.body.bookingChannel || "Booking.com").trim();
+        const paymentDetails = String(req.body.paymentDetails || "").trim();
+        const adultCount = Math.max(0, Number(req.body.adultCount ?? importedEvent.adultCount ?? 0));
+        const childCount = Math.max(0, Number(req.body.childCount ?? importedEvent.childCount ?? 0));
+        const totalCost = Math.max(0, Number(req.body.totalCost ?? importedEvent.totalCost ?? 0));
+        const specialRequests = String(req.body.specialRequests || importedEvent.specialRequests || "").trim();
+
+        if (!firstName || !lastName) {
+          return res.status(400).json({ message: "Guest first name and last name are required for imported bookings." });
+        }
+
+        if (!email) {
+          return res.status(400).json({ message: "A guest email is required for imported bookings." });
+        }
+
+        if (adultCount + childCount < 1) {
+          return res.status(400).json({ message: "At least one guest is required for imported bookings." });
+        }
+
+        const uploadedFiles = ((req as any).files as any[]) || [];
+        let documentUrls: string[] = [];
+
+        if (uploadedFiles.length > 0) {
+          documentUrls = await uploadDocuments(uploadedFiles);
+        }
+
+        const existingDocumentsRaw = (req.body.existingDocuments || []) as string | string[];
+        const existingDocuments = Array.isArray(existingDocumentsRaw)
+          ? existingDocumentsRaw.filter(Boolean)
+          : existingDocumentsRaw
+            ? [existingDocumentsRaw]
+            : [];
+        const mergedDocuments = [...existingDocuments, ...documentUrls];
+
+        const cityTax = calculateCityTax({
+          checkIn: importedEvent.startDate,
+          checkOut: importedEvent.endDate,
+          adultCount,
+          childCount,
+        });
+
+        importedEvent.firstName = firstName;
+        importedEvent.lastName = lastName;
+        importedEvent.email = email;
+        importedEvent.phone = phone;
+        importedEvent.adultCount = adultCount;
+        importedEvent.childCount = childCount;
+        importedEvent.totalCost = totalCost;
+        importedEvent.nationality = nationality;
+        importedEvent.specialRequests = specialRequests;
+        importedEvent.checkInInfo = {
+          arrivalTime: req.body.arrivalTime,
+          phone,
+          email,
+          nationality,
+          bookingChannel,
+          paymentDetails,
+          specialNotes: req.body.specialNotes || "",
+          documents: mergedDocuments,
+          cityTax,
+          checkedInAt: new Date(),
+        };
+
+        await importedEvent.save();
+
+        return res.status(200).json({
+          message: "Imported booking details and check-in submitted successfully",
+          booking: toImportedEventResponse(importedEvent, accessCheck.hotel),
+          notificationsSent: true,
+        });
       }
 
       const accessCheck = await getAccessibleHotel(booking.hotelId, req);

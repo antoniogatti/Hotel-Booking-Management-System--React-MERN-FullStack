@@ -10,7 +10,28 @@ export interface IExternalCalendarEvent extends Document {
   summary: string;
   startDate: Date;
   endDate: Date;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  adultCount?: number;
+  childCount?: number;
+  totalCost?: number;
+  nationality?: string;
+  specialRequests?: string;
   dtStamp?: Date;
+  checkInInfo?: {
+    arrivalTime?: string;
+    phone?: string;
+    email?: string;
+    nationality?: string;
+    bookingChannel?: string;
+    paymentDetails?: string;
+    specialNotes?: string;
+    documents?: string[];
+    cityTax?: number;
+    checkedInAt?: Date;
+  };
   status: ExternalCalendarEventStatus;
   lastSeenAt: Date;
   rawEvent?: string;
@@ -32,7 +53,28 @@ const externalCalendarEventSchema = new mongoose.Schema(
     summary: { type: String, default: "" },
     startDate: { type: Date, required: true, index: true },
     endDate: { type: Date, required: true, index: true },
+    firstName: { type: String, default: "" },
+    lastName: { type: String, default: "" },
+    email: { type: String, default: "" },
+    phone: { type: String, default: "" },
+    adultCount: { type: Number, default: 0 },
+    childCount: { type: Number, default: 0 },
+    totalCost: { type: Number, default: 0 },
+    nationality: { type: String, default: "" },
+    specialRequests: { type: String, default: "" },
     dtStamp: { type: Date },
+    checkInInfo: {
+      arrivalTime: { type: String },
+      phone: { type: String },
+      email: { type: String },
+      nationality: { type: String },
+      bookingChannel: { type: String },
+      paymentDetails: { type: String },
+      specialNotes: { type: String },
+      documents: [{ type: String }],
+      cityTax: { type: Number, default: 0 },
+      checkedInAt: { type: Date },
+    },
     status: {
       type: String,
       enum: ["active", "inactive"],

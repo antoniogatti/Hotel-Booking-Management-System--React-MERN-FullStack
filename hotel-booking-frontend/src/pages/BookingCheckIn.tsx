@@ -22,6 +22,10 @@ import { formatFriendlyDate } from "../lib/utils";
 type BookingDetails = {
   _id: string;
   reservationNumber?: string;
+  isImported?: boolean;
+  source?: "local" | "booking_com";
+  sourceLabel?: string;
+  status?: string;
   firstName: string;
   lastName: string;
   email: string;
@@ -36,6 +40,8 @@ type BookingDetails = {
   checkOut: string;
   totalCost: number;
   specialRequests?: string;
+  summary?: string;
+  externalUid?: string;
   checkInInfo?: {
     arrivalTime?: string;
     phone?: string;
@@ -50,6 +56,12 @@ type BookingDetails = {
 };
 
 type CheckInFormData = {
+  firstName: string;
+  lastName: string;
+  adultCount: number;
+  childCount: number;
+  totalCost: string;
+  specialRequests: string;
   arrivalTime: string;
   phone: string;
   email: string;
@@ -95,6 +107,12 @@ const BookingCheckIn = () => {
   const { showToast } = useAppContext();
 
   const [formData, setFormData] = useState<CheckInFormData>({
+    firstName: "",
+    lastName: "",
+    adultCount: 1,
+    childCount: 0,
+    totalCost: "0",
+    specialRequests: "",
     arrivalTime: "",
     phone: "",
     email: "",
@@ -120,16 +138,25 @@ const BookingCheckIn = () => {
     }
   );
 
+  const isImportedBooking = Boolean(booking?.isImported || booking?.source === "booking_com" || booking?.status === "imported");
+  const guestDisplayName = `${formData.firstName} ${formData.lastName}`.trim() || (isImportedBooking ? "Booking.com imported booking" : "Guest details not available");
+
   useEffect(() => {
     if (!booking) return;
 
     setFormData((prev) => ({
       ...prev,
+      firstName: booking.firstName || "",
+      lastName: booking.lastName || "",
+      adultCount: booking.adultCount || 1,
+      childCount: booking.childCount || 0,
+      totalCost: String(booking.totalCost || 0),
+      specialRequests: booking.specialRequests || "",
       arrivalTime: booking.checkInInfo?.arrivalTime || booking.arrivalTime || prev.arrivalTime,
       phone: booking.checkInInfo?.phone || booking.phone || "",
       email: booking.checkInInfo?.email || booking.email || "",
       nationality: booking.checkInInfo?.nationality || booking.nationality || "",
-      bookingChannel: booking.checkInInfo?.bookingChannel || prev.bookingChannel,
+      bookingChannel: booking.checkInInfo?.bookingChannel || (booking.source === "booking_com" ? "Booking.com" : prev.bookingChannel),
       paymentDetails: booking.checkInInfo?.paymentDetails || prev.paymentDetails,
       specialNotes: booking.checkInInfo?.specialNotes || "",
     }));
@@ -140,6 +167,12 @@ const BookingCheckIn = () => {
   const submitCheckInMutation = useMutation(
     async () => {
       const payload = new FormData();
+      payload.append("firstName", formData.firstName);
+      payload.append("lastName", formData.lastName);
+      payload.append("adultCount", String(formData.adultCount));
+      payload.append("childCount", String(formData.childCount));
+      payload.append("totalCost", formData.totalCost);
+      payload.append("specialRequests", formData.specialRequests);
       payload.append("arrivalTime", formData.arrivalTime);
       payload.append("phone", formData.phone);
       payload.append("email", formData.email);
@@ -189,11 +222,17 @@ const BookingCheckIn = () => {
   const ms = new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime();
   const nights = Math.max(1, Math.ceil(ms / 86400000));
   const taxableDays = Math.min(nights, 7);
-  const guestCount = booking.adultCount + booking.childCount;
+  const guestCount = Math.max(1, formData.adultCount + formData.childCount);
   const cityTax = taxableDays * guestCount * 2.5;
-  const totalWithCityTax = booking.totalCost + cityTax;
+  const currentTotalCost = Math.max(0, Number(formData.totalCost || 0));
+  const totalWithCityTax = currentTotalCost + cityTax;
 
   const missingRequiredFields: string[] = [];
+  if (isImportedBooking && !formData.firstName.trim()) missingRequiredFields.push("guest first name");
+  if (isImportedBooking && !formData.lastName.trim()) missingRequiredFields.push("guest last name");
+  if (isImportedBooking && formData.adultCount + formData.childCount < 1) {
+    missingRequiredFields.push("guest count");
+  }
   if (!formData.arrivalTime.trim()) missingRequiredFields.push("arrival time");
   if (!formData.phone.trim()) missingRequiredFields.push("phone number");
   if (!formData.email.trim() || !isValidEmail(formData.email)) {
@@ -232,7 +271,7 @@ const BookingCheckIn = () => {
           <div>
             <p className="text-sm text-gray-600">Guest</p>
             <p className="font-semibold text-gray-900">
-              {booking.firstName} {booking.lastName}
+              {guestDisplayName}
             </p>
           </div>
           <div>
@@ -246,9 +285,9 @@ const BookingCheckIn = () => {
               <Users className="h-4 w-4" /> Guests
             </p>
             <p className="font-semibold text-gray-900">
-              {booking.adultCount} Adult{booking.adultCount > 1 ? "s" : ""}
-              {booking.childCount > 0
-                ? `, ${booking.childCount} Child${booking.childCount > 1 ? "ren" : ""}`
+              {formData.adultCount} Adult{formData.adultCount > 1 ? "s" : ""}
+              {formData.childCount > 0
+                ? `, ${formData.childCount} Child${formData.childCount > 1 ? "ren" : ""}`
                 : ""}
             </p>
           </div>
@@ -257,7 +296,7 @@ const BookingCheckIn = () => {
               <DollarSign className="h-4 w-4" /> Total Due Today
             </p>
             <p className="font-semibold text-gray-900">EUR {totalWithCityTax.toFixed(2)}</p>
-            <p className="mt-1 text-xs text-gray-600">Room total: EUR {booking.totalCost.toFixed(2)}</p>
+            <p className="mt-1 text-xs text-gray-600">Room total: EUR {currentTotalCost.toFixed(2)}</p>
             <p className="text-xs text-gray-600">
               City tax: EUR {cityTax.toFixed(2)} ({taxableDays} day{taxableDays > 1 ? "s" : ""} x {guestCount} guest{guestCount > 1 ? "s" : ""} x EUR 2.50, max 7 days)
             </p>
@@ -278,6 +317,73 @@ const BookingCheckIn = () => {
           <CardTitle>Check-in Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
+          {isImportedBooking && (
+            <div className="grid grid-cols-1 gap-4 rounded-lg border border-blue-100 bg-blue-50 p-4 md:grid-cols-2">
+              <div className="md:col-span-2 text-sm text-blue-900">
+                This reservation was imported from Booking.com. The guest-name fields below are intentionally separate from the import source so you can enter the real guest details manually.
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Guest First Name *</label>
+                <input
+                  type="text"
+                  value={formData.firstName}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, firstName: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Guest Last Name *</label>
+                <input
+                  type="text"
+                  value={formData.lastName}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, lastName: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Adults *</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.adultCount}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, adultCount: Number(e.target.value) || 0 }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Children</label>
+                <input
+                  type="number"
+                  min={0}
+                  value={formData.childCount}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, childCount: Number(e.target.value) || 0 }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Room Total</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={formData.totalCost}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, totalCost: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="text-sm font-semibold text-gray-700">Special Requests</label>
+                <textarea
+                  rows={2}
+                  value={formData.specialRequests}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, specialRequests: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="Optional guest requests or notes"
+                />
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="text-sm font-semibold text-gray-700">Arrival Time *</label>
@@ -465,7 +571,7 @@ const BookingCheckIn = () => {
           disabled={submitCheckInMutation.isLoading || !isFormValid}
         >
           <Save className="mr-2 h-4 w-4" />
-          {submitCheckInMutation.isLoading ? "Saving..." : "Save Check-in"}
+          {submitCheckInMutation.isLoading ? "Saving..." : isImportedBooking ? "Save Details and Check-in" : "Save Check-in"}
         </Button>
       </div>
       {!isFormValid && (

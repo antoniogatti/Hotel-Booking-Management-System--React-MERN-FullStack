@@ -385,6 +385,19 @@ const ManageBookings = () => {
     });
   };
 
+  const getBookingGuestLabel = (booking: (typeof selectedDayBookings)[number] | BookingCalendarResponseType["bookings"][number]) => {
+    const fullName = `${booking.firstName || ""} ${booking.lastName || ""}`.trim();
+    if (fullName) {
+      return fullName;
+    }
+
+    if (booking.isImported || booking.status === "Imported") {
+      return "Booking.com imported booking";
+    }
+
+    return "Guest details not available";
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-2">
@@ -714,14 +727,14 @@ const ManageBookings = () => {
                         <div key={booking._id} className="rounded-md border border-gray-200 bg-gray-50 p-3">
                           <div className="flex items-center justify-between gap-2">
                             <p className="text-sm font-semibold text-gray-900">
-                              {booking.firstName} {booking.lastName}
+                              {getBookingGuestLabel(booking)}
                             </p>
                             <Badge className={STATUS_STYLES[booking.status]}>{booking.status}</Badge>
                           </div>
                           {booking.sourceLabel && (
                             <p className="mt-1 text-xs font-medium text-[#3f67a8]">Source: {booking.sourceLabel}</p>
                           )}
-                          <p className="mt-1 text-xs text-gray-700">{booking.email}</p>
+                          <p className="mt-1 text-xs text-gray-700">{booking.email || (booking.isImported ? "No guest email added yet" : "")}</p>
                           {booking.phone && <p className="text-xs text-gray-700">{booking.phone}</p>}
                           <p className="mt-1 text-xs text-gray-700">Ref: {booking.reservationNumber || "N/A"}</p>
                           <p className="text-xs text-gray-700">
@@ -738,6 +751,21 @@ const ManageBookings = () => {
                           <p className="mt-1 text-xs font-semibold text-gray-900">
                             {booking.status === "Imported" ? "Imported block" : `EUR ${booking.totalCost}`}
                           </p>
+
+                          {booking.status === "Imported" && (
+                            <div className="mt-2">
+                              <Button
+                                size="sm"
+                                className="h-8 w-full"
+                                onClick={() =>
+                                  navigate(`/hotel/${selectedRoomId}/check-in/${booking._id}`)
+                                }
+                              >
+                                <LogIn className="mr-1 h-3.5 w-3.5" />
+                                {booking.checkedInAt ? "Edit Details / Check-in" : "Add Details / Check-in"}
+                              </Button>
+                            </div>
+                          )}
 
                           {booking.status === "Requested" && (
                             <div className="mt-2 flex items-center gap-2">
@@ -835,9 +863,9 @@ const ManageBookings = () => {
                         </td>
                         <td className="px-2 py-3">
                           <p className="font-semibold text-gray-900">
-                            {booking.firstName} {booking.lastName}
+                            {getBookingGuestLabel(booking)}
                           </p>
-                          <p className="text-xs text-gray-600">{booking.email}</p>
+                          <p className="text-xs text-gray-600">{booking.email || (booking.isImported ? "No guest email added yet" : "")}</p>
                         </td>
                         <td className="px-2 py-3">
                           <p className="text-gray-900">{formatDateLabel(String(booking.checkIn))}</p>
@@ -882,6 +910,17 @@ const ManageBookings = () => {
                                 Reject
                               </Button>
                             </div>
+                          ) : booking.status === "Imported" ? (
+                            <Button
+                              size="sm"
+                              className="h-8"
+                              onClick={() =>
+                                navigate(`/hotel/${selectedRoomId}/check-in/${booking._id}`)
+                              }
+                            >
+                              <LogIn className="mr-1 h-3.5 w-3.5" />
+                              {booking.checkedInAt ? "Edit Check-in" : "Add Details"}
+                            </Button>
                           ) : (
                             <span className="text-xs text-gray-500">No action</span>
                           )}

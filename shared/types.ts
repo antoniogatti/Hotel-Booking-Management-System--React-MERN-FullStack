@@ -188,6 +188,7 @@ export type BookingCalendarDayType = {
 export type BookingCalendarBookingRowType = {
   _id: string;
   reservationNumber?: string;
+  isImported?: boolean;
   firstName: string;
   lastName: string;
   email: string;
@@ -204,6 +205,9 @@ export type BookingCalendarBookingRowType = {
   summary?: string;
   externalUid?: string;
   dtStamp?: Date;
+  nationality?: string;
+  specialRequests?: string;
+  checkedInAt?: Date;
 };
 
 export type BookingCalendarResponseType = {
