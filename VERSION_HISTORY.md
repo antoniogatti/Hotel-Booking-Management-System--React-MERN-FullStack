@@ -1,5 +1,12 @@
 # Version History
 
+## 1.7.1 - 2026-04-07
+
+### Homepage Staff Section
+- Added a new "Our Staff" section to the home page with real staff photos for Maurizio, Anna, Lucia, and Antonio.
+- Simplified the presentation into responsive horizontal cards with photo, name, and short description.
+- Refined the staff copy to better match the Palazzo Pinto tone and updated the deployment build version marker to `1.7.1`.
+
 ## 1.7.0 - 2026-04-06
 
 ### Booking.com Calendar Sync
