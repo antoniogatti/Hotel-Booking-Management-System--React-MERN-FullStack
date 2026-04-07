@@ -350,13 +350,6 @@ router.post(
       const date = toUtcStartOfDay(req.body.date);
       const note = typeof req.body.note === "string" ? req.body.note.trim() : "";
 
-      if (isBookingComManagedRoom(accessCheck.hotel as any)) {
-        return res.status(409).json({
-          message:
-            "Manual day closures are disabled for this room because Booking.com calendar import is the active source of truth.",
-        });
-      }
-
       if (status === "closed" && !note) {
         return res.status(400).json({ message: "A comment is required when closing a day." });
       }

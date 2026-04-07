@@ -368,15 +368,6 @@ const ManageBookings = () => {
       return;
     }
 
-    if (isBookingComManagedRoom) {
-      showToast({
-        title:
-          "Manual day closures are disabled for Booking.com-managed rooms. Use Booking.com availability or the export feed instead.",
-        type: "ERROR",
-      });
-      return;
-    }
-
     const reason = closeReason.trim();
     if (close && !reason) {
       showToast({
@@ -670,12 +661,11 @@ const ManageBookings = () => {
 
               {isBookingComManagedRoom && (
                 <div className="rounded-md border border-[#d8eaf8] bg-[#f4f9fd] p-3 text-sm text-[#355f8e]">
-                  Booking.com import is the active source of truth for this room. Imported dates block availability and manual local closures are disabled.
+                  Booking.com imported dates still block overlaps for this room. Local closures remain available here and can be exported through the Booking.com Sync panel.
                 </div>
               )}
 
-              {!isBookingComManagedRoom &&
-                selectedDayInfo?.status !== "Requested" &&
+              {selectedDayInfo?.status !== "Requested" &&
                 selectedDayInfo?.status !== "Booked" &&
                 selectedDayInfo?.status !== "Imported" && (
                   <>
