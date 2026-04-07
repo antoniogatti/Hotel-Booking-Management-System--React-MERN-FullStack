@@ -389,6 +389,18 @@ export type BookingRequestResponse = {
   warning?: string;
 };
 
+export type HotelAvailabilityResponse = {
+  available: boolean;
+  message?: string;
+  reason?: string;
+  minimumNights?: number;
+  conflict?: {
+    bookingId?: string;
+    reservationNumber?: string;
+    status?: string;
+  };
+};
+
 export const submitContactForm = async (payload: ContactFormPayload) => {
   const response = await axiosInstance.post("/api/contact", payload);
   return response.data;
@@ -401,5 +413,26 @@ export const submitBookingRequest = async (
     `/api/rooms/${payload.hotelId}/booking-request`,
     payload
   );
+  return response.data;
+};
+
+export const checkHotelAvailability = async (params: {
+  hotelId: string;
+  checkIn: string;
+  checkOut: string;
+  adultCount: number;
+  childCount: number;
+}): Promise<HotelAvailabilityResponse> => {
+  const queryParams = new URLSearchParams({
+    checkIn: params.checkIn,
+    checkOut: params.checkOut,
+    adultCount: String(params.adultCount),
+    childCount: String(params.childCount),
+  });
+
+  const response = await axiosInstance.get(
+    `/api/rooms/${params.hotelId}/availability?${queryParams.toString()}`
+  );
+
   return response.data;
 };

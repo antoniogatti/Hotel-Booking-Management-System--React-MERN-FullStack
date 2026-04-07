@@ -6,7 +6,6 @@ import User from "../models/user";
 import {
   findOverlappingImportedEvent,
   getImportedUnavailableHotelIds,
-  isBookingComManagedRoom,
 } from "../lib/booking-com-ical";
 import { BookingType, HotelSearchResponse } from "../../../shared/types";
 import { body, param, validationResult } from "express-validator";
@@ -45,6 +44,23 @@ const calculateNights = (checkIn: Date, checkOut: Date) => {
 
 const getMinimumNights = (hotel: { minimumNights?: number }) =>
   Math.max(1, Number(hotel.minimumNights) || 1);
+
+type AvailabilityAssessment = {
+  available: boolean;
+  message?: string;
+  reason?:
+    | "invalid_dates"
+    | "minimum_stay"
+    | "guest_capacity"
+    | "overlap"
+    | "room_not_found";
+  minimumNights?: number;
+  conflict?: {
+    bookingId: unknown;
+    reservationNumber?: string;
+    status?: string;
+  };
+};
 
 const ACTIVE_BOOKING_STATUSES = ["pending", "confirmed", "arrived", "completed"] as const;
 
@@ -152,6 +168,74 @@ const findOverlappingBooking = async (params: {
   };
 };
 
+const assessHotelAvailability = async (params: {
+  hotel: {
+    _id: unknown;
+    adultCount: number;
+    childCount: number;
+    minimumNights?: number;
+  };
+  checkIn: Date;
+  checkOut: Date;
+  adultCount: number;
+  childCount: number;
+}): Promise<AvailabilityAssessment> => {
+  const { hotel, checkIn, checkOut, adultCount, childCount } = params;
+
+  if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime()) || checkOut <= checkIn) {
+    return {
+      available: false,
+      reason: "invalid_dates",
+      message: "Please select a valid check-in and check-out range.",
+    };
+  }
+
+  const nights = calculateNights(checkIn, checkOut);
+  const minimumNights = getMinimumNights(hotel);
+
+  if (nights < minimumNights) {
+    return {
+      available: false,
+      reason: "minimum_stay",
+      minimumNights,
+      message: `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`,
+    };
+  }
+
+  if (adultCount > hotel.adultCount || childCount > hotel.childCount) {
+    return {
+      available: false,
+      reason: "guest_capacity",
+      message: "Guest count exceeds the room capacity.",
+    };
+  }
+
+  const overlappingBooking = await findOverlappingBooking({
+    hotelId: String(hotel._id),
+    checkIn,
+    checkOut,
+  });
+
+  if (overlappingBooking) {
+    return {
+      available: false,
+      reason: "overlap",
+      message:
+        "This room is not available for the selected dates because there is already a booking or blocked period in the same range.",
+      conflict: {
+        bookingId: overlappingBooking._id,
+        reservationNumber: overlappingBooking.reservationNumber,
+        status: overlappingBooking.status,
+      },
+    };
+  }
+
+  return {
+    available: true,
+    minimumNights,
+  };
+};
+
 router.get("/search", async (req: Request, res: Response) => {
   try {
     const query = constructSearchQuery(req.query);
@@ -238,6 +322,54 @@ router.get(
   }
 );
 
+router.get(
+  "/:hotelId/availability",
+  [
+    param("hotelId").notEmpty().withMessage("Hotel ID is required"),
+  ],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const hotel = await Hotel.findById(req.params.hotelId).select(
+        "_id name adultCount childCount minimumNights"
+      );
+
+      if (!hotel) {
+        return res.status(404).json({
+          available: false,
+          reason: "room_not_found",
+          message: "Room not found",
+        });
+      }
+
+      const checkIn = new Date(String(req.query.checkIn || ""));
+      const checkOut = new Date(String(req.query.checkOut || ""));
+      const adultCount = Math.max(1, Number(req.query.adultCount) || 1);
+      const childCount = Math.max(0, Number(req.query.childCount) || 0);
+
+      const availability = await assessHotelAvailability({
+        hotel,
+        checkIn,
+        checkOut,
+        adultCount,
+        childCount,
+      });
+
+      return res.json(availability);
+    } catch (error) {
+      console.log(error);
+      return res.status(500).json({
+        available: false,
+        message: "Unable to check room availability",
+      });
+    }
+  }
+);
+
 router.post(
   "/:hotelId/booking-request",
   [
@@ -275,13 +407,6 @@ router.post(
         return res.status(404).json({ message: "Hotel not found" });
       }
 
-      if (isBookingComManagedRoom(hotel)) {
-        return res.status(409).json({
-          message:
-            "Direct booking requests are disabled for this room because Booking.com calendar import is the active source of truth.",
-        });
-      }
-
       const checkIn = new Date(req.body.checkIn);
       const checkOut = new Date(req.body.checkOut);
       const normalizedEmail = String(req.body.email).trim().toLowerCase();
@@ -294,36 +419,25 @@ router.post(
         return res.status(400).json({ message: "Check-out date cannot be earlier than check-in date" });
       }
 
-      const nights = calculateNights(checkIn, checkOut);
-      const minimumNights = getMinimumNights(hotel);
-
-      if (nights < minimumNights) {
-        return res.status(400).json({
-          message: `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`,
-        });
-      }
-
-      if (req.body.adultCount > hotel.adultCount || req.body.childCount > hotel.childCount) {
-        return res.status(400).json({
-          message: "Guest count exceeds the room capacity",
-        });
-      }
-
-      const overlappingBooking = await findOverlappingBooking({
-        hotelId,
+      const availability = await assessHotelAvailability({
+        hotel,
         checkIn,
         checkOut,
+        adultCount: Number(req.body.adultCount),
+        childCount: Number(req.body.childCount),
       });
 
-      if (overlappingBooking) {
-        return res.status(409).json({
-          message:
-            "This room is not available for the selected dates because there is already a booking/request in the same period.",
-          bookingId: overlappingBooking._id,
-          reservationNumber: overlappingBooking.reservationNumber,
-          conflictStatus: overlappingBooking.status,
+      if (!availability.available) {
+        const statusCode = availability.reason === "overlap" ? 409 : 400;
+        return res.status(statusCode).json({
+          message: availability.message,
+          bookingId: availability.conflict?.bookingId,
+          reservationNumber: availability.conflict?.reservationNumber,
+          conflictStatus: availability.conflict?.status,
         });
       }
+
+      const nights = calculateNights(checkIn, checkOut);
 
       const duplicateThreshold = new Date(Date.now() - DUPLICATE_BOOKING_WINDOW_MS);
       const existingRecentBooking = await Booking.findOne({
@@ -430,13 +544,6 @@ router.post(
       return res.status(400).json({ message: "Hotel not found" });
     }
 
-    if (isBookingComManagedRoom(hotel)) {
-      return res.status(409).json({
-        message:
-          "Direct payments are disabled for this room because Booking.com calendar import is the active source of truth.",
-      });
-    }
-
     const minimumNights = getMinimumNights(hotel);
 
     if (Number(numberOfNights) < minimumNights) {
@@ -502,13 +609,6 @@ router.post(
 
       if (!hotel) {
         return res.status(400).json({ message: "Hotel not found" });
-      }
-
-      if (isBookingComManagedRoom(hotel)) {
-        return res.status(409).json({
-          message:
-            "Direct bookings are disabled for this room because Booking.com calendar import is the active source of truth.",
-        });
       }
 
       const checkIn = new Date(req.body.checkIn);

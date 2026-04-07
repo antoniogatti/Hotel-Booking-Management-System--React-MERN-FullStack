@@ -24,6 +24,10 @@ const Booking = () => {
   const navigate = useNavigate();
   const { hotelId } = useParams();
   const search = useSearchContext();
+  const checkIn = search.checkIn;
+  const checkOut = search.checkOut;
+  const checkInIso = Number.isNaN(checkIn.getTime()) ? "" : checkIn.toISOString();
+  const checkOutIso = Number.isNaN(checkOut.getTime()) ? "" : checkOut.toISOString();
 
   const savedDraft = (() => {
     const raw = sessionStorage.getItem("bookingDraft");
@@ -51,6 +55,36 @@ const Booking = () => {
     }
   );
 
+  const {
+    data: availability,
+    isLoading: isAvailabilityLoading,
+  } = useQueryWithLoading(
+    [
+      "checkHotelAvailability",
+      hotelId,
+      checkInIso,
+      checkOutIso,
+      search.adultCount,
+      search.childCount,
+    ],
+    () =>
+      apiClient.checkHotelAvailability({
+        hotelId: hotelId || "",
+        checkIn: checkInIso,
+        checkOut: checkOutIso,
+        adultCount: search.adultCount,
+        childCount: search.childCount,
+      }),
+    {
+      enabled:
+        !!hotelId &&
+        !Number.isNaN(checkIn.getTime()) &&
+        !Number.isNaN(checkOut.getTime()) &&
+        checkOut > checkIn,
+      loadingMessage: "Checking room availability...",
+    }
+  );
+
   const { register, handleSubmit, watch, formState } = useForm<BookingDetailsFormData>({
     defaultValues: {
       firstName: savedDraft?.firstName || "",
@@ -66,15 +100,13 @@ const Booking = () => {
       termsAccepted: savedDraft?.termsAccepted || false,
     },
   });
-
-  const checkIn = search.checkIn;
-  const checkOut = search.checkOut;
   const draftValues = watch();
   const nights = useMemo(() => {
     const diff = checkOut.getTime() - checkIn.getTime();
     return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }, [checkIn, checkOut]);
   const minimumNights = hotel?.minimumNights || 1;
+  const roomDisplayName = hotel?.name?.trim() || hotel?.type?.[0] || "Room";
   const isBelowMinimumStay = nights < minimumNights;
 
   useEffect(() => {
@@ -85,8 +117,30 @@ const Booking = () => {
     return <div className="text-center py-10 text-gray-500">Loading booking page...</div>;
   }
 
+  if (isAvailabilityLoading) {
+    return <div className="text-center py-10 text-gray-500">Checking room availability...</div>;
+  }
+
   if (isError || !hotel || !hotelId) {
     return <div className="text-center py-10 text-gray-500">Unable to load booking details.</div>;
+  }
+
+  if (availability && !availability.available) {
+    return (
+      <div className="max-w-4xl mx-auto px-4 py-12 text-center">
+        <h1 className="text-2xl font-semibold text-slate-800 mb-3">Room Not Available</h1>
+        <p className="text-slate-600 mb-6">
+          {availability.message || "This room is no longer available for the selected dates."}
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate(-1)}
+          className="bg-[#ea836c] hover:bg-[#db755f] text-white px-5 py-2 rounded"
+        >
+          Back to Availability
+        </button>
+      </div>
+    );
   }
 
   const onSubmit = (formValues: BookingDetailsFormData) => {
@@ -99,7 +153,7 @@ const Booking = () => {
       bookingDetails: {
         hotelId,
         hotelName: hotel.name,
-        roomName: Array.isArray(hotel.type) && hotel.type.length > 0 ? hotel.type[0] : "Room",
+        roomName: roomDisplayName,
         checkIn: checkIn.toISOString(),
         checkOut: checkOut.toISOString(),
         adultCount: search.adultCount,
@@ -125,12 +179,14 @@ const Booking = () => {
             Please fill the form below to continue with your booking request.
           </div>
 
+          <p className="mb-4 text-sm text-slate-500">Fields marked with * are required.</p>
+
           <h2 className="text-2xl font-semibold text-slate-700 mb-4">Billing Details</h2>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm text-slate-600 mb-1">First Name</label>
+                <label className="block text-sm text-slate-600 mb-1">First Name *</label>
                 <input
                   {...register("firstName", {
                     required: "First name is required",
@@ -144,7 +200,7 @@ const Booking = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-slate-600 mb-1">Last Name</label>
+                <label className="block text-sm text-slate-600 mb-1">Last Name *</label>
                 <input
                   {...register("lastName", {
                     required: "Last name is required",
@@ -158,7 +214,7 @@ const Booking = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-slate-600 mb-1">Email</label>
+                <label className="block text-sm text-slate-600 mb-1">Email *</label>
                 <input
                   type="email"
                   {...register("email", {
@@ -176,7 +232,7 @@ const Booking = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-slate-600 mb-1">Phone</label>
+                <label className="block text-sm text-slate-600 mb-1">Phone *</label>
                 <input
                   {...register("phone", {
                     required: "Phone is required",
@@ -190,7 +246,7 @@ const Booking = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-slate-600 mb-1">City</label>
+                <label className="block text-sm text-slate-600 mb-1">City *</label>
                 <input
                   {...register("city", { required: "City is required" })}
                   className="w-full border border-slate-300 rounded px-3 py-2"
@@ -201,7 +257,7 @@ const Booking = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-slate-600 mb-1">Country</label>
+                <label className="block text-sm text-slate-600 mb-1">Country *</label>
                 <input
                   {...register("country", { required: "Country is required" })}
                   className="w-full border border-slate-300 rounded px-3 py-2"
@@ -212,7 +268,7 @@ const Booking = () => {
               </div>
 
               <div>
-                <label className="block text-sm text-slate-600 mb-1">Nationality</label>
+                <label className="block text-sm text-slate-600 mb-1">Nationality *</label>
                 <input
                   {...register("nationality", { required: "Nationality is required" })}
                   className="w-full border border-slate-300 rounded px-3 py-2"
@@ -235,7 +291,7 @@ const Booking = () => {
             </div>
 
             <div>
-              <label className="block text-sm text-slate-600 mb-2">Arrival Time</label>
+              <label className="block text-sm text-slate-600 mb-2">Arrival Time *</label>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {(["Morning", "Afternoon", "Evening", "Night"] as const).map((option) => {
                   const selected = watch("arrivalTime") === option;
@@ -285,7 +341,7 @@ const Booking = () => {
                 className="mt-0.5"
               />
               <span>
-                I agree to the {" "}
+                I agree to the * {" "}
                 <Link to="/terms-conditions" className="text-[#ea836c] underline" target="_blank" rel="noreferrer">
                   Terms and Conditions
                 </Link>
@@ -331,7 +387,7 @@ const Booking = () => {
               <p><strong>Nights:</strong> {nights}</p>
               <p><strong>Minimum Stay:</strong> {minimumNights} nights</p>
               <p><strong>Guests:</strong> {search.adultCount} Adults, {search.childCount} Children</p>
-              <p><strong>Room:</strong> {Array.isArray(hotel.type) && hotel.type.length > 0 ? hotel.type[0] : "Room"}</p>
+              <p><strong>Room:</strong> {roomDisplayName}</p>
             </div>
             <div className="border-t pt-3 text-sm text-slate-700 space-y-1">
               <p className="flex justify-between"><span>Price Summary</span><span>EUR {hotel.pricePerNight * nights}</span></p>

@@ -5,6 +5,8 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import useSearchContext from "../../hooks/useSearchContext";
 import { useNavigate } from "react-router-dom";
+import * as apiClient from "../../api-client";
+import useAppContext from "../../hooks/useAppContext";
 import { User, Baby, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { getCancellationPolicyMessage } from "../../lib/cancellation-policy";
 
@@ -54,8 +56,11 @@ const GuestInfoForm = ({
 }: Props) => {
   const search = useSearchContext();
   const navigate = useNavigate();
+  const { showToast } = useAppContext();
   const [usePortalCalendar, setUsePortalCalendar] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
 
   useEffect(() => {
     const updateViewport = () => {
@@ -136,7 +141,7 @@ const GuestInfoForm = ({
     </div>
   );
 
-  const onSubmit = (data: GuestInfoFormData) => {
+  const onSubmit = async (data: GuestInfoFormData) => {
     if (!data.checkIn || !data.checkOut) {
       return;
     }
@@ -161,15 +166,49 @@ const GuestInfoForm = ({
       return;
     }
 
-    search.saveSearchValues(
-      "",
-      normalizedCheckIn,
-      normalizedCheckOut,
-      data.adultCount,
-      data.childCount,
-      hotelId
-    );
-    navigate(`/hotel/${hotelId}/booking`);
+    setAvailabilityError(null);
+    setIsCheckingAvailability(true);
+
+    try {
+      const availability = await apiClient.checkHotelAvailability({
+        hotelId,
+        checkIn: normalizedCheckIn.toISOString(),
+        checkOut: normalizedCheckOut.toISOString(),
+        adultCount: data.adultCount,
+        childCount: data.childCount,
+      });
+
+      if (!availability.available) {
+        const message = availability.message || "This room is not available for the selected dates.";
+        setAvailabilityError(message);
+        showToast({
+          title: "Room Not Available",
+          description: message,
+          type: "INFO",
+        });
+        return;
+      }
+
+      search.saveSearchValues(
+        "",
+        normalizedCheckIn,
+        normalizedCheckOut,
+        data.adultCount,
+        data.childCount,
+        hotelId
+      );
+      navigate(`/hotel/${hotelId}/booking`);
+    } catch {
+      const message = "Unable to check availability right now. Please try again in a moment.";
+      setAvailabilityError(message);
+      showToast({
+        title: "Availability Check Failed",
+        description: message,
+        type: "ERROR",
+      });
+    } finally {
+      setIsCheckingAvailability(false);
+    }
   };
 
   return (
@@ -351,14 +390,20 @@ const GuestInfoForm = ({
         </p>
       )}
 
+      {availabilityError && (
+        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+          {availabilityError}
+        </p>
+      )}
+
       {/* CTA */}
       <form onSubmit={handleSubmit(onSubmit)} className="mt-4 w-full">
         <button
           type="submit"
-          disabled={!checkIn || !checkOut || isBelowMinimumStay}
+          disabled={!checkIn || !checkOut || isBelowMinimumStay || isCheckingAvailability}
           className="block w-full bg-[#ea836c] hover:bg-[#d9725d] disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg text-sm tracking-wide uppercase transition-colors"
         >
-          Check Availability
+          {isCheckingAvailability ? "Checking Availability..." : "Check Availability"}
         </button>
       </form>
 
