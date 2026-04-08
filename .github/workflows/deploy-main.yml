@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  BACKEND_APP_NAME: palazzopinto-api-2603151048
+  BACKEND_APP_NAME: palazzopinto-api-secure
   FRONTEND_APP_NAME: palazzopinto-web-2603151048
 
 jobs:
@@ -92,7 +92,7 @@ jobs:
       - name: Build frontend
         working-directory: hotel-booking-frontend
         env:
-          VITE_API_BASE_URL: https://palazzopinto-api-2603151048.azurewebsites.net
+          VITE_API_BASE_URL: https://palazzopinto-api-secure.azurewebsites.net
           VITE_APP_ENV: production
           VITE_APP_VERSION: "1.3.0"
         run: npm run build:prod
