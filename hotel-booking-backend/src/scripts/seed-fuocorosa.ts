@@ -4,6 +4,8 @@ import path from "node:path";
 import mongoose from "mongoose";
 import Hotel from "../models/hotel";
 
+const PALAZZO_SITE_URL = "https://palazzopinto-web-2603151048.azurewebsites.net/";
+
 const getFuocorosaImages = (): string[] => {
   const imagesDir = path.resolve(
     process.cwd(),
@@ -59,7 +61,7 @@ const seedFuocorosa = async () => {
     contact: {
       phone: "+39 0831 1785476",
       email: "info@palazzopintobnb.com",
-      website: "https://palazzopintobnb.com/en/",
+      website: PALAZZO_SITE_URL,
     },
     policies: {
       checkInTime: "14:00",

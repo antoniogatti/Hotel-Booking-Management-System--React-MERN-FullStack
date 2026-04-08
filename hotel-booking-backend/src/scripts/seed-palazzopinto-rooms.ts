@@ -7,6 +7,8 @@ import Booking from "../models/booking";
 import BookingDayStatus from "../models/booking-day-status";
 import Hotel from "../models/hotel";
 
+const PALAZZO_SITE_URL = "https://palazzopinto-web-2603151048.azurewebsites.net/";
+
 const PALAZZO_BASE = {
   userId: "palazzopintobnb-owner",
   city: "Brindisi",
@@ -14,7 +16,7 @@ const PALAZZO_BASE = {
   contact: {
     phone: "+39 0831 1785476",
     email: "info@palazzopintobnb.com",
-    website: "https://palazzopintobnb.com/en/",
+    website: PALAZZO_SITE_URL,
   },
   policies: {
     checkInTime: "14:00",

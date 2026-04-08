@@ -76,6 +76,10 @@ const Footer = () => {
                 <Linkedin className="w-5 h-5" />
               </a>
             </div>
+            <div className="pt-2 text-sm text-[#2b4463]/80 space-y-1">
+              <p>P. IVA: {siteConfig.business.vatNumber}</p>
+              <p>CIN: {siteConfig.business.cin}</p>
+            </div>
           </div>
 
           {/* Navigation */}
@@ -96,14 +100,12 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a
-                  href={siteConfig.links.services}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  to={siteConfig.links.services}
                   className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
                 >
-                  Services
-                </a>
+                  Guest Services
+                </Link>
               </li>
               <li>
                 <Link
@@ -138,14 +140,12 @@ const Footer = () => {
                 <span className="text-[#2b4463]/85">Quiet central location</span>
               </li>
               <li>
-                <a
-                  href={siteConfig.links.rooms}
-                  target="_blank"
-                  rel="noreferrer"
+                <Link
+                  to={siteConfig.links.rooms}
                   className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
                 >
-                  View original room gallery
-                </a>
+                  View room gallery
+                </Link>
               </li>
             </ul>
           </div>
@@ -210,14 +210,12 @@ const Footer = () => {
             >
               Terms & Conditions
             </Link>
-            <a
-              href={siteConfig.links.website}
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              to={siteConfig.links.website}
               className="text-[#2b4463]/85 hover:text-[#ea836c] text-sm transition-colors"
             >
               Official Website
-            </a>
+            </Link>
           </div>
         </div>
       </div>

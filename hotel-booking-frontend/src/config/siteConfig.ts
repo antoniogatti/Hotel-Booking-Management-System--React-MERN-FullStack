@@ -23,10 +23,14 @@ export const siteConfig = {
     email: "info@palazzopintobnb.com",
     address: "Via Masaniello, 30 72100 Brindisi",
   },
+  business: {
+    vatNumber: "02654480744",
+    cin: "IT074001B400055036",
+  },
   links: {
-    website: "https://palazzopintobnb.com/en/",
-    rooms: "https://palazzopintobnb.com/en/rooms/",
-    services: "https://palazzopintobnb.com/en/services/",
+    website: "/",
+    rooms: "/rooms",
+    services: "/contact-us",
     contact: "/contact-us",
   },
   social: {
