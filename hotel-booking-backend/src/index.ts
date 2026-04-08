@@ -2,7 +2,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import "dotenv/config";
 import mongoose from "mongoose";
-import { MongoMemoryServer } from "mongodb-memory-server";
+import type { MongoMemoryServer } from "mongodb-memory-server";
 import userRoutes from "./routes/users";
 import authRoutes from "./routes/auth";
 import cookieParser from "cookie-parser";
@@ -57,6 +57,7 @@ const connectDB = async () => {
   try {
     const mongoUri = useInMemoryMongo
       ? await (async () => {
+          const { MongoMemoryServer } = await import("mongodb-memory-server");
           mongoMemoryServer = await MongoMemoryServer.create({
             instance: { dbName: "hotel-booking-dev" },
           });

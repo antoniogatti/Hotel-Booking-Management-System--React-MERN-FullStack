@@ -1,5 +1,10 @@
 # Version History
 
+## 1.8.2 - 2026-04-08
+
+### Production Stability
+- Fixed the backend startup path so the local-only `mongodb-memory-server` fallback is loaded lazily and no longer crashes Azure App Service production instances.
+
 ## 1.8.1 - 2026-04-08
 
 ### Local Development Stability
