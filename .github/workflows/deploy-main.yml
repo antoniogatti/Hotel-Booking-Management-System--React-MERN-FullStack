@@ -42,6 +42,20 @@ jobs:
         working-directory: hotel-booking-backend
         run: npm run build
 
+      - name: Prune backend dev dependencies
+        working-directory: hotel-booking-backend
+        run: npm prune --omit=dev
+
+      - name: Prepare backend deployment package
+        run: |
+          rm -rf backend-release
+          mkdir -p backend-release
+          cp -R hotel-booking-backend/dist backend-release/dist
+          cp -R hotel-booking-backend/node_modules backend-release/node_modules
+          cp hotel-booking-backend/package.json backend-release/package.json
+          cp hotel-booking-backend/package-lock.json backend-release/package-lock.json
+          cp hotel-booking-backend/web.config backend-release/web.config
+
       - name: Azure Login
         uses: azure/login@v2
         with:
@@ -51,7 +65,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.BACKEND_APP_NAME }}
-          package: hotel-booking-backend
+          package: backend-release
 
   deploy-frontend:
     name: Deploy Frontend
