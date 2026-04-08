@@ -12,6 +12,8 @@ import { queryClient } from "./main";
 
 export { getApiBaseUrl };
 
+export const DEFAULT_PROFILE_IMAGE = "/common/immagineprofilo.png";
+
 type RegisterFormData = {
   firstName: string;
   lastName: string;
@@ -34,6 +36,10 @@ const clearStoredAuth = () => {
   localStorage.removeItem("user_role");
 };
 
+const persistUserImage = (image?: string | null) => {
+  localStorage.setItem("user_image", image || DEFAULT_PROFILE_IMAGE);
+};
+
 export const register = async (formData: RegisterFormData) => {
   const response = await axiosInstance.post("/api/users/register", formData);
   return response.data;
@@ -46,11 +52,12 @@ export const signIn = async (formData: SignInFormData) => {
     localStorage.setItem("user_id", response.data.userId);
   }
   if (response.data?.user) {
-    const { email, firstName, lastName, role } = response.data.user;
+    const { email, firstName, lastName, role, image } = response.data.user;
     if (email) localStorage.setItem("user_email", email);
     const name = [firstName, lastName].filter(Boolean).join(" ") || email;
     if (name) localStorage.setItem("user_name", name);
     if (role) localStorage.setItem("user_role", role);
+    persistUserImage(image);
   }
 
   // Force validate token after successful login to update React Query cache
@@ -87,9 +94,7 @@ export const validateToken = async () => {
         localStorage.setItem("user_name", name);
       }
     }
-    if (response.data?.image) {
-      localStorage.setItem("user_image", response.data.image);
-    }
+    persistUserImage(response.data?.image);
     if (response.data?.role) {
       localStorage.setItem("user_role", response.data.role);
     }

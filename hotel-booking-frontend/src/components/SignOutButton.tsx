@@ -16,11 +16,8 @@ import {
 // Google profile image if exists, otherwise Robohash avatar
 const getAvatarUrl = () => {
   const image = localStorage.getItem("user_image");
-  if (image) return image; // Google Gmail profile image
-  const email = localStorage.getItem("user_email");
-  const name = localStorage.getItem("user_name");
-  const identifier = email || name || "user";
-  return `https://robohash.org/${encodeURIComponent(identifier)}.png?size=80x80&set=set1`;
+  if (image) return image;
+  return apiClient.DEFAULT_PROFILE_IMAGE;
 };
 
 const SignOutButton = () => {
@@ -108,7 +105,7 @@ const SignOutButton = () => {
             className="h-9 w-9 rounded-full object-cover"
             referrerPolicy="no-referrer"
             onError={(e) => {
-              e.currentTarget.src = `https://robohash.org/${encodeURIComponent(displayName)}.png?size=80x80&set=set1`;
+              e.currentTarget.src = apiClient.DEFAULT_PROFILE_IMAGE;
             }}
           />
         </button>

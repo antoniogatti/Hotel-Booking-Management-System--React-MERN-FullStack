@@ -1,5 +1,14 @@
 # Version History
 
+## 1.8.1 - 2026-04-08
+
+### Local Development Stability
+- Added an opt-in in-memory MongoDB fallback for local backend development when the configured cloud database is unavailable.
+- Updated local Microsoft sign-in behavior in the in-memory development environment so the profile menu exposes the expected admin surfaces during testing.
+
+### Profile Experience
+- Set the signed-in avatar fallback to the local `immagineprofilo.png` asset instead of the generated Robohash placeholder.
+
 ## 1.8.0 - 2026-04-08
 
 ### Security and Authentication Hardening

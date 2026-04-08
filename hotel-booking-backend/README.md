@@ -88,6 +88,10 @@ JWT_SECRET_KEY=your-super-secure-jwt-secret-key-here
 # Frontend URL (for CORS)
 FRONTEND_URL=http://localhost:5174
 
+# Optional local-only fallback when your real MongoDB is unavailable.
+# When true, the backend starts against a temporary in-memory MongoDB.
+USE_IN_MEMORY_MONGO=false
+
 # Microsoft Entra OAuth / Graph
 MS_ENTRA_CLIENT_ID=your_microsoft_client_id
 MS_ENTRA_CLIENT_SECRET=your_microsoft_client_secret

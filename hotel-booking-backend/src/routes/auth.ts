@@ -32,8 +32,11 @@ const BACKEND_URL = (
 
 const microsoftBaseUrl = `https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/oauth2/v2.0`;
 const isProduction = process.env.NODE_ENV === "production";
+const useInMemoryMongo =
+  !isProduction && process.env.USE_IN_MEMORY_MONGO === "true";
 const sessionCookieName = "session_id";
 const oauthStateCookieName = "oauth_state";
+const localDevDefaultRole: AppRole = useInMemoryMongo ? "admin" : defaultAppRole;
 
 const getSessionCookieOptions = (
   overrides: Partial<CookieOptions> = {}
@@ -79,7 +82,9 @@ const issueToken = (userId: string, role: AppRole) => {
 };
 
 const ensurePersistedRole = async (user: any, email: string) => {
-  const computedRole = resolvePersistedRole(user.role);
+  const computedRole = user.role
+    ? resolvePersistedRole(user.role)
+    : localDevDefaultRole;
   const previousRole = user.role;
 
   if (!user.role || user.role !== computedRole) {
@@ -326,7 +331,7 @@ router.get("/callback/microsoft", async (req: Request, res: Response) => {
         lastName,
         password: randomPassword,
         emailVerified: true,
-        role: "user",
+        role: localDevDefaultRole,
       });
       await user.save();
     }
@@ -476,7 +481,9 @@ router.get("/validate-token", verifyToken, async (req: Request, res: Response) =
     return res.status(401).json({ message: "unauthorized" });
   }
 
-  const role = user.role ? resolvePersistedRole(user.role) : defaultAppRole;
+  const role = user.role
+    ? resolvePersistedRole(user.role)
+    : localDevDefaultRole;
   if (!user.role || user.role !== role) {
     user.role = role;
     await user.save();

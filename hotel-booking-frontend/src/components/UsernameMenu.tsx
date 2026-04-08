@@ -14,11 +14,8 @@ import useAppContext from "../hooks/useAppContext";
 
 const getAvatarUrl = () => {
   const image = localStorage.getItem("user_image");
-  const email = localStorage.getItem("user_email");
-  const name = localStorage.getItem("user_name");
-  const id = email || name || "user";
   if (image) return image;
-  return `https://robohash.org/${encodeURIComponent(id)}.png?set=set1&size=80x80`;
+  return apiClient.DEFAULT_PROFILE_IMAGE;
 };
 
 const UsernameMenu = () => {
@@ -30,7 +27,7 @@ const UsernameMenu = () => {
   const name = localStorage.getItem("user_name");
 
   const avatarUrl = imgError
-    ? `https://robohash.org/${email || "user"}.png?set=set1&size=80x80`
+    ? apiClient.DEFAULT_PROFILE_IMAGE
     : getAvatarUrl();
 
   const handleMenuClick = () => setIsOpen(false);

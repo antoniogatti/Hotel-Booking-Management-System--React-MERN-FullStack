@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import "dotenv/config";
 import mongoose from "mongoose";
+import { MongoMemoryServer } from "mongodb-memory-server";
 import userRoutes from "./routes/users";
 import authRoutes from "./routes/auth";
 import cookieParser from "cookie-parser";
@@ -24,11 +25,14 @@ import { startBookingComSyncScheduler } from "./lib/booking-com-ical";
 import { logError, logInfo, logWarn } from "./lib/logger";
 
 const isProduction = process.env.NODE_ENV === "production";
+const useInMemoryMongo =
+  !isProduction && process.env.USE_IN_MEMORY_MONGO === "true";
 const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
+let mongoMemoryServer: MongoMemoryServer | null = null;
 
 // Environment Variables Validation
 const requiredEnvVars = [
-  "MONGODB_CONNECTION_STRING",
+  ...(useInMemoryMongo ? [] : ["MONGODB_CONNECTION_STRING"]),
   "JWT_SECRET_KEY",
 ];
 
@@ -45,13 +49,29 @@ logInfo("Environment configuration validated", {
   environment: process.env.NODE_ENV || "development",
   frontendUrl: process.env.FRONTEND_URL || "not-set",
   backendUrl: process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`,
+  useInMemoryMongo,
 });
 
 // MongoDB Connection with Error Handling
 const connectDB = async () => {
   try {
-    logInfo("Attempting MongoDB connection");
-    await mongoose.connect(process.env.MONGODB_CONNECTION_STRING as string);
+    const mongoUri = useInMemoryMongo
+      ? await (async () => {
+          mongoMemoryServer = await MongoMemoryServer.create({
+            instance: { dbName: "hotel-booking-dev" },
+          });
+          const uri = mongoMemoryServer.getUri();
+          logWarn("Using in-memory MongoDB for development", {
+            dbName: "hotel-booking-dev",
+          });
+          return uri;
+        })()
+      : (process.env.MONGODB_CONNECTION_STRING as string);
+
+    logInfo("Attempting MongoDB connection", {
+      mode: useInMemoryMongo ? "in-memory" : "configured",
+    });
+    await mongoose.connect(mongoUri);
     logInfo("MongoDB connected successfully", {
       database: mongoose.connection.db.databaseName,
     });
@@ -262,6 +282,11 @@ const gracefulShutdown = (signal: string) => {
 
     try {
       await mongoose.connection.close();
+      if (mongoMemoryServer) {
+        await mongoMemoryServer.stop();
+        mongoMemoryServer = null;
+        logInfo("In-memory MongoDB stopped");
+      }
       logInfo("MongoDB connection closed");
       logInfo("Graceful shutdown completed");
       process.exit(0);
