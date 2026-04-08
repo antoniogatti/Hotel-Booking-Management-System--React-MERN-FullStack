@@ -28,6 +28,12 @@ const isProduction = process.env.NODE_ENV === "production";
 const useInMemoryMongo =
   !isProduction && process.env.USE_IN_MEMORY_MONGO === "true";
 const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
+const normalizeForwardedProto = (protoHeader?: string | string[]) => {
+  const value = Array.isArray(protoHeader) ? protoHeader[0] : protoHeader;
+  return value?.split(",")[0]?.trim().toLowerCase();
+};
+const isSecureRequest = (req: Request) =>
+  req.secure || normalizeForwardedProto(req.headers["x-forwarded-proto"]) === "https";
 const normalizeRateLimitIp = (ip?: string) => {
   if (!ip) {
     return "127.0.0.1";
@@ -110,10 +116,37 @@ connectDB();
 const app = express();
 
 // Security middleware
-app.use(helmet());
+app.use(
+  helmet({
+    hsts: isProduction
+      ? {
+          maxAge: 31536000,
+          includeSubDomains: true,
+          preload: true,
+        }
+      : false,
+  })
+);
 
 // Trust proxy for production (fixes rate limiting issues)
 app.set("trust proxy", 1);
+
+if (isProduction) {
+  app.use((req, res, next) => {
+    if (isSecureRequest(req)) {
+      return next();
+    }
+
+    const host = req.headers.host;
+
+    if (!host) {
+      return next();
+    }
+
+    const redirectUrl = `https://${host}${req.originalUrl}`;
+    return res.redirect(308, redirectUrl);
+  });
+}
 
 // Rate limiting for API endpoints
 const generalLimiter = rateLimit({
