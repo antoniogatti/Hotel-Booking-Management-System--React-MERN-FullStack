@@ -55,6 +55,9 @@ jobs:
           cp hotel-booking-backend/package.json backend-release/package.json
           cp hotel-booking-backend/package-lock.json backend-release/package-lock.json
           cp hotel-booking-backend/web.config backend-release/web.config
+          rm -f backend-release.zip
+          cd backend-release
+          zip -r ../backend-release.zip .
 
       - name: Azure Login
         uses: azure/login@v2
@@ -65,7 +68,7 @@ jobs:
         uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ env.BACKEND_APP_NAME }}
-          package: backend-release
+          package: backend-release.zip
 
   deploy-frontend:
     name: Deploy Frontend
