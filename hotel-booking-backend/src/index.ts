@@ -20,7 +20,7 @@ import { specs } from "./swagger";
 import helmet from "helmet";
 import morgan from "morgan";
 import compression from "compression";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { startBookingComSyncScheduler } from "./lib/booking-com-ical";
 import { logError, logInfo, logWarn } from "./lib/logger";
 
@@ -28,6 +28,15 @@ const isProduction = process.env.NODE_ENV === "production";
 const useInMemoryMongo =
   !isProduction && process.env.USE_IN_MEMORY_MONGO === "true";
 const normalizeOrigin = (origin: string) => origin.replace(/\/$/, "");
+const normalizeRateLimitIp = (ip?: string) => {
+  if (!ip) {
+    return "127.0.0.1";
+  }
+
+  return /^\d{1,3}(?:\.\d{1,3}){3}:\d+$/.test(ip)
+    ? ip.replace(/:\d+$/, "")
+    : ip;
+};
 let mongoMemoryServer: MongoMemoryServer | null = null;
 
 // Environment Variables Validation
@@ -113,6 +122,7 @@ const generalLimiter = rateLimit({
   message: "Too many requests from this IP, please try again later.",
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: (req) => ipKeyGenerator(normalizeRateLimitIp(req.ip)),
 });
 
 app.use("/api/", generalLimiter);

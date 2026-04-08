@@ -1,5 +1,11 @@
 # Version History
 
+## 1.8.3 - 2026-04-08
+
+### Azure Production Hardening
+- Normalized proxied client IP values before `express-rate-limit` key generation so Azure App Service requests with `IP:port` no longer trigger invalid IP validation errors.
+- Added a local ambient declaration for the optional `mongodb-memory-server` dev dependency so TypeScript builds remain stable in pruned deployment-style environments.
+
 ## 1.8.2 - 2026-04-08
 
 ### Production Stability
