@@ -24,9 +24,11 @@ const AuthCallback = () => {
 
     const error = searchParams.get("error");
     const provider = searchParams.get("provider");
+    const token = searchParams.get("token");
 
     void (async () => {
       if (error) {
+        apiClient.persistSessionToken(null);
         showToast({
           title: "Sign-in failed",
           description:
@@ -44,6 +46,8 @@ const AuthCallback = () => {
       }
 
       try {
+        apiClient.persistSessionToken(token);
+
         let result: Awaited<ReturnType<typeof apiClient.validateToken>> = null;
 
         for (let attempt = 0; attempt < 5; attempt++) {
@@ -68,6 +72,7 @@ const AuthCallback = () => {
         });
         navigate("/");
       } catch {
+        apiClient.persistSessionToken(null);
         showToast({
           title: "Sign-in failed",
           description: "Your session could not be established. Please try again.",

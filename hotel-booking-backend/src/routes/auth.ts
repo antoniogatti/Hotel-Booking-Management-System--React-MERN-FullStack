@@ -346,6 +346,7 @@ router.get("/callback/microsoft", async (req: Request, res: Response) => {
     return redirectToAuthCallback(res, {
       provider: "microsoft",
       success: "1",
+      token,
     });
   } catch (err) {
     logError("Microsoft OAuth callback failed", err, { provider: "microsoft" });

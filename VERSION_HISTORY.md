@@ -1,5 +1,11 @@
 # Version History
 
+## 1.8.4 - 2026-04-08
+
+### Production Authentication Recovery
+- Added a bearer-token fallback to the Microsoft OAuth callback so production sign-in can complete even when browsers do not preserve the cross-site session cookie between the frontend and backend Azure Web App hosts.
+- Persisted the issued session token in the frontend auth callback and attached it automatically to authenticated API requests for token validation and protected admin flows.
+
 ## 1.8.3 - 2026-04-08
 
 ### Azure Production Hardening

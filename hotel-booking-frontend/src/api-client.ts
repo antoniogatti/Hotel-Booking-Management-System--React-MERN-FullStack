@@ -40,6 +40,15 @@ const persistUserImage = (image?: string | null) => {
   localStorage.setItem("user_image", image || DEFAULT_PROFILE_IMAGE);
 };
 
+export const persistSessionToken = (token?: string | null) => {
+  if (!token) {
+    localStorage.removeItem("session_id");
+    return;
+  }
+
+  localStorage.setItem("session_id", token);
+};
+
 export const register = async (formData: RegisterFormData) => {
   const response = await axiosInstance.post("/api/users/register", formData);
   return response.data;
@@ -47,6 +56,8 @@ export const register = async (formData: RegisterFormData) => {
 
 export const signIn = async (formData: SignInFormData) => {
   const response = await axiosInstance.post("/api/auth/login", formData);
+
+  persistSessionToken(response.data?.token);
 
   if (response.data?.userId) {
     localStorage.setItem("user_id", response.data.userId);

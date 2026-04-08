@@ -1,5 +1,7 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 
+const getStoredSessionToken = () => localStorage.getItem("session_id");
+
 // Define base URL based on environment
 const getBaseURL = () => {
   if (import.meta.env.VITE_API_BASE_URL) {
@@ -43,6 +45,12 @@ const axiosInstance = axios.create({
 
 axiosInstance.interceptors.request.use((config: CustomAxiosRequestConfig) => {
   config.metadata = { retryCount: 0 };
+
+  const token = getStoredSessionToken();
+  if (token && !config.headers.Authorization) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
   return config;
 });
 
