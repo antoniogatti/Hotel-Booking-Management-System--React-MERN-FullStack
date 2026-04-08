@@ -8,7 +8,7 @@ import {
   BookingManagementRoomType,
   BookingCalendarResponseType,
 } from "../../shared/types";
-import { queryClient } from "./main";
+import { queryClient } from "./lib/query-client";
 
 export { getApiBaseUrl };
 

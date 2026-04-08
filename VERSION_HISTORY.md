@@ -1,5 +1,11 @@
 # Version History
 
+## 1.8.5 - 2026-04-08
+
+### Frontend Bootstrap Fix
+- Fixed a React runtime initialization failure that left the frontend on a white screen in local and production builds.
+- Moved the shared React Query client out of the frontend bootstrap entrypoint to remove a circular import between `main.tsx`, `App.tsx`, and the API client.
+
 ## 1.8.4 - 2026-04-08
 
 ### Production Authentication Recovery
