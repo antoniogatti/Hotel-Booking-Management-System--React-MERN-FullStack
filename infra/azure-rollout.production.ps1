@@ -253,6 +253,6 @@ Write-Host "Secure backend URL: $BackendUrl"
 Write-Host "Static Web App URL: $StaticWebAppUrl"
 Write-Host "Next step: assign explicit persisted roles before final admin testing, for example:"
 Write-Host "  cd hotel-booking-backend"
-Write-Host '  $env:MONGODB_CONNECTION_STRING="PRODUCTION_CONNECTION_STRING"'
+Write-Host "  `$env:MONGODB_CONNECTION_STRING=`"PRODUCTION_CONNECTION_STRING`""
 Write-Host "  ..\infra\apply-user-roles.production.ps1"
 Write-Host "Next step: deploy hotel-booking-frontend/dist to the Static Web App using your preferred workflow (GitHub Actions or SWA CLI)."

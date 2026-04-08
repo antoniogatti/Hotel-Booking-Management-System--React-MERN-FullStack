@@ -556,11 +556,13 @@ router.post(
   }
 );
 
+const escapeRegexLiteral = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
 const constructSearchQuery = (queryParams: any) => {
   let constructedQuery: any = {};
 
   if (queryParams.destination && queryParams.destination.trim() !== "") {
-    const destination = queryParams.destination.trim();
+    const destination = escapeRegexLiteral(queryParams.destination.trim().slice(0, 100));
 
     constructedQuery.$or = [
       { city: { $regex: destination, $options: "i" } },

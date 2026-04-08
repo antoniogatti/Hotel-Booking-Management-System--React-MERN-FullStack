@@ -1,6 +1,7 @@
 import * as nodeIcal from "node-ical";
 import Hotel from "../models/hotel";
 import ExternalCalendarEvent from "../models/external-calendar-event";
+import { assertValidBookingComImportUrl } from "./booking-com-url";
 import { logError, logInfo } from "./logger";
 
 export const BOOKING_COM_SOURCE = "booking_com" as const;
@@ -177,7 +178,9 @@ export const syncBookingComRoom = async (hotel: SyncableHotel): Promise<SyncResu
   }
 
   try {
-    const response = await fetch(importUrl, {
+    const validatedImportUrl = assertValidBookingComImportUrl(importUrl);
+
+    const response = await fetch(validatedImportUrl, {
       method: "GET",
       headers: {
         Accept: "text/calendar,text/plain;q=0.9,*/*;q=0.8",

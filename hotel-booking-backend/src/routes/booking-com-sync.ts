@@ -10,6 +10,7 @@ import {
   syncAllBookingComRooms,
   syncBookingComRoom,
 } from "../lib/booking-com-ical";
+import { validateBookingComImportUrl } from "../lib/booking-com-url";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
 
@@ -194,6 +195,20 @@ router.put(
       }
 
       const importUrl = typeof req.body.importUrl === "string" ? req.body.importUrl.trim() : "";
+      const syncEnabled = Boolean(req.body.syncEnabled);
+
+      if (syncEnabled && !importUrl) {
+        return res.status(400).json({
+          message: "Booking.com import URL is required when sync is enabled",
+        });
+      }
+
+      const importUrlValidation = validateBookingComImportUrl(importUrl);
+      if (importUrlValidation.ok === false) {
+        return res.status(400).json({ message: importUrlValidation.message });
+      }
+
+      const normalizedImportUrl = importUrlValidation.normalizedUrl;
       const exportEnabled = Boolean(req.body.exportEnabled);
       const existingExportToken = accessCheck.hotel?.bookingComIcal?.exportToken || "";
       const exportToken =
@@ -205,8 +220,8 @@ router.put(
         req.params.hotelId,
         {
           $set: {
-            "bookingComIcal.importUrl": importUrl,
-            "bookingComIcal.syncEnabled": Boolean(req.body.syncEnabled),
+            "bookingComIcal.importUrl": normalizedImportUrl,
+            "bookingComIcal.syncEnabled": syncEnabled,
             "bookingComIcal.exportEnabled": exportEnabled,
             "bookingComIcal.exportToken": exportToken,
             "bookingComIcal.lastSyncError": "",
@@ -224,9 +239,9 @@ router.put(
         actorRole: req.userRole,
         req,
         metadata: {
-          syncEnabled: Boolean(req.body.syncEnabled),
+          syncEnabled,
           exportEnabled,
-          hasImportUrl: Boolean(importUrl),
+          hasImportUrl: Boolean(normalizedImportUrl),
         },
       });
 
