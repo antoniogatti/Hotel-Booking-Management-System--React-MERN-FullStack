@@ -13,6 +13,9 @@ Included artifacts:
 What this Bicep deploys:
 - Linux App Service Plan `B1` for the backend API
 - Linux App Service for the backend API with HTTPS-only, TLS 1.2, managed identity, and Key Vault-backed settings
+- Regional VNet integration for the backend App Service with route-all enabled
+- Dedicated private endpoint subnet and private DNS zone link for MongoDB vCore
+- Private Endpoint from the backend VNet to the Azure Cosmos DB for MongoDB vCore cluster
 - Key Vault with RBAC enabled and purge protection enabled
 - Log Analytics workspace
 - Application Insights connected to the workspace
@@ -22,8 +25,12 @@ What it intentionally does not deploy yet:
 - Frontend hosting target implementation
 - DNS or custom domains
 - Front Door or WAF
-- Private endpoints
 - Alert rules and dashboards
+
+Cutover note:
+- The template provisions the private network path for the secure backend App Service.
+- The production rollout script validates the secure backend over the database-backed `/api/rooms` route and then disables Mongo cluster public network access.
+- This keeps the Mongo cluster move to Private Link explicit and testable, instead of embedding a fragile full-cluster overwrite into the Bicep template.
 
 Frontend target status:
 - The selected frontend target is Azure Static Web Apps Standard.

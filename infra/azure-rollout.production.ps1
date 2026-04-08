@@ -129,6 +129,7 @@ $ParameterFile = Get-Content $ParameterFilePath | ConvertFrom-Json
 $NamePrefix = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "namePrefix"
 $BackendAppName = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "backendAppName"
 $KeyVaultName = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "keyVaultName"
+$MongoClusterName = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "mongoClusterName"
 $ConfiguredFrontendAdditionalOrigins = @(Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "frontendAdditionalOrigins")
 
 $Location = az group show --name $ResourceGroup --query location -o tsv
@@ -214,6 +215,29 @@ az webapp deploy --resource-group $ResourceGroup --name $BackendAppName --src-pa
 $BackendHostname = az webapp show --resource-group $ResourceGroup --name $BackendAppName --query defaultHostName -o tsv
 $BackendUrl = "https://$BackendHostname"
 
+# Validate the secure backend while public access is still available on the cluster.
+$HealthUrl = "$BackendUrl/api/health"
+$RoomsUrl = "$BackendUrl/api/rooms"
+Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing | Out-Null
+Invoke-WebRequest -Uri $RoomsUrl -UseBasicParsing | Out-Null
+
+# Disable public network access on the Mongo vCore cluster after the secure backend has proven DB connectivity.
+$MongoClusterResourceId = az resource show --resource-group $ResourceGroup --resource-type "Microsoft.DocumentDB/mongoClusters" --name $MongoClusterName --query id -o tsv
+if (-not $MongoClusterResourceId) {
+  throw "Unable to resolve resource ID for mongo cluster '$MongoClusterName'."
+}
+
+$MongoClusterPatchBody = @{
+  properties = @{
+    publicNetworkAccess = 'Disabled'
+  }
+} | ConvertTo-Json -Depth 5 -Compress
+
+az rest --method patch --uri "https://management.azure.com$MongoClusterResourceId?api-version=2025-09-01" --body $MongoClusterPatchBody --output none
+
+# Verify the backend still works after forcing database access through Private Link only.
+Invoke-WebRequest -Uri $RoomsUrl -UseBasicParsing | Out-Null
+
 # Create the Azure Static Web App resource for frontend cutover.
 az staticwebapp create --name $StaticWebAppName --resource-group $ResourceGroup --location $Location --sku Standard
 az staticwebapp appsettings set --name $StaticWebAppName --resource-group $ResourceGroup --setting-names VITE_API_BASE_URL=$BackendUrl
@@ -229,6 +253,6 @@ Write-Host "Secure backend URL: $BackendUrl"
 Write-Host "Static Web App URL: $StaticWebAppUrl"
 Write-Host "Next step: assign explicit persisted roles before final admin testing, for example:"
 Write-Host "  cd hotel-booking-backend"
-Write-Host "  `$env:MONGODB_CONNECTION_STRING=\"<production-connection-string>\""
+Write-Host '  $env:MONGODB_CONNECTION_STRING="PRODUCTION_CONNECTION_STRING"'
 Write-Host "  ..\infra\apply-user-roles.production.ps1"
 Write-Host "Next step: deploy hotel-booking-frontend/dist to the Static Web App using your preferred workflow (GitHub Actions or SWA CLI)."

@@ -21,6 +21,30 @@ param logAnalyticsWorkspaceName string = '${namePrefix}-logs'
 @description('Name of the Application Insights component.')
 param applicationInsightsName string = '${namePrefix}-appi'
 
+@description('Name of the Azure Cosmos DB for MongoDB vCore cluster.')
+param mongoClusterName string = '${namePrefix}db'
+
+@description('Name of the virtual network used for backend private connectivity.')
+param virtualNetworkName string = '${namePrefix}-backend-vnet'
+
+@description('CIDR block for the backend virtual network.')
+param virtualNetworkAddressPrefix string = '10.42.0.0/16'
+
+@description('Name of the App Service VNet integration subnet.')
+param appServiceIntegrationSubnetName string = '${namePrefix}-appsvc-snet'
+
+@description('CIDR block for the App Service VNet integration subnet.')
+param appServiceIntegrationSubnetPrefix string = '10.42.0.0/26'
+
+@description('Name of the private endpoint subnet.')
+param privateEndpointSubnetName string = '${namePrefix}-private-endpoints-snet'
+
+@description('CIDR block for the private endpoint subnet.')
+param privateEndpointSubnetPrefix string = '10.42.0.64/26'
+
+@description('Private DNS zone name for Azure Cosmos DB for MongoDB vCore.')
+param mongoPrivateDnsZoneName string = 'privatelink.mongocluster.cosmos.azure.com'
+
 @description('Primary frontend origin allowed to call the backend API.')
 param frontendUrl string
 
@@ -58,6 +82,67 @@ param backendExtraAppSettings array = []
 param tags object = {}
 
 var keyVaultSecretsUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
+var appServiceIntegrationSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', virtualNetworkName, appServiceIntegrationSubnetName)
+var privateEndpointSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', virtualNetworkName, privateEndpointSubnetName)
+var backendDefaultHostname = '${backendAppName}.azurewebsites.net'
+
+resource mongoCluster 'Microsoft.DocumentDB/mongoClusters@2025-09-01' existing = {
+  name: mongoClusterName
+}
+
+resource virtualNetwork 'Microsoft.Network/virtualNetworks@2024-01-01' = {
+  name: virtualNetworkName
+  location: location
+  properties: {
+    addressSpace: {
+      addressPrefixes: [
+        virtualNetworkAddressPrefix
+      ]
+    }
+    subnets: [
+      {
+        name: appServiceIntegrationSubnetName
+        properties: {
+          addressPrefix: appServiceIntegrationSubnetPrefix
+          delegations: [
+            {
+              name: 'appServiceDelegation'
+              properties: {
+                serviceName: 'Microsoft.Web/serverFarms'
+              }
+            }
+          ]
+        }
+      }
+      {
+        name: privateEndpointSubnetName
+        properties: {
+          addressPrefix: privateEndpointSubnetPrefix
+          privateEndpointNetworkPolicies: 'Disabled'
+        }
+      }
+    ]
+  }
+  tags: tags
+}
+
+resource mongoPrivateDnsZone 'Microsoft.Network/privateDnsZones@2020-06-01' = {
+  name: mongoPrivateDnsZoneName
+  location: 'global'
+  tags: tags
+}
+
+resource mongoPrivateDnsZoneLink 'Microsoft.Network/privateDnsZones/virtualNetworkLinks@2020-06-01' = {
+  parent: mongoPrivateDnsZone
+  name: '${virtualNetworkName}-link'
+  location: 'global'
+  properties: {
+    registrationEnabled: false
+    virtualNetwork: {
+      id: virtualNetwork.id
+    }
+  }
+}
 
 resource backendPlan 'Microsoft.Web/serverfarms@2024-04-01' = {
   name: backendPlanName
@@ -138,6 +223,8 @@ resource backendSite 'Microsoft.Web/sites@2024-04-01' = {
     serverFarmId: backendPlan.id
     httpsOnly: true
     publicNetworkAccess: 'Enabled'
+    virtualNetworkSubnetId: appServiceIntegrationSubnetId
+    vnetRouteAllEnabled: true
     siteConfig: {
       linuxFxVersion: 'NODE|20-lts'
       minTlsVersion: '1.2'
@@ -152,7 +239,7 @@ resource backendSite 'Microsoft.Web/sites@2024-04-01' = {
         }
         {
           name: 'BACKEND_URL'
-          value: 'https://${backendSite.properties.defaultHostName}'
+          value: 'https://${backendDefaultHostname}'
         }
         {
           name: 'FRONTEND_URL'
@@ -169,6 +256,10 @@ resource backendSite 'Microsoft.Web/sites@2024-04-01' = {
         {
           name: 'APPLICATIONINSIGHTS_CONNECTION_STRING'
           value: applicationInsights.properties.ConnectionString
+        }
+        {
+          name: 'WEBSITE_VNET_ROUTE_ALL'
+          value: '1'
         }
         {
           name: 'APPINSIGHTS_PROFILERFEATURE_VERSION'
@@ -215,9 +306,41 @@ resource backendSite 'Microsoft.Web/sites@2024-04-01' = {
   })
 }
 
-resource backendAppInsightsExtension 'Microsoft.Web/sites/siteextensions@2024-04-01' = {
-  name: 'ApplicationInsightsAgent'
-  parent: backendSite
+resource mongoPrivateEndpoint 'Microsoft.Network/privateEndpoints@2024-01-01' = {
+  name: '${namePrefix}-mongodb-pe'
+  location: location
+  properties: {
+    subnet: {
+      id: privateEndpointSubnetId
+    }
+    privateLinkServiceConnections: [
+      {
+        name: '${namePrefix}-mongodb-pls'
+        properties: {
+          privateLinkServiceId: mongoCluster.id
+          groupIds: [
+            'MongoCluster'
+          ]
+        }
+      }
+    ]
+  }
+  tags: tags
+}
+
+resource mongoPrivateEndpointDnsZoneGroup 'Microsoft.Network/privateEndpoints/privateDnsZoneGroups@2024-01-01' = {
+  parent: mongoPrivateEndpoint
+  name: 'default'
+  properties: {
+    privateDnsZoneConfigs: [
+      {
+        name: 'mongo-cluster-dns'
+        properties: {
+          privateDnsZoneId: mongoPrivateDnsZone.id
+        }
+      }
+    ]
+  }
 }
 
 resource backendKeyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {

@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "outDir": "./dist",
+    "rootDir": "..",
     /* Visit https://aka.ms/tsconfig to read more about this file */
     /* Projects */
     // "incremental": true,                              /* Save .tsbuildinfo files to allow for incremental compilation of projects. */
@@ -90,7 +91,6 @@
     "strictPropertyInitialization": false /* Check for class properties that are declared but not set in the constructor. */,
     "noImplicitThis": false /* Enable error reporting when 'this' is given the type 'any'. */,
     "useUnknownInCatchVariables": false /* Default catch clause variables as 'unknown' instead of 'any'. */,
-    "alwaysStrict": false /* Ensure 'use strict' is always emitted. */,
     "noUnusedLocals": false /* Enable error reporting when local variables aren't read. */,
     "noUnusedParameters": false /* Raise an error when a function parameter isn't read. */,
     "exactOptionalPropertyTypes": false /* Interpret optional property types as written, rather than adding 'undefined'. */,

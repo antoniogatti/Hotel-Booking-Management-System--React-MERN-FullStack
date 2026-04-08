@@ -1,0 +1,442 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.42.1.51946",
+      "templateHash": "15455538780137870795"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "defaultValue": "[resourceGroup().location]",
+      "metadata": {
+        "description": "Azure region for all resources."
+      }
+    },
+    "namePrefix": {
+      "type": "string",
+      "defaultValue": "palazzopinto",
+      "metadata": {
+        "description": "Prefix used for resource names."
+      }
+    },
+    "backendPlanName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-api-b1-plan', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the Linux App Service plan for the backend API."
+      }
+    },
+    "backendAppName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-api-secure', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the backend App Service."
+      }
+    },
+    "keyVaultName": {
+      "type": "string",
+      "defaultValue": "[format('{0}kv', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the Key Vault."
+      }
+    },
+    "logAnalyticsWorkspaceName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-logs', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the Log Analytics workspace."
+      }
+    },
+    "applicationInsightsName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-appi', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the Application Insights component."
+      }
+    },
+    "mongoClusterName": {
+      "type": "string",
+      "defaultValue": "[format('{0}db', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the Azure Cosmos DB for MongoDB vCore cluster."
+      }
+    },
+    "virtualNetworkName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-backend-vnet', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the virtual network used for backend private connectivity."
+      }
+    },
+    "virtualNetworkAddressPrefix": {
+      "type": "string",
+      "defaultValue": "10.42.0.0/16",
+      "metadata": {
+        "description": "CIDR block for the backend virtual network."
+      }
+    },
+    "appServiceIntegrationSubnetName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-appsvc-snet', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the App Service VNet integration subnet."
+      }
+    },
+    "appServiceIntegrationSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.42.0.0/26",
+      "metadata": {
+        "description": "CIDR block for the App Service VNet integration subnet."
+      }
+    },
+    "privateEndpointSubnetName": {
+      "type": "string",
+      "defaultValue": "[format('{0}-private-endpoints-snet', parameters('namePrefix'))]",
+      "metadata": {
+        "description": "Name of the private endpoint subnet."
+      }
+    },
+    "privateEndpointSubnetPrefix": {
+      "type": "string",
+      "defaultValue": "10.42.0.64/26",
+      "metadata": {
+        "description": "CIDR block for the private endpoint subnet."
+      }
+    },
+    "mongoPrivateDnsZoneName": {
+      "type": "string",
+      "defaultValue": "privatelink.mongocluster.cosmos.azure.com",
+      "metadata": {
+        "description": "Private DNS zone name for Azure Cosmos DB for MongoDB vCore."
+      }
+    },
+    "frontendUrl": {
+      "type": "string",
+      "metadata": {
+        "description": "Primary frontend origin allowed to call the backend API."
+      }
+    },
+    "frontendAdditionalOrigins": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Additional allowed frontend origins, comma-joined into FRONTEND_URLS."
+      }
+    },
+    "entraTenantId": {
+      "type": "string",
+      "metadata": {
+        "description": "Microsoft Entra tenant ID used by the backend OAuth flow."
+      }
+    },
+    "mongoConnectionStringSecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault secret URI for MONGODB_CONNECTION_STRING."
+      }
+    },
+    "jwtSecretKeySecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault secret URI for JWT_SECRET_KEY."
+      }
+    },
+    "cloudinaryCloudNameSecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault secret URI for CLOUDINARY_CLOUD_NAME."
+      }
+    },
+    "cloudinaryApiKeySecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault secret URI for CLOUDINARY_API_KEY."
+      }
+    },
+    "cloudinaryApiSecretSecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault secret URI for CLOUDINARY_API_SECRET."
+      }
+    },
+    "entraClientIdSecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault secret URI for MS_ENTRA_CLIENT_ID."
+      }
+    },
+    "entraClientSecretSecretUri": {
+      "type": "string",
+      "metadata": {
+        "description": "Key Vault secret URI for MS_ENTRA_CLIENT_SECRET."
+      }
+    },
+    "backendExtraAppSettings": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Optional extra backend app settings."
+      }
+    },
+    "tags": {
+      "type": "object",
+      "defaultValue": {},
+      "metadata": {
+        "description": "Optional tags applied to all resources."
+      }
+    }
+  },
+  "variables": {
+    "keyVaultSecretsUserRoleId": "[subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')]",
+    "appServiceIntegrationSubnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('appServiceIntegrationSubnetName'))]",
+    "privateEndpointSubnetId": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('virtualNetworkName'), parameters('privateEndpointSubnetName'))]",
+    "backendDefaultHostname": "[format('{0}.azurewebsites.net', parameters('backendAppName'))]"
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Network/virtualNetworks",
+      "apiVersion": "2024-01-01",
+      "name": "[parameters('virtualNetworkName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "[parameters('virtualNetworkAddressPrefix')]"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[parameters('appServiceIntegrationSubnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('appServiceIntegrationSubnetPrefix')]",
+              "delegations": [
+                {
+                  "name": "appServiceDelegation",
+                  "properties": {
+                    "serviceName": "Microsoft.Web/serverFarms"
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "name": "[parameters('privateEndpointSubnetName')]",
+            "properties": {
+              "addressPrefix": "[parameters('privateEndpointSubnetPrefix')]",
+              "privateEndpointNetworkPolicies": "Disabled"
+            }
+          }
+        ]
+      },
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones",
+      "apiVersion": "2020-06-01",
+      "name": "[parameters('mongoPrivateDnsZoneName')]",
+      "location": "global",
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Network/privateDnsZones/virtualNetworkLinks",
+      "apiVersion": "2020-06-01",
+      "name": "[format('{0}/{1}', parameters('mongoPrivateDnsZoneName'), format('{0}-link', parameters('virtualNetworkName')))]",
+      "location": "global",
+      "properties": {
+        "registrationEnabled": false,
+        "virtualNetwork": {
+          "id": "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]"
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', parameters('mongoPrivateDnsZoneName'))]",
+        "[resourceId('Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Web/serverfarms",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('backendPlanName')]",
+      "location": "[parameters('location')]",
+      "kind": "linux",
+      "sku": {
+        "name": "B1",
+        "tier": "Basic",
+        "capacity": 1
+      },
+      "properties": {
+        "reserved": true
+      },
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.OperationalInsights/workspaces",
+      "apiVersion": "2023-09-01",
+      "name": "[parameters('logAnalyticsWorkspaceName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "retentionInDays": 30,
+        "features": {
+          "searchVersion": 1,
+          "enableLogAccessUsingOnlyResourcePermissions": true
+        }
+      },
+      "sku": {
+        "name": "PerGB2018"
+      },
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Insights/components",
+      "apiVersion": "2020-02-02",
+      "name": "[parameters('applicationInsightsName')]",
+      "location": "[parameters('location')]",
+      "kind": "web",
+      "properties": {
+        "Application_Type": "web",
+        "WorkspaceResourceId": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]",
+        "IngestionMode": "LogAnalytics",
+        "DisableIpMasking": false
+      },
+      "tags": "[parameters('tags')]",
+      "dependsOn": [
+        "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('logAnalyticsWorkspaceName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.KeyVault/vaults",
+      "apiVersion": "2023-07-01",
+      "name": "[parameters('keyVaultName')]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "tenantId": "[subscription().tenantId]",
+        "enableRbacAuthorization": true,
+        "enablePurgeProtection": true,
+        "enabledForDeployment": false,
+        "enabledForDiskEncryption": false,
+        "enabledForTemplateDeployment": false,
+        "publicNetworkAccess": "Enabled",
+        "softDeleteRetentionInDays": 90,
+        "sku": {
+          "family": "A",
+          "name": "standard"
+        },
+        "networkAcls": {
+          "bypass": "AzureServices",
+          "defaultAction": "Allow"
+        }
+      },
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Web/sites",
+      "apiVersion": "2024-04-01",
+      "name": "[parameters('backendAppName')]",
+      "location": "[parameters('location')]",
+      "kind": "app,linux",
+      "identity": {
+        "type": "SystemAssigned"
+      },
+      "properties": {
+        "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', parameters('backendPlanName'))]",
+        "httpsOnly": true,
+        "publicNetworkAccess": "Enabled",
+        "virtualNetworkSubnetId": "[variables('appServiceIntegrationSubnetId')]",
+        "vnetRouteAllEnabled": true,
+        "siteConfig": {
+          "linuxFxVersion": "NODE|20-lts",
+          "minTlsVersion": "1.2",
+          "ftpsState": "Disabled",
+          "alwaysOn": true,
+          "http20Enabled": true,
+          "healthCheckPath": "/api/health",
+          "appSettings": "[concat(createArray(createObject('name', 'NODE_ENV', 'value', 'production'), createObject('name', 'BACKEND_URL', 'value', format('https://{0}', variables('backendDefaultHostname'))), createObject('name', 'FRONTEND_URL', 'value', parameters('frontendUrl')), createObject('name', 'FRONTEND_URLS', 'value', join(parameters('frontendAdditionalOrigins'), ',')), createObject('name', 'MS_ENTRA_TENANT_ID', 'value', parameters('entraTenantId')), createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString), createObject('name', 'WEBSITE_VNET_ROUTE_ALL', 'value', '1'), createObject('name', 'APPINSIGHTS_PROFILERFEATURE_VERSION', 'value', 'disabled'), createObject('name', 'APPINSIGHTS_SNAPSHOTFEATURE_VERSION', 'value', 'disabled'), createObject('name', 'MONGODB_CONNECTION_STRING', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('mongoConnectionStringSecretUri'))), createObject('name', 'JWT_SECRET_KEY', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('jwtSecretKeySecretUri'))), createObject('name', 'CLOUDINARY_CLOUD_NAME', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryCloudNameSecretUri'))), createObject('name', 'CLOUDINARY_API_KEY', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryApiKeySecretUri'))), createObject('name', 'CLOUDINARY_API_SECRET', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryApiSecretSecretUri'))), createObject('name', 'MS_ENTRA_CLIENT_ID', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('entraClientIdSecretUri'))), createObject('name', 'MS_ENTRA_CLIENT_SECRET', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('entraClientSecretSecretUri')))), parameters('backendExtraAppSettings'))]"
+        }
+      },
+      "tags": "[union(parameters('tags'), createObject('workload', 'hotel-booking-backend', 'securityBaseline', 'phase-1-4'))]",
+      "dependsOn": [
+        "[resourceId('Microsoft.Insights/components', parameters('applicationInsightsName'))]",
+        "[resourceId('Microsoft.Web/serverfarms', parameters('backendPlanName'))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints",
+      "apiVersion": "2024-01-01",
+      "name": "[format('{0}-mongodb-pe', parameters('namePrefix'))]",
+      "location": "[parameters('location')]",
+      "properties": {
+        "subnet": {
+          "id": "[variables('privateEndpointSubnetId')]"
+        },
+        "privateLinkServiceConnections": [
+          {
+            "name": "[format('{0}-mongodb-pls', parameters('namePrefix'))]",
+            "properties": {
+              "privateLinkServiceId": "[resourceId('Microsoft.DocumentDB/mongoClusters', parameters('mongoClusterName'))]",
+              "groupIds": [
+                "MongoCluster"
+              ]
+            }
+          }
+        ]
+      },
+      "tags": "[parameters('tags')]"
+    },
+    {
+      "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+      "apiVersion": "2024-01-01",
+      "name": "[format('{0}/{1}', format('{0}-mongodb-pe', parameters('namePrefix')), 'default')]",
+      "properties": {
+        "privateDnsZoneConfigs": [
+          {
+            "name": "mongo-cluster-dns",
+            "properties": {
+              "privateDnsZoneId": "[resourceId('Microsoft.Network/privateDnsZones', parameters('mongoPrivateDnsZoneName'))]"
+            }
+          }
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/privateDnsZones', parameters('mongoPrivateDnsZoneName'))]",
+        "[resourceId('Microsoft.Network/privateEndpoints', format('{0}-mongodb-pe', parameters('namePrefix')))]"
+      ]
+    },
+    {
+      "type": "Microsoft.Authorization/roleAssignments",
+      "apiVersion": "2022-04-01",
+      "scope": "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]",
+      "name": "[guid(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), parameters('backendAppName'), 'key-vault-secrets-user')]",
+      "properties": {
+        "roleDefinitionId": "[variables('keyVaultSecretsUserRoleId')]",
+        "principalId": "[reference(resourceId('Microsoft.Web/sites', parameters('backendAppName')), '2024-04-01', 'full').identity.principalId]",
+        "principalType": "ServicePrincipal"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Web/sites', parameters('backendAppName'))]",
+        "[resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName'))]"
+      ]
+    }
+  ],
+  "outputs": {
+    "backendDefaultHostname": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', parameters('backendAppName')), '2024-04-01').defaultHostName]"
+    },
+    "backendPrincipalId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Web/sites', parameters('backendAppName')), '2024-04-01', 'full').identity.principalId]"
+    },
+    "keyVaultUri": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.KeyVault/vaults', parameters('keyVaultName')), '2023-07-01').vaultUri]"
+    },
+    "applicationInsightsConnectionString": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString]"
+    }
+  }
+}

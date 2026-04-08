@@ -23,6 +23,30 @@
     "applicationInsightsName": {
       "value": "palazzopinto-appi"
     },
+    "mongoClusterName": {
+      "value": "palazzopintodb"
+    },
+    "virtualNetworkName": {
+      "value": "palazzopinto-backend-vnet"
+    },
+    "virtualNetworkAddressPrefix": {
+      "value": "10.42.0.0/16"
+    },
+    "appServiceIntegrationSubnetName": {
+      "value": "palazzopinto-appsvc-snet"
+    },
+    "appServiceIntegrationSubnetPrefix": {
+      "value": "10.42.0.0/26"
+    },
+    "privateEndpointSubnetName": {
+      "value": "palazzopinto-private-endpoints-snet"
+    },
+    "privateEndpointSubnetPrefix": {
+      "value": "10.42.0.64/26"
+    },
+    "mongoPrivateDnsZoneName": {
+      "value": "privatelink.mongocluster.cosmos.azure.com"
+    },
     "frontendUrl": {
       "value": "https://palazzopinto-web-2603151048.azurewebsites.net"
     },
