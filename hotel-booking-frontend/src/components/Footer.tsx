@@ -117,6 +117,14 @@ const Footer = () => {
               </li>
               <li>
                 <Link
+                  to="/our-recommendations"
+                  className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
+                >
+                  Our Recommendations
+                </Link>
+              </li>
+              <li>
+                <Link
                   to="/reach-us"
                   className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
                 >

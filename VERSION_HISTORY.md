@@ -1,5 +1,12 @@
 # Version History
 
+## 1.8.6 - 2026-04-09
+
+### Local Recommendations Guide
+- Added a new public "Our Recommendations" page with curated restaurants, Brindisi landmarks, beaches, Valle d'Itria stops, and Salento day-trip ideas.
+- Linked the new guide from the main navigation, mobile navigation, and footer so guests can reach it from anywhere on the site.
+- Added lightweight category and distance filtering plus proximity-based sorting across all recommendation sections.
+
 ## 1.8.5 - 2026-04-08
 
 ### Frontend Bootstrap Fix

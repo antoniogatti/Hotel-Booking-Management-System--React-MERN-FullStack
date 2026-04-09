@@ -34,6 +34,9 @@ const MainNav = () => {
       <Link to="/contact-us" className={navLinkClass}>
         Contact Us
       </Link>
+      <Link to="/our-recommendations" className={navLinkClass}>
+        Our Recommendations
+      </Link>
       <Link to="/reach-us" className={navLinkClass}>
         Reach Us
       </Link>

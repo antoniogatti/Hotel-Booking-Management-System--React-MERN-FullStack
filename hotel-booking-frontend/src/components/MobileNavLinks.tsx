@@ -8,6 +8,7 @@ import {
   Hotel,
   Mail,
   MapPin,
+  Sparkles,
 } from "lucide-react";
 import UsernameMenu from "./UsernameMenu";
 import useAppContext from "../hooks/useAppContext";
@@ -32,6 +33,10 @@ const MobileNavLinks = () => {
       <Link to="/contact-us" className={linkClass}>
         <Mail className="h-4 w-4" />
         Contact Us
+      </Link>
+      <Link to="/our-recommendations" className={linkClass}>
+        <Sparkles className="h-4 w-4" />
+        Our Recommendations
       </Link>
       <Link to="/reach-us" className={linkClass}>
         <MapPin className="h-4 w-4" />
