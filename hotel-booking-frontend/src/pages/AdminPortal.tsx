@@ -39,6 +39,17 @@ const formatDate = (value: string) =>
     month: "short",
   });
 
+const isToday = (value: string) => {
+  const date = new Date(value);
+  const today = new Date();
+
+  return (
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth() &&
+    date.getDate() === today.getDate()
+  );
+};
+
 const getGuestName = (row: apiClient.UpcomingCheckInRow) => {
   const fullName = `${row.firstName} ${row.lastName}`.trim();
   return fullName || row.sourceLabel;
@@ -65,6 +76,7 @@ const AdminPortal = () => {
 
   const syncSummary = upcomingData?.summary.sync;
   const syncTone = syncSummary?.issueRooms ? "text-amber-700" : "text-emerald-700";
+  const todayRows = (upcomingData?.rows || []).filter((row) => isToday(row.checkIn));
   const previewRows = upcomingData?.rows.slice(0, 5) || [];
 
   return (
@@ -163,6 +175,85 @@ const AdminPortal = () => {
               <p className="mt-1 text-sm text-slate-600">upcoming arrivals ready for front-desk planning</p>
               <p className="mt-3 text-xs text-slate-500">Rolling view based on live room availability and imports</p>
             </CardContent>
+          </Card>
+        </section>
+
+        <section>
+          <Card className="overflow-hidden border-0 shadow-lg shadow-orange-200/40">
+            <div className="bg-[linear-gradient(135deg,#fff1eb_0%,#ffe4d6_100%)]">
+              <CardHeader className="border-b border-orange-200/70 pb-4">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <CardTitle className="text-2xl text-slate-900">Today&apos;s arrivals</CardTitle>
+                    <p className="mt-1 text-sm text-slate-700">
+                      Immediate front-desk queue for guests arriving today.
+                    </p>
+                  </div>
+                  <div className="inline-flex items-center gap-3 rounded-2xl bg-white/80 px-4 py-3 shadow-sm">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Today</p>
+                      <p className="text-3xl font-bold text-slate-900">{todayRows.length}</p>
+                    </div>
+                    <div className="h-10 w-px bg-orange-200" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Checked in</p>
+                      <p className="text-3xl font-bold text-emerald-700">{upcomingData?.summary.checkedInToday || 0}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-5">
+                {isLoading ? (
+                  <p className="text-sm text-slate-500">Loading today&apos;s arrivals...</p>
+                ) : todayRows.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-orange-200 bg-white/70 px-4 py-6 text-sm text-slate-600">
+                    No new arrivals scheduled for today.
+                  </div>
+                ) : (
+                  <div className="grid gap-3 lg:grid-cols-2">
+                    {todayRows.map((row) => (
+                      <div
+                        key={row._id}
+                        className="rounded-2xl border border-orange-200 bg-white/90 p-4 shadow-sm"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-lg font-semibold text-slate-900">{getGuestName(row)}</p>
+                              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                {getChannelLabel(row)}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-sm font-medium text-slate-700">{row.hotelName}</p>
+                            <p className="text-xs text-slate-500">
+                              Arrival time: {row.arrivalTime || "Missing"}
+                            </p>
+                          </div>
+                          <div
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${row.isCheckedIn ? "bg-emerald-100 text-emerald-700" : "bg-orange-100 text-orange-700"}`}
+                          >
+                            {row.isCheckedIn ? "Checked in" : "Arriving today"}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
+                            <Button size="sm" className="bg-[#ea836c] hover:bg-[#db755f]">
+                              Start check-in
+                            </Button>
+                          </Link>
+                          <Link to="/admin-portal/check-in">
+                            <Button size="sm" variant="secondary">
+                              Open desk
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </div>
           </Card>
         </section>
 

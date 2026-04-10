@@ -47,7 +47,7 @@ const getWhatsappHref = (phone: string) => {
 
 const AdminPortalCheckIns = () => {
   const [selectedHotelId, setSelectedHotelId] = useState("");
-  const [days, setDays] = useState(14);
+  const [days, setDays] = useState(1);
 
   const { data: rooms } = useQueryWithLoading(
     ["bookingManagementRooms"],
@@ -103,6 +103,7 @@ const AdminPortalCheckIns = () => {
                 onChange={(event) => setDays(Number(event.target.value))}
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
               >
+                <option value={1}>Today</option>
                 <option value={7}>Next 7 days</option>
                 <option value={14}>Next 14 days</option>
                 <option value={30}>Next 30 days</option>
