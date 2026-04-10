@@ -224,13 +224,6 @@ const Search = () => {
     commitDateRange(minDate, minDate);
   };
 
-  const selectedNights = useMemo(() => {
-    const endDate = draftCheckOut || draftCheckIn || search.checkOut;
-    const startDate = draftCheckIn || search.checkIn;
-    const diff = endDate.getTime() - startDate.getTime();
-    return diff > 0 ? Math.ceil(diff / (1000 * 60 * 60 * 24)) : 0;
-  }, [draftCheckIn, draftCheckOut, search.checkIn, search.checkOut]);
-
   const dateRangeValue = useMemo(() => {
     const formatDate = (value: Date) =>
       value.toLocaleDateString("en-GB", {
