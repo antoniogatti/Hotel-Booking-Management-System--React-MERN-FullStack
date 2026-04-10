@@ -114,68 +114,76 @@ const AdminPortal = () => {
         </section>
 
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <Card className="border-0 shadow-lg shadow-slate-200/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between text-base text-slate-700">
-                Sync Status
-                <RefreshCw className={`h-4 w-4 ${syncTone}`} />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{syncSummary?.enabledRooms || 0}</div>
-              <p className="mt-1 text-sm text-slate-600">rooms with Booking.com sync enabled</p>
-              <p className={`mt-3 text-sm font-medium ${syncTone}`}>
-                {syncSummary?.issueRooms ? `${syncSummary.issueRooms} room sync issues` : "Sync healthy"}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Last success: {formatDateTime(syncSummary?.lastSuccessfulSyncAt)}
-              </p>
-            </CardContent>
-          </Card>
+          <Link to="/booking-com-sync#sync-errors" className="block transition-transform hover:-translate-y-0.5">
+            <Card className="border-0 shadow-lg shadow-slate-200/60 hover:shadow-xl hover:shadow-slate-200/80">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-base text-slate-700">
+                  Sync Status
+                  <RefreshCw className={`h-4 w-4 ${syncTone}`} />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-slate-900">{syncSummary?.enabledRooms || 0}</div>
+                <p className="mt-1 text-sm text-slate-600">rooms with Booking.com sync enabled</p>
+                <p className={`mt-3 text-sm font-medium ${syncTone}`}>
+                  {syncSummary?.issueRooms ? `${syncSummary.issueRooms} room sync issues` : "Sync healthy"}
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Last success: {formatDateTime(syncSummary?.lastSuccessfulSyncAt)}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="border-0 shadow-lg shadow-slate-200/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between text-base text-slate-700">
-                Arrivals Today
-                <CalendarClock className="h-4 w-4 text-orange-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{upcomingData?.summary.arrivalsToday || 0}</div>
-              <p className="mt-1 text-sm text-slate-600">bookings scheduled to arrive today</p>
-              <p className="mt-3 text-xs text-slate-500">
-                Check-in completed today: {upcomingData?.summary.checkedInToday || 0}
-              </p>
-            </CardContent>
-          </Card>
+          <Link to="/admin-portal/check-in?days=1&status=needs-action" className="block transition-transform hover:-translate-y-0.5">
+            <Card className="border-0 shadow-lg shadow-slate-200/60 hover:shadow-xl hover:shadow-slate-200/80">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-base text-slate-700">
+                  Arrivals Today
+                  <CalendarClock className="h-4 w-4 text-orange-600" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-slate-900">{upcomingData?.summary.arrivalsToday || 0}</div>
+                <p className="mt-1 text-sm text-slate-600">bookings scheduled to arrive today</p>
+                <p className="mt-3 text-xs text-slate-500">
+                  Check-in completed today: {upcomingData?.summary.checkedInToday || 0}
+                </p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="border-0 shadow-lg shadow-slate-200/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between text-base text-slate-700">
-                Stays In House
-                <BedDouble className="h-4 w-4 text-indigo-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{upcomingData?.summary.inHouseToday || 0}</div>
-              <p className="mt-1 text-sm text-slate-600">bookings currently in house</p>
-              <p className="mt-3 text-xs text-slate-500">Across {rooms?.length || 0} accessible rooms</p>
-            </CardContent>
-          </Card>
+          <Link to="/admin-portal/check-in?days=1&status=checked-in" className="block transition-transform hover:-translate-y-0.5">
+            <Card className="border-0 shadow-lg shadow-slate-200/60 hover:shadow-xl hover:shadow-slate-200/80">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-base text-slate-700">
+                  Stays In House
+                  <BedDouble className="h-4 w-4 text-indigo-600" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-slate-900">{upcomingData?.summary.inHouseToday || 0}</div>
+                <p className="mt-1 text-sm text-slate-600">bookings currently in house</p>
+                <p className="mt-3 text-xs text-slate-500">Across {rooms?.length || 0} accessible rooms</p>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="border-0 shadow-lg shadow-slate-200/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between text-base text-slate-700">
-                Next 7 Days
-                <Clock3 className="h-4 w-4 text-teal-600" />
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-slate-900">{upcomingData?.summary.upcomingArrivals || 0}</div>
-              <p className="mt-1 text-sm text-slate-600">upcoming arrivals ready for front-desk planning</p>
-              <p className="mt-3 text-xs text-slate-500">Rolling view based on live room availability and imports</p>
-            </CardContent>
-          </Card>
+          <Link to="/admin-portal/check-in?days=7" className="block transition-transform hover:-translate-y-0.5">
+            <Card className="border-0 shadow-lg shadow-slate-200/60 hover:shadow-xl hover:shadow-slate-200/80">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between text-base text-slate-700">
+                  Next 7 Days
+                  <Clock3 className="h-4 w-4 text-teal-600" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-slate-900">{upcomingData?.summary.upcomingArrivals || 0}</div>
+                <p className="mt-1 text-sm text-slate-600">upcoming arrivals ready for front-desk planning</p>
+                <p className="mt-3 text-xs text-slate-500">Rolling view based on live room availability and imports</p>
+              </CardContent>
+            </Card>
+          </Link>
         </section>
 
         <section>

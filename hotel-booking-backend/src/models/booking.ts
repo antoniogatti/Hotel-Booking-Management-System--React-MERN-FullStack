@@ -32,6 +32,25 @@ export interface IBooking extends Document {
     cityTax?: number;
     checkedInAt?: Date;
   };
+  excelSync?: {
+    lastSyncedAt?: Date;
+    sheetName?: string;
+    workbookItemId?: string;
+    matchedRowNumber?: number;
+    matchedRoom?: string;
+    matchedDate?: Date;
+    guestName?: string;
+    invoiceNumber?: string;
+    identifier?: string;
+    paymentVia?: string;
+    pax?: number;
+    totalPrice?: number;
+    unitPrice?: number;
+    netPrice?: number;
+    city?: string;
+    country?: string;
+    raw?: Record<string, string | number | null>;
+  };
   city?: string;
   country?: string;
   arrivalTime?: "Morning" | "Afternoon" | "Evening" | "Night";
@@ -84,6 +103,25 @@ const bookingSchema = new mongoose.Schema(
       documents: [{ type: String }],
       cityTax: { type: Number, default: 0 },
       checkedInAt: { type: Date },
+    },
+    excelSync: {
+      lastSyncedAt: { type: Date },
+      sheetName: { type: String },
+      workbookItemId: { type: String },
+      matchedRowNumber: { type: Number },
+      matchedRoom: { type: String },
+      matchedDate: { type: Date },
+      guestName: { type: String },
+      invoiceNumber: { type: String },
+      identifier: { type: String },
+      paymentVia: { type: String },
+      pax: { type: Number },
+      totalPrice: { type: Number },
+      unitPrice: { type: Number },
+      netPrice: { type: Number },
+      city: { type: String },
+      country: { type: String },
+      raw: { type: mongoose.Schema.Types.Mixed },
     },
   },
   {

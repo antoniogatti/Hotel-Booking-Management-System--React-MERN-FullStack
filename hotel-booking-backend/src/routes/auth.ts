@@ -11,6 +11,11 @@ import {
   defaultAppRole,
   AppRole,
 } from "../lib/user-role";
+import {
+  hasMicrosoftGraphAccess,
+  MICROSOFT_GRAPH_SIGN_IN_SCOPE,
+  persistMicrosoftGraphAuth,
+} from "../lib/microsoft-graph-auth";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
 
@@ -135,7 +140,7 @@ router.get("/microsoft", (req: Request, res: Response) => {
 
   const state = crypto.randomBytes(32).toString("hex");
   const redirectUri = `${BACKEND_URL}/api/auth/callback/microsoft`;
-  const scope = "openid profile email User.Read";
+  const scope = MICROSOFT_GRAPH_SIGN_IN_SCOPE;
   const url = `${microsoftBaseUrl}/authorize?client_id=${MICROSOFT_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&response_mode=query&scope=${encodeURIComponent(scope)}&state=${state}`;
 
   res.cookie(oauthStateCookieName, state, getOAuthStateCookieOptions());
@@ -340,6 +345,9 @@ router.get("/callback/microsoft", async (req: Request, res: Response) => {
       await user.save();
     }
 
+    persistMicrosoftGraphAuth(user, tokenData);
+    await user.save();
+
     const computedRole = await ensurePersistedRole(user, email);
 
     const token = issueToken(user.id, computedRole);
@@ -520,6 +528,7 @@ router.get("/validate-token", verifyToken, async (req: Request, res: Response) =
     firstName: user.firstName,
     lastName: user.lastName,
     image: user.image,
+    microsoftGraphConnected: hasMicrosoftGraphAccess(user),
   });
 });
 

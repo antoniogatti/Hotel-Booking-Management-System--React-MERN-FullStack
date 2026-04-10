@@ -709,9 +709,8 @@ const OurRecommendations = () => {
     <section className="min-h-[70vh] bg-[#f7f7f7]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         <div>
-          <div className="rounded-[30px] border border-[#e7e9df] bg-white p-7 sm:p-10 shadow-soft overflow-hidden relative">
-            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-[#eef1e7] via-[#f8f6f1] to-[#eef5fb]" />
-            <div className="relative">
+          <div className="rounded-[30px] border border-[#e7e9df] bg-white p-7 sm:p-10 shadow-soft">
+            <div>
               <p className="text-xs font-semibold uppercase tracking-[0.26em] text-[#ea836c] mb-3">
                 Palazzo Pinto Curated Guide
               </p>

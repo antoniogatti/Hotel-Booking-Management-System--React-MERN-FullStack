@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "react-query";
 import { ArrowLeft, CalendarClock, CheckCircle2, Mail, MessageCircleMore, Phone } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -45,9 +45,16 @@ const getWhatsappHref = (phone: string) => {
   return digits ? `https://wa.me/${digits}` : "";
 };
 
+type CheckInStatusFilter = "all" | "needs-action" | "checked-in";
+
 const AdminPortalCheckIns = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [selectedHotelId, setSelectedHotelId] = useState("");
-  const [days, setDays] = useState(1);
+  const [days, setDays] = useState(() => Number(searchParams.get("days")) || 1);
+  const [statusFilter, setStatusFilter] = useState<CheckInStatusFilter>(() => {
+    const requested = searchParams.get("status");
+    return requested === "needs-action" || requested === "checked-in" ? requested : "all";
+  });
 
   const { data: rooms } = useQueryWithLoading(
     ["bookingManagementRooms"],
@@ -62,7 +69,27 @@ const AdminPortalCheckIns = () => {
     () => apiClient.fetchUpcomingCheckIns({ days, hotelId: selectedHotelId || undefined })
   );
 
-  const rows = useMemo(() => data?.rows || [], [data]);
+  useEffect(() => {
+    const nextParams = new URLSearchParams();
+    if (selectedHotelId) nextParams.set("hotelId", selectedHotelId);
+    nextParams.set("days", String(days));
+    if (statusFilter !== "all") nextParams.set("status", statusFilter);
+    setSearchParams(nextParams, { replace: true });
+  }, [days, selectedHotelId, setSearchParams, statusFilter]);
+
+  const rows = useMemo(() => {
+    const baseRows = data?.rows || [];
+
+    if (statusFilter === "needs-action") {
+      return baseRows.filter((row) => !row.isCheckedIn);
+    }
+
+    if (statusFilter === "checked-in") {
+      return baseRows.filter((row) => row.isCheckedIn);
+    }
+
+    return baseRows;
+  }, [data, statusFilter]);
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
@@ -79,7 +106,7 @@ const AdminPortalCheckIns = () => {
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <label className="text-sm font-medium text-slate-700">
               Room
               <select
@@ -107,6 +134,19 @@ const AdminPortalCheckIns = () => {
                 <option value={7}>Next 7 days</option>
                 <option value={14}>Next 14 days</option>
                 <option value={30}>Next 30 days</option>
+              </select>
+            </label>
+
+            <label className="text-sm font-medium text-slate-700">
+              Status
+              <select
+                value={statusFilter}
+                onChange={(event) => setStatusFilter(event.target.value as CheckInStatusFilter)}
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+              >
+                <option value="all">All rows</option>
+                <option value="needs-action">Needs check-in</option>
+                <option value="checked-in">Already checked in</option>
               </select>
             </label>
           </div>

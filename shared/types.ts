@@ -29,6 +29,7 @@ export type UserType = {
   emailVerified?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
+  microsoftGraphConnected?: boolean;
 };
 
 export type HotelType = {
@@ -102,6 +103,11 @@ export type HotelType = {
     lastSyncAt?: Date;
     lastSyncStatus?: string;
     lastSyncError?: string;
+    syncErrorHistory?: Array<{
+      at: Date;
+      status: string;
+      message: string;
+    }>;
   };
   createdAt?: Date;
   updatedAt?: Date;
@@ -127,6 +133,39 @@ export type BookingType = {
   specialRequests?: string;
   cancellationReason?: string;
   refundAmount?: number;
+  city?: string;
+  country?: string;
+  checkInInfo?: {
+    arrivalTime?: string;
+    phone?: string;
+    email?: string;
+    nationality?: string;
+    bookingChannel?: string;
+    paymentDetails?: string;
+    specialNotes?: string;
+    documents?: string[];
+    cityTax?: number;
+    checkedInAt?: Date;
+  };
+  excelSync?: {
+    lastSyncedAt?: Date;
+    sheetName?: string;
+    workbookItemId?: string;
+    matchedRowNumber?: number;
+    matchedRoom?: string;
+    matchedDate?: Date;
+    guestName?: string;
+    invoiceNumber?: string;
+    identifier?: string;
+    paymentVia?: string;
+    pax?: number;
+    totalPrice?: number;
+    unitPrice?: number;
+    netPrice?: number;
+    city?: string;
+    country?: string;
+    raw?: Record<string, string | number | null>;
+  };
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -164,6 +203,11 @@ export type BookingManagementRoomType = {
     lastSyncAt?: Date;
     lastSyncStatus?: string;
     lastSyncError?: string;
+    syncErrorHistory?: Array<{
+      at: Date;
+      status: string;
+      message: string;
+    }>;
   };
 };
 

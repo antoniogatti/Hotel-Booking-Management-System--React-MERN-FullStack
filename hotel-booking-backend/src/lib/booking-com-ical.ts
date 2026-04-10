@@ -18,6 +18,11 @@ type SyncableHotel = {
     lastSyncAt?: Date;
     lastSyncStatus?: string;
     lastSyncError?: string;
+    syncErrorHistory?: Array<{
+      at: Date;
+      status: string;
+      message: string;
+    }>;
   };
 };
 
@@ -98,16 +103,32 @@ const updateHotelSyncStatus = async (
   status: "success" | "error" | "skipped",
   errorMessage?: string
 ) => {
-  await Hotel.updateOne(
-    { _id: hotelId },
-    {
-      $set: {
-        "bookingComIcal.lastSyncAt": new Date(),
-        "bookingComIcal.lastSyncStatus": status,
-        "bookingComIcal.lastSyncError": errorMessage || "",
+  const now = new Date();
+  const update: Record<string, unknown> = {
+    $set: {
+      "bookingComIcal.lastSyncAt": now,
+      "bookingComIcal.lastSyncStatus": status,
+      "bookingComIcal.lastSyncError": errorMessage || "",
+    },
+  };
+
+  if (status === "error" && errorMessage) {
+    update.$push = {
+      "bookingComIcal.syncErrorHistory": {
+        $each: [
+          {
+            at: now,
+            status,
+            message: errorMessage,
+          },
+        ],
+        $position: 0,
+        $slice: 20,
       },
-    }
-  );
+    };
+  }
+
+  await Hotel.updateOne({ _id: hotelId }, update);
 };
 
 export const isBookingComManagedRoom = (hotel?: {

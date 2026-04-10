@@ -261,6 +261,11 @@ export const fetchBooking = async (bookingId: string): Promise<any> => {
   return response.data;
 };
 
+export const syncBookingFromExcel = async (bookingId: string) => {
+  const response = await axiosInstance.post(`/api/bookings/${bookingId}/sync-excel`);
+  return response.data;
+};
+
 export const fetchBookingManagementRooms = async (): Promise<
   BookingManagementRoomType[]
 > => {

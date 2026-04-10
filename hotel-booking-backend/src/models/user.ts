@@ -40,6 +40,16 @@ const userSchema = new mongoose.Schema(
     // Audit fields
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    microsoftGraphAuth: {
+      provider: { type: String },
+      scope: { type: String },
+      tokenType: { type: String },
+      accessTokenCiphertext: { type: String },
+      refreshTokenCiphertext: { type: String },
+      expiresAt: { type: Date },
+      connectedAt: { type: Date },
+      lastRefreshedAt: { type: Date },
+    },
   },
   {
     timestamps: true,

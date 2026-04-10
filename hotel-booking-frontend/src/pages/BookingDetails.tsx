@@ -35,6 +35,8 @@ const BookingDetails = () => {
   const [rejectReason, setRejectReason] = useState("");
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [excelSyncMessage, setExcelSyncMessage] = useState<string | null>(null);
+  const [excelSyncError, setExcelSyncError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<BookingDetailsResponse>>({});
 
@@ -125,6 +127,25 @@ const BookingDetails = () => {
         queryClient.invalidateQueries(["bookingDetails", bookingId]);
         setShowRejectModal(false);
         setShowConfirmModal(false);
+      },
+    }
+  );
+
+  const syncExcelMutation = useMutation(
+    () => apiClient.syncBookingFromExcel(bookingId || ""),
+    {
+      onSuccess: (data) => {
+        setExcelSyncError(null);
+        setExcelSyncMessage(data?.message || "Excel data synced");
+        queryClient.invalidateQueries(["bookingDetails", bookingId]);
+      },
+      onError: (mutationError: any) => {
+        setExcelSyncMessage(null);
+        setExcelSyncError(
+          mutationError?.response?.data?.message ||
+            mutationError?.response?.data?.reason ||
+            "Unable to sync booking from Excel"
+        );
       },
     }
   );
@@ -342,12 +363,33 @@ const BookingDetails = () => {
           {/* Booking Information */}
           <Card className="border-0 shadow-lg">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-teal-600" />
-                Booking Details
-              </CardTitle>
+              <div className="flex items-center justify-between gap-4">
+                <CardTitle className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-teal-600" />
+                  Booking Details
+                </CardTitle>
+                <button
+                  onClick={() => syncExcelMutation.mutate()}
+                  disabled={syncExcelMutation.isLoading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <FileText className="h-4 w-4" />
+                  {syncExcelMutation.isLoading ? "Syncing Excel..." : "Sync Excel"}
+                </button>
+              </div>
             </CardHeader>
             <CardContent>
+              {(excelSyncMessage || excelSyncError) && (
+                <div
+                  className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+                    excelSyncError
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  }`}
+                >
+                  {excelSyncError || excelSyncMessage}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -384,9 +426,78 @@ const BookingDetails = () => {
                     £{booking.totalCost?.toFixed(2) || "0.00"}
                   </p>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Excel Sync
+                  </label>
+                  <p className="text-gray-900 font-medium">
+                    {booking.excelSync?.lastSyncedAt
+                      ? `Row ${booking.excelSync.matchedRowNumber || "-"} on ${formatDate(
+                          booking.excelSync.lastSyncedAt
+                        )}`
+                      : "Not synced yet"}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Payment Via
+                  </label>
+                  <p className="text-gray-900 font-medium">
+                    {booking.excelSync?.paymentVia || booking.checkInInfo?.paymentDetails || "-"}
+                  </p>
+                </div>
               </div>
             </CardContent>
           </Card>
+
+          {booking.excelSync && (
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-emerald-600" />
+                  Excel Match
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Matched Guest
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.excelSync.guestName || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Matched Room / Date
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.excelSync.matchedRoom || "-"} · {formatDate(booking.excelSync.matchedDate)}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Invoice / Identifier
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.excelSync.invoiceNumber || "-"} / {booking.excelSync.identifier || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      City / Country
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.excelSync.city || booking.city || "-"} / {booking.excelSync.country || booking.country || "-"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Special Requests */}
           {booking.specialRequests && (

@@ -73,6 +73,13 @@ const hotelSchema = new mongoose.Schema<HotelType>(
       lastSyncAt: { type: Date },
       lastSyncStatus: { type: String, default: "idle" },
       lastSyncError: { type: String, default: "" },
+      syncErrorHistory: [
+        {
+          at: { type: Date, required: true },
+          status: { type: String, required: true },
+          message: { type: String, required: true },
+        },
+      ],
     },
     // Audit fields
     createdAt: { type: Date, default: Date.now },

@@ -18,6 +18,8 @@ import {
   sendBookingDecisionEmails,
   sendCheckInNotificationEmail,
 } from "../lib/contact-mail";
+import { getValidMicrosoftGraphAccessToken } from "../lib/microsoft-graph-auth";
+import { syncBookingFromExcel } from "../lib/excel-booking-sync";
 import { body, param, query, validationResult } from "express-validator";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
@@ -36,6 +38,34 @@ const toUtcStartOfDay = (value: string | Date) => {
 };
 
 const formatDayKey = (date: Date) => date.toISOString().slice(0, 10);
+
+const ROOM_DISPLAY_ORDER = ["malvasia", "verdeca", "aleatico", "fuocorosa"] as const;
+
+const getManagedRoomOrderKey = (hotel: { slug?: string; name?: string }) => {
+  const slug = String(hotel.slug || "").trim().toLowerCase();
+  if (slug) {
+    const slugIndex = ROOM_DISPLAY_ORDER.indexOf(slug as (typeof ROOM_DISPLAY_ORDER)[number]);
+    if (slugIndex >= 0) {
+      return slugIndex;
+    }
+  }
+
+  const normalizedName = String(hotel.name || "").trim().toLowerCase();
+  const nameIndex = ROOM_DISPLAY_ORDER.findIndex((roomSlug) => normalizedName.includes(roomSlug));
+  return nameIndex >= 0 ? nameIndex : ROOM_DISPLAY_ORDER.length;
+};
+
+const sortManagedHotels = <THotel extends { slug?: string; name?: string }>(hotels: THotel[]) =>
+  [...hotels].sort((left, right) => {
+    const orderDifference = getManagedRoomOrderKey(left) - getManagedRoomOrderKey(right);
+    if (orderDifference !== 0) {
+      return orderDifference;
+    }
+
+    return String(left.name || "").localeCompare(String(right.name || ""), "en", {
+      sensitivity: "base",
+    });
+  });
 
 const parseMonthRange = (month: string) => {
   const [yearText, monthText] = month.split("-");
@@ -140,9 +170,9 @@ router.get(
     try {
       const hotelQuery = req.userRole === "admin" ? {} : { userId: req.userId };
 
-      const hotels = await Hotel.find(hotelQuery)
-        .sort({ name: 1 })
-        .select("_id name city country userId bookingComIcal");
+      const hotels = sortManagedHotels(
+        await Hotel.find(hotelQuery).select("_id name city country userId bookingComIcal slug")
+      );
 
       res.status(200).json(
         hotels.map((hotel) => ({
@@ -672,6 +702,146 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
     res.status(500).json({ message: "Unable to fetch booking" });
   }
 });
+
+router.post(
+  "/:id/sync-excel",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  async (req: Request, res: Response) => {
+    try {
+      const booking = await Booking.findById(req.params.id);
+      if (!booking) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const accessCheck = await getAccessibleHotel(String(booking.hotelId), req);
+      if (accessCheck.error) {
+        return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+      }
+
+      const user = await User.findById(req.userId);
+      if (!user) {
+        return res.status(401).json({ message: "unauthorized" });
+      }
+
+      let graphAccessToken: string | null = null;
+      try {
+        graphAccessToken = await getValidMicrosoftGraphAccessToken(user);
+      } catch (tokenError) {
+        logError("Unable to refresh Microsoft Graph token", tokenError, {
+          route: "bookings.sync-excel",
+          bookingId: req.params.id,
+          actorId: req.userId,
+        });
+        return res.status(401).json({
+          message: "Microsoft Graph access expired. Sign in with Microsoft again to continue Excel sync.",
+        });
+      }
+
+      if (!graphAccessToken) {
+        return res.status(409).json({
+          message: "Microsoft Graph access is not connected for this account. Sign in with Microsoft again and grant Files.Read access.",
+        });
+      }
+
+      const syncResult = await syncBookingFromExcel({
+        accessToken: graphAccessToken,
+        booking,
+        hotel: {
+          name: accessCheck.hotel?.name,
+          slug: accessCheck.hotel?.slug,
+        },
+      });
+
+      if (!syncResult.matched) {
+        return res.status(409).json(syncResult);
+      }
+
+      const matchedRow = syncResult.row;
+      if (matchedRow.city) {
+        booking.city = matchedRow.city;
+      }
+      if (matchedRow.country) {
+        booking.country = matchedRow.country;
+        booking.nationality = matchedRow.country;
+      }
+      if (typeof matchedRow.totalPrice === "number" && matchedRow.totalPrice > 0) {
+        booking.totalCost = matchedRow.totalPrice;
+      }
+
+      booking.checkInInfo = {
+        arrivalTime: booking.checkInInfo?.arrivalTime || booking.arrivalTime || "",
+        phone: booking.checkInInfo?.phone || booking.phone || "",
+        email: booking.checkInInfo?.email || booking.email || "",
+        nationality:
+          booking.checkInInfo?.nationality || booking.nationality || matchedRow.country || "",
+        bookingChannel: booking.checkInInfo?.bookingChannel || "",
+        paymentDetails: matchedRow.paymentVia || booking.checkInInfo?.paymentDetails || "",
+        specialNotes: booking.checkInInfo?.specialNotes || "",
+        documents: booking.checkInInfo?.documents || [],
+        cityTax: booking.checkInInfo?.cityTax || 0,
+        checkedInAt: booking.checkInInfo?.checkedInAt,
+      };
+      booking.excelSync = {
+        lastSyncedAt: new Date(),
+        sheetName: syncResult.workbook.sheetName,
+        workbookItemId: syncResult.workbook.itemId,
+        matchedRowNumber: matchedRow.rowNumber,
+        matchedRoom: matchedRow.room,
+        matchedDate: new Date(`${matchedRow.date}T00:00:00.000Z`),
+        guestName: matchedRow.guestName,
+        invoiceNumber: matchedRow.invoiceNumber,
+        identifier: matchedRow.identifier,
+        paymentVia: matchedRow.paymentVia,
+        pax: matchedRow.pax,
+        totalPrice: matchedRow.totalPrice,
+        unitPrice: matchedRow.unitPrice,
+        netPrice: matchedRow.netPrice,
+        city: matchedRow.city,
+        country: matchedRow.country,
+        raw: matchedRow.raw,
+      };
+
+      await booking.save();
+
+      await recordAuditEvent({
+        action: "booking.excel-sync.completed",
+        entityType: "booking",
+        entityId: String(booking._id),
+        hotelId: String(booking.hotelId),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          reservationNumber: booking.reservationNumber,
+          matchedRowNumber: matchedRow.rowNumber,
+          matchedRoom: matchedRow.room,
+          matchedDate: matchedRow.date,
+        },
+      });
+
+      return res.status(200).json({
+        message: "Excel booking data synced successfully",
+        booking,
+        matchedRow: {
+          rowNumber: matchedRow.rowNumber,
+          guestName: matchedRow.guestName,
+          room: matchedRow.room,
+          date: matchedRow.date,
+          paymentVia: matchedRow.paymentVia,
+          totalPrice: matchedRow.totalPrice,
+        },
+      });
+    } catch (error) {
+      logError("Unable to sync booking from Excel", error, {
+        route: "bookings.sync-excel",
+        bookingId: req.params.id,
+        actorId: req.userId,
+      });
+      return res.status(500).json({ message: "Unable to sync booking from Excel" });
+    }
+  }
+);
 
 // Update booking status
 router.patch(
@@ -1260,9 +1430,9 @@ router.get(
         hotelQuery = { _id: hotelId };
       }
 
-      const hotels = await Hotel.find(hotelQuery)
-        .sort({ name: 1 })
-        .select("_id name city country bookingComIcal");
+      const hotels = sortManagedHotels(
+        await Hotel.find(hotelQuery).select("_id name city country bookingComIcal slug")
+      );
 
       const hotelIds = hotels.map((hotel) => String(hotel._id));
       const hotelMap = new Map(
@@ -1272,8 +1442,16 @@ router.get(
       const today = toUtcStartOfDay(new Date());
       const tomorrow = new Date(today.getTime() + 86400000);
       const windowEnd = new Date(today.getTime() + days * 86400000);
+      const isPastStayStart = (value: string | Date) => toUtcStartOfDay(value).getTime() < today.getTime();
 
-      const [localUpcoming, importedUpcoming, localInHouseCount, importedInHouseCount, localCheckedInTodayCount, importedCheckedInTodayCount] =
+      const [
+        localUpcoming,
+        importedUpcoming,
+        localInHouse,
+        importedInHouse,
+        localCheckedInTodayCount,
+        importedCheckedInTodayCount,
+      ] =
         await Promise.all([
           Booking.find({
             hotelId: { $in: hotelIds },
@@ -1294,19 +1472,35 @@ router.get(
             .select(
               "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
             ),
-          Booking.countDocuments({
+          Booking.find({
             hotelId: { $in: hotelIds },
-            status: { $in: ["confirmed", "arrived", "completed"] },
             checkIn: { $lte: today },
             checkOut: { $gt: today },
-          }),
-          ExternalCalendarEvent.countDocuments({
+            $or: [
+              { "checkInInfo.checkedInAt": { $exists: true } },
+              { status: { $in: ["arrived", "completed"] } },
+              { checkIn: { $lt: today } },
+            ],
+          })
+            .sort({ checkIn: 1, createdAt: 1 })
+            .select(
+              "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
+            ),
+          ExternalCalendarEvent.find({
             hotelId: { $in: hotelIds },
             source: BOOKING_COM_SOURCE,
             status: "active",
             startDate: { $lte: today },
             endDate: { $gt: today },
-          }),
+            $or: [
+              { "checkInInfo.checkedInAt": { $exists: true } },
+              { startDate: { $lt: today } },
+            ],
+          })
+            .sort({ startDate: 1, createdAt: 1 })
+            .select(
+              "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
+            ),
           Booking.countDocuments({
             hotelId: { $in: hotelIds },
             "checkInInfo.checkedInAt": { $gte: today, $lt: tomorrow },
@@ -1319,8 +1513,7 @@ router.get(
           }),
         ]);
 
-      const rows = [
-        ...localUpcoming.map((booking) => {
+      const toLocalRow = (booking: any) => {
           const hotel = hotelMap.get(String(booking.hotelId));
           const arrivalTime = booking.checkInInfo?.arrivalTime || booking.arrivalTime || "";
           const checkedInAt = booking.checkInInfo?.checkedInAt;
@@ -1343,11 +1536,16 @@ router.get(
             checkOut: booking.checkOut,
             arrivalTime,
             checkedInAt,
-            isCheckedIn: Boolean(checkedInAt) || booking.status === "arrived",
+            isCheckedIn:
+              Boolean(checkedInAt) ||
+              booking.status === "arrived" ||
+              booking.status === "completed" ||
+              isPastStayStart(booking.checkIn),
             isImported: false,
           };
-        }),
-        ...importedUpcoming.map((event) => {
+        };
+
+      const toImportedRow = (event: any) => {
           const hotel = hotelMap.get(String(event.hotelId));
           const arrivalTime = event.checkInInfo?.arrivalTime || "";
           const checkedInAt = event.checkInInfo?.checkedInAt;
@@ -1370,13 +1568,24 @@ router.get(
             checkOut: event.endDate,
             arrivalTime,
             checkedInAt,
-            isCheckedIn: Boolean(checkedInAt),
+            isCheckedIn: Boolean(checkedInAt) || isPastStayStart(event.startDate),
             isImported: true,
           };
-        }),
-      ].sort((left, right) => new Date(left.checkIn).getTime() - new Date(right.checkIn).getTime());
+        };
 
-      const arrivalsToday = rows.filter((row) => {
+      const upcomingRows = [...localUpcoming.map(toLocalRow), ...importedUpcoming.map(toImportedRow)];
+      const inHouseRows = [...localInHouse.map(toLocalRow), ...importedInHouse.map(toImportedRow)];
+
+      const rowMap = new Map<string, (typeof upcomingRows)[number]>();
+      [...upcomingRows, ...inHouseRows].forEach((row) => {
+        rowMap.set(row._id, row);
+      });
+
+      const rows = [...rowMap.values()].sort(
+        (left, right) => new Date(left.checkIn).getTime() - new Date(right.checkIn).getTime()
+      );
+
+      const arrivalsToday = upcomingRows.filter((row) => {
         const checkIn = toUtcStartOfDay(row.checkIn);
         return checkIn.getTime() === today.getTime();
       }).length;
@@ -1399,8 +1608,8 @@ router.get(
         },
         summary: {
           arrivalsToday,
-          upcomingArrivals: rows.length,
-          inHouseToday: localInHouseCount + importedInHouseCount,
+          upcomingArrivals: upcomingRows.length,
+          inHouseToday: inHouseRows.length,
           checkedInToday: localCheckedInTodayCount + importedCheckedInTodayCount,
           sync: {
             totalRooms: hotels.length,
