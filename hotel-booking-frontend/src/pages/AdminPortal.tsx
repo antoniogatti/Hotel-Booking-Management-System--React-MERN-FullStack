@@ -244,9 +244,9 @@ const AdminPortal = () => {
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
-                          <Link to={`/booking/${row._id}`}>
+                          <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
                             <Button size="sm" className="bg-[#ea836c] hover:bg-[#db755f]">
-                              Update Booking
+                              Start check-in
                             </Button>
                           </Link>
                           <Link to="/admin-portal/check-in">
