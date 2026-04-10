@@ -200,13 +200,33 @@ export const searchHotels = async (
     queryParams.append("destination", searchParams.destination.trim());
   }
 
-  queryParams.append("checkIn", searchParams.checkIn || "");
-  queryParams.append("checkOut", searchParams.checkOut || "");
-  queryParams.append("adultCount", searchParams.adultCount || "");
-  queryParams.append("childCount", searchParams.childCount || "");
-  queryParams.append("page", searchParams.page || "");
-  queryParams.append("maxPrice", searchParams.maxPrice || "");
-  queryParams.append("sortOption", searchParams.sortOption || "");
+  if (searchParams.checkIn) {
+    queryParams.append("checkIn", searchParams.checkIn);
+  }
+
+  if (searchParams.checkOut) {
+    queryParams.append("checkOut", searchParams.checkOut);
+  }
+
+  if (searchParams.adultCount) {
+    queryParams.append("adultCount", searchParams.adultCount);
+  }
+
+  if (searchParams.childCount) {
+    queryParams.append("childCount", searchParams.childCount);
+  }
+
+  if (searchParams.page) {
+    queryParams.append("page", searchParams.page);
+  }
+
+  if (searchParams.maxPrice) {
+    queryParams.append("maxPrice", searchParams.maxPrice);
+  }
+
+  if (searchParams.sortOption) {
+    queryParams.append("sortOption", searchParams.sortOption);
+  }
 
   searchParams.facilities?.forEach((facility) =>
     queryParams.append("facilities", facility)
@@ -351,6 +371,64 @@ export const fetchBookingDashboardSummary = async (filters?: {
 
   const response = await axiosInstance.get(
     `/api/bookings/dashboard/summary?${params.toString()}`
+  );
+  return response.data;
+};
+
+export type UpcomingCheckInRow = {
+  _id: string;
+  hotelId: string;
+  hotelName: string;
+  hotelCity: string;
+  hotelCountry: string;
+  reservationNumber: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  nationality: string;
+  status: string;
+  source: string;
+  sourceLabel: string;
+  checkIn: string;
+  checkOut: string;
+  arrivalTime: string;
+  checkedInAt?: string;
+  isCheckedIn: boolean;
+  isImported: boolean;
+};
+
+export type UpcomingCheckInsResponse = {
+  range: {
+    start: string;
+    end: string;
+    days: number;
+  };
+  summary: {
+    arrivalsToday: number;
+    upcomingArrivals: number;
+    inHouseToday: number;
+    checkedInToday: number;
+    sync: {
+      totalRooms: number;
+      enabledRooms: number;
+      issueRooms: number;
+      lastSuccessfulSyncAt: string | null;
+    };
+  };
+  rows: UpcomingCheckInRow[];
+};
+
+export const fetchUpcomingCheckIns = async (filters?: {
+  days?: number;
+  hotelId?: string;
+}): Promise<UpcomingCheckInsResponse> => {
+  const params = new URLSearchParams();
+  if (filters?.days) params.append("days", String(filters.days));
+  if (filters?.hotelId) params.append("hotelId", filters.hotelId);
+
+  const response = await axiosInstance.get(
+    `/api/bookings/dashboard/upcoming-check-ins?${params.toString()}`
   );
   return response.data;
 };

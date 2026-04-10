@@ -60,6 +60,10 @@ const Search = () => {
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [draftCheckIn, setDraftCheckIn] = useState<Date | null>(search.checkIn);
   const [draftCheckOut, setDraftCheckOut] = useState<Date | null>(search.checkOut);
+  const hasCommittedDateRange = useMemo(
+    () => search.checkOut.getTime() > search.checkIn.getTime(),
+    [search.checkIn, search.checkOut]
+  );
 
   const minDate = useMemo(() => {
     const today = new Date();
@@ -131,8 +135,8 @@ const Search = () => {
 
   const searchParams = {
     destination: search.destination?.trim() || "",
-    checkIn: search.checkIn.toISOString(),
-    checkOut: search.checkOut.toISOString(),
+    checkIn: hasCommittedDateRange ? search.checkIn.toISOString() : undefined,
+    checkOut: hasCommittedDateRange ? search.checkOut.toISOString() : undefined,
     adultCount: search.adultCount.toString(),
     childCount: search.childCount.toString(),
     page: page.toString(),
@@ -235,12 +239,16 @@ const Search = () => {
         year: "numeric",
       });
 
+    if (!hasCommittedDateRange && !draftCheckOut) {
+      return "Select dates - Optional";
+    }
+
     return `${formatDate(draftCheckIn || search.checkIn)} - ${formatDate(
       draftCheckOut || draftCheckIn || search.checkOut
     )}`;
-  }, [draftCheckIn, draftCheckOut, search.checkIn, search.checkOut]);
+  }, [draftCheckIn, draftCheckOut, hasCommittedDateRange, search.checkIn, search.checkOut]);
 
-  const hasInvalidStay = selectedNights === 0;
+  const hasInvalidStay = false;
   const hasNoResults = !hasInvalidStay && hotelData?.pagination.total === 0;
 
   return (
@@ -482,10 +490,13 @@ const Search = () => {
               isSinglePropertyMode ? (
                 <div className="space-y-1">
                   <p>
-                    <strong className="text-gray-900">{availableRoomCount} of {totalRoomChoices}</strong> rooms available for your dates.
+                    <strong className="text-gray-900">{availableRoomCount} of {totalRoomChoices}</strong>{" "}
+                    rooms {hasCommittedDateRange ? "available for your dates" : "currently listed"}.
                   </p>
                   <p className="text-xs text-gray-500">
-                    Only rooms with current availability are shown below.
+                    {hasCommittedDateRange
+                      ? "Only rooms with current availability are shown below."
+                      : "Browse all rooms first, then add dates to filter by live availability."}
                     {minPrice !== null && (
                       <>
                         {" "}Rates start from <strong className="text-gray-700">€{minPrice}</strong>.

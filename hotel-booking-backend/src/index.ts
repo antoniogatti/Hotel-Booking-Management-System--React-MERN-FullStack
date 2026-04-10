@@ -44,6 +44,11 @@ const normalizeRateLimitIp = (ip?: string) => {
     : ip;
 };
 let mongoMemoryServer: MongoMemoryServer | null = null;
+const mongoConnectRetryDelayMs = Number(process.env.MONGODB_CONNECT_RETRY_DELAY_MS || 5000);
+const mongoConnectMaxAttempts = Math.max(
+  1,
+  Number(process.env.MONGODB_CONNECT_MAX_ATTEMPTS || 12)
+);
 
 // Environment Variables Validation
 const requiredEnvVars = [
@@ -86,8 +91,30 @@ const connectDB = async () => {
 
     logInfo("Attempting MongoDB connection", {
       mode: useInMemoryMongo ? "in-memory" : "configured",
+      maxAttempts: mongoConnectMaxAttempts,
     });
-    await mongoose.connect(mongoUri);
+
+    let attempt = 0;
+    while (attempt < mongoConnectMaxAttempts) {
+      attempt += 1;
+
+      try {
+        await mongoose.connect(mongoUri);
+        break;
+      } catch (error) {
+        logError("MongoDB connection attempt failed", error, {
+          attempt,
+          maxAttempts: mongoConnectMaxAttempts,
+        });
+
+        if (attempt >= mongoConnectMaxAttempts) {
+          throw error;
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, mongoConnectRetryDelayMs));
+      }
+    }
+
     logInfo("MongoDB connected successfully", {
       database: mongoose.connection.db.databaseName,
     });

@@ -9,7 +9,7 @@ import { Separator } from "./ui/separator";
 import { Button } from "./ui/button";
 import { useState } from "react";
 import * as apiClient from "../api-client";
-import { LogOut, Building2, CalendarClock, BarChart3, RefreshCw } from "lucide-react";
+import { CalendarDays, LogOut, Shield } from "lucide-react";
 import useAppContext from "../hooks/useAppContext";
 
 const getAvatarUrl = () => {
@@ -19,7 +19,7 @@ const getAvatarUrl = () => {
 };
 
 const UsernameMenu = () => {
-  const { isOwnerOrAdmin, userRole } = useAppContext();
+  const { isOwnerOrAdmin } = useAppContext();
   const [isOpen, setIsOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -65,11 +65,11 @@ const UsernameMenu = () => {
               className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
             >
               <Link
-                to="/booking-dashboard"
+                to="/admin-portal"
                 className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
               >
-                <BarChart3 className="h-4 w-4" />
-                Booking Dashboard
+                <Shield className="h-4 w-4" />
+                Admin Portal
               </Link>
             </DropdownMenuItem>
             <DropdownMenuItem
@@ -78,51 +78,18 @@ const UsernameMenu = () => {
               className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
             >
               <Link
-                to="/my-hotels"
+                to="/manage-bookings"
                 className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
               >
-                <Building2 className="h-4 w-4" />
-                Manage Rooms
+                <CalendarDays className="h-4 w-4" />
+                Room Calendar
               </Link>
             </DropdownMenuItem>
-            {userRole === "admin" && (
-              <DropdownMenuItem
-                onClick={handleMenuClick}
-                asChild
-                className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
-              >
-                <Link
-                  to="/booking-com-sync"
-                  className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Booking.com Sync
-                </Link>
-              </DropdownMenuItem>
-            )}
-            {userRole === "admin" && (
-              <DropdownMenuItem
-                onClick={handleMenuClick}
-                asChild
-                className="py-1.5 rounded-md cursor-pointer hover:bg-gray-100 focus:bg-gray-100"
-              >
-                <Link
-                  to="/manage-bookings"
-                  className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
-                >
-                  <CalendarClock className="h-4 w-4" />
-                  Manage Bookings
-                </Link>
-              </DropdownMenuItem>
-            )}
             <Separator className="my-2 bg-gray-200" />
           </>
         )}
         <DropdownMenuItem className="py-1.5 rounded-md cursor-pointer">
-          <Button
-            onClick={handleLogout}
-            className="w-full font-bold"
-          >
+          <Button onClick={handleLogout} className="w-full font-bold">
             <LogOut className="h-4 w-4 mr-2" />
             Log Out
           </Button>

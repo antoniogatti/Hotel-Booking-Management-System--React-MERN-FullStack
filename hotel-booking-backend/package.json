@@ -15,9 +15,12 @@
     "seed:palazzo-rooms": "ts-node src/scripts/seed-palazzopinto-rooms.ts",
     "setup:bookingcom-feeds": "ts-node src/scripts/configure-booking-com-feeds.ts",
     "sync:bookingcom": "ts-node src/scripts/sync-booking-com-ical.ts",
+    "bootstrap:palazzopinto-db": "ts-node src/scripts/bootstrap-palazzopinto-db.ts",
+    "reset:bookingcom-imports": "ts-node src/scripts/reset-booking-com-imports.ts",
     "reset:booking-master": "ts-node src/scripts/reset-booking-master-data.ts",
     "cleanup:legacy-booking-fields": "ts-node src/scripts/cleanup-legacy-booking-fields.ts",
-    "set-user-role": "ts-node src/scripts/set-user-role.ts"
+    "set-user-role": "ts-node src/scripts/set-user-role.ts",
+    "ensure-user-role": "ts-node src/scripts/ensure-user-role.ts"
   },
   "author": "Arnob Mahmud",
   "license": "ISC",

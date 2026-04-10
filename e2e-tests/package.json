@@ -7,7 +7,8 @@
     "test": "playwright test",
     "test:pages-live": "playwright test tests/pages-live.spec.ts --project=chromium",
     "test:pages-live:all": "playwright test tests/pages-live.spec.ts",
-    "test:room-routing": "playwright test tests/room-routing.spec.ts --project=chromium"
+    "test:room-routing": "playwright test tests/room-routing.spec.ts --project=chromium",
+    "test:production-live": "playwright test tests/production-live.spec.ts --project=chromium"
   },
   "keywords": [],
   "author": "",

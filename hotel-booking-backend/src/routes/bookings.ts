@@ -1229,4 +1229,196 @@ router.get(
   }
 );
 
+router.get(
+  "/dashboard/upcoming-check-ins",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  [
+    query("days")
+      .optional()
+      .isInt({ min: 1, max: 180 })
+      .withMessage("Days must be between 1 and 180"),
+    query("hotelId").optional().isString().withMessage("Hotel ID must be a string"),
+  ],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const days = req.query.days ? Number(req.query.days) : 7;
+      const hotelId = req.query.hotelId ? String(req.query.hotelId) : "";
+      let hotelQuery: Record<string, unknown> = req.userRole === "admin" ? {} : { userId: req.userId };
+
+      if (hotelId) {
+        const accessCheck = await getAccessibleHotel(hotelId, req);
+        if (accessCheck.error) {
+          return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+        }
+
+        hotelQuery = { _id: hotelId };
+      }
+
+      const hotels = await Hotel.find(hotelQuery)
+        .sort({ name: 1 })
+        .select("_id name city country bookingComIcal");
+
+      const hotelIds = hotels.map((hotel) => String(hotel._id));
+      const hotelMap = new Map(
+        hotels.map((hotel) => [String(hotel._id), hotel])
+      );
+
+      const today = toUtcStartOfDay(new Date());
+      const tomorrow = new Date(today.getTime() + 86400000);
+      const windowEnd = new Date(today.getTime() + days * 86400000);
+
+      const [localUpcoming, importedUpcoming, localInHouseCount, importedInHouseCount, localCheckedInTodayCount, importedCheckedInTodayCount] =
+        await Promise.all([
+          Booking.find({
+            hotelId: { $in: hotelIds },
+            status: { $in: ["pending", "confirmed", "arrived"] },
+            checkIn: { $gte: today, $lt: windowEnd },
+          })
+            .sort({ checkIn: 1, createdAt: 1 })
+            .select(
+              "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
+            ),
+          ExternalCalendarEvent.find({
+            hotelId: { $in: hotelIds },
+            source: BOOKING_COM_SOURCE,
+            status: "active",
+            startDate: { $gte: today, $lt: windowEnd },
+          })
+            .sort({ startDate: 1, createdAt: 1 })
+            .select(
+              "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
+            ),
+          Booking.countDocuments({
+            hotelId: { $in: hotelIds },
+            status: { $in: ["confirmed", "arrived", "completed"] },
+            checkIn: { $lte: today },
+            checkOut: { $gt: today },
+          }),
+          ExternalCalendarEvent.countDocuments({
+            hotelId: { $in: hotelIds },
+            source: BOOKING_COM_SOURCE,
+            status: "active",
+            startDate: { $lte: today },
+            endDate: { $gt: today },
+          }),
+          Booking.countDocuments({
+            hotelId: { $in: hotelIds },
+            "checkInInfo.checkedInAt": { $gte: today, $lt: tomorrow },
+          }),
+          ExternalCalendarEvent.countDocuments({
+            hotelId: { $in: hotelIds },
+            source: BOOKING_COM_SOURCE,
+            status: "active",
+            "checkInInfo.checkedInAt": { $gte: today, $lt: tomorrow },
+          }),
+        ]);
+
+      const rows = [
+        ...localUpcoming.map((booking) => {
+          const hotel = hotelMap.get(String(booking.hotelId));
+          const arrivalTime = booking.checkInInfo?.arrivalTime || booking.arrivalTime || "";
+          const checkedInAt = booking.checkInInfo?.checkedInAt;
+          return {
+            _id: String(booking._id),
+            hotelId: String(booking.hotelId),
+            hotelName: hotel?.name || "Room",
+            hotelCity: hotel?.city || "",
+            hotelCountry: hotel?.country || "",
+            reservationNumber: booking.reservationNumber || "N/A",
+            firstName: booking.firstName,
+            lastName: booking.lastName,
+            email: booking.email || "",
+            phone: booking.phone || "",
+            nationality: booking.nationality || "",
+            status: booking.status || "pending",
+            source: "local",
+            sourceLabel: "Direct",
+            checkIn: booking.checkIn,
+            checkOut: booking.checkOut,
+            arrivalTime,
+            checkedInAt,
+            isCheckedIn: Boolean(checkedInAt) || booking.status === "arrived",
+            isImported: false,
+          };
+        }),
+        ...importedUpcoming.map((event) => {
+          const hotel = hotelMap.get(String(event.hotelId));
+          const arrivalTime = event.checkInInfo?.arrivalTime || "";
+          const checkedInAt = event.checkInInfo?.checkedInAt;
+          return {
+            _id: String(event._id),
+            hotelId: String(event.hotelId),
+            hotelName: hotel?.name || "Room",
+            hotelCity: hotel?.city || "",
+            hotelCountry: hotel?.country || "",
+            reservationNumber: event.externalUid || "Booking.com",
+            firstName: event.firstName || "",
+            lastName: event.lastName || "",
+            email: event.email || "",
+            phone: event.phone || "",
+            nationality: event.nationality || "",
+            status: "imported",
+            source: BOOKING_COM_SOURCE,
+            sourceLabel: "Booking.com",
+            checkIn: event.startDate,
+            checkOut: event.endDate,
+            arrivalTime,
+            checkedInAt,
+            isCheckedIn: Boolean(checkedInAt),
+            isImported: true,
+          };
+        }),
+      ].sort((left, right) => new Date(left.checkIn).getTime() - new Date(right.checkIn).getTime());
+
+      const arrivalsToday = rows.filter((row) => {
+        const checkIn = toUtcStartOfDay(row.checkIn);
+        return checkIn.getTime() === today.getTime();
+      }).length;
+
+      const roomsWithSync = hotels.filter((hotel) => Boolean(hotel.bookingComIcal?.syncEnabled));
+      const lastSuccessfulSync = roomsWithSync
+        .filter((hotel) => hotel.bookingComIcal?.lastSyncAt)
+        .map((hotel) => new Date(hotel.bookingComIcal?.lastSyncAt as Date))
+        .sort((left, right) => right.getTime() - left.getTime())[0];
+
+      const syncIssues = roomsWithSync.filter(
+        (hotel) => hotel.bookingComIcal?.lastSyncStatus && hotel.bookingComIcal.lastSyncStatus !== "success"
+      ).length;
+
+      return res.status(200).json({
+        range: {
+          start: today.toISOString(),
+          end: windowEnd.toISOString(),
+          days,
+        },
+        summary: {
+          arrivalsToday,
+          upcomingArrivals: rows.length,
+          inHouseToday: localInHouseCount + importedInHouseCount,
+          checkedInToday: localCheckedInTodayCount + importedCheckedInTodayCount,
+          sync: {
+            totalRooms: hotels.length,
+            enabledRooms: roomsWithSync.length,
+            issueRooms: syncIssues,
+            lastSuccessfulSyncAt: lastSuccessfulSync ? lastSuccessfulSync.toISOString() : null,
+          },
+        },
+        rows,
+      });
+    } catch (error) {
+      logError("Unable to fetch upcoming check-ins", error, {
+        route: "bookings.upcoming-check-ins",
+        hotelId: req.query.hotelId,
+      });
+      return res.status(500).json({ message: "Unable to fetch upcoming check-ins" });
+    }
+  }
+);
+
 export default router;

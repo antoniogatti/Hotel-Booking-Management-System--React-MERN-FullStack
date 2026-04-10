@@ -36,6 +36,8 @@ import BookingDashboard from "./pages/BookingDashboard";
 import BookingDetails from "./pages/BookingDetails";
 import VacancyDashboard from "./pages/VacancyDashboard";
 import RoomLanding from "./pages/RoomLanding";
+import AdminPortal from "./pages/AdminPortal";
+import AdminPortalCheckIns from "./pages/AdminPortalCheckIns";
 import { siteConfig } from "./config/siteConfig";
 import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
 
@@ -75,6 +77,8 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/auth/callback") return `${BRAND_NAME} | Sign In`;
   if (pathname === "/my-hotels") return `${BRAND_NAME} | My Properties`;
   if (pathname === "/booking-dashboard") return `${BRAND_NAME} | Booking Dashboard`;
+  if (pathname === "/admin-portal") return `${BRAND_NAME} | Admin Portal`;
+  if (pathname === "/admin-portal/check-in") return `${BRAND_NAME} | Check-In Desk`;
   if (pathname.startsWith("/booking/")) return `${BRAND_NAME} | Booking Details`;
   if (pathname === "/vacancy-management") return `${BRAND_NAME} | Vacancy Management`;
   if (pathname === "/booking-com-sync") return `${BRAND_NAME} | Booking.com Sync`;
@@ -263,6 +267,30 @@ const App = () => {
           }
         />
         <Route
+          path="/admin-portal"
+          element={
+            userRole === "admin" || userRole === "hotel_owner" ? (
+              <Layout>
+                <AdminPortal />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/admin-portal/check-in"
+          element={
+            userRole === "admin" || userRole === "hotel_owner" ? (
+              <Layout>
+                <AdminPortalCheckIns />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
           path="/booking-dashboard"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
@@ -334,7 +362,7 @@ const App = () => {
         <Route
           path="/hotel/:hotelId/check-in/:bookingId"
           element={
-            userRole === "admin" ? (
+            userRole === "admin" || userRole === "hotel_owner" ? (
               <Layout>
                 <BookingCheckIn />
               </Layout>

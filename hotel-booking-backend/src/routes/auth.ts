@@ -34,9 +34,14 @@ const microsoftBaseUrl = `https://login.microsoftonline.com/${MICROSOFT_TENANT_I
 const isProduction = process.env.NODE_ENV === "production";
 const useInMemoryMongo =
   !isProduction && process.env.USE_IN_MEMORY_MONGO === "true";
+const allowLocalPasswordLogin =
+  !isProduction && process.env.ENABLE_LOCAL_PASSWORD_LOGIN === "true";
 const sessionCookieName = "session_id";
 const oauthStateCookieName = "oauth_state";
-const localDevDefaultRole: AppRole = useInMemoryMongo ? "admin" : defaultAppRole;
+const forceLocalAdminRole =
+  !isProduction && String(process.env.FORCE_LOCAL_ADMIN_ROLE || "true").toLowerCase() !== "false";
+const localDevDefaultRole: AppRole =
+  useInMemoryMongo || forceLocalAdminRole ? "admin" : defaultAppRole;
 
 const getSessionCookieOptions = (
   overrides: Partial<CookieOptions> = {}
@@ -82,9 +87,8 @@ const issueToken = (userId: string, role: AppRole) => {
 };
 
 const ensurePersistedRole = async (user: any, email: string) => {
-  const computedRole = user.role
-    ? resolvePersistedRole(user.role)
-    : localDevDefaultRole;
+  const currentRole = user.role ? resolvePersistedRole(user.role) : null;
+  const computedRole = forceLocalAdminRole ? "admin" : currentRole || localDevDefaultRole;
   const previousRole = user.role;
 
   if (!user.role || user.role !== computedRole) {
@@ -405,9 +409,11 @@ router.post(
     }),
   ],
   async (req: Request, res: Response) => {
-    return res.status(410).json({
-      message: "Email/password login disabled. Use Microsoft sign-in.",
-    });
+    if (!allowLocalPasswordLogin) {
+      return res.status(410).json({
+        message: "Email/password login disabled. Use Microsoft sign-in.",
+      });
+    }
 
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -482,7 +488,9 @@ router.get("/validate-token", verifyToken, async (req: Request, res: Response) =
     return res.status(401).json({ message: "unauthorized" });
   }
 
-  const role = user.role
+  const role = forceLocalAdminRole
+    ? "admin"
+    : user.role
     ? resolvePersistedRole(user.role)
     : localDevDefaultRole;
   if (!user.role || user.role !== role) {

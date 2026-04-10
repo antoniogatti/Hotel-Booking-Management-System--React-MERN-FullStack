@@ -1,4 +1,6 @@
 import { ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import * as apiClient from "../api-client";
 import { Button } from "../components/ui/button";
 import {
@@ -11,6 +13,24 @@ import {
 import { siteConfig } from "../config/siteConfig";
 
 const SignIn = () => {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("admin.local@palazzopinto.test");
+  const [password, setPassword] = useState("Admin123!");
+  const [error, setError] = useState("");
+  const localPasswordLoginEnabled =
+    import.meta.env.DEV &&
+    import.meta.env.VITE_ENABLE_LOCAL_PASSWORD_LOGIN === "true";
+
+  const handleLocalLogin = async () => {
+    try {
+      setError("");
+      await apiClient.signIn({ email, password });
+      navigate("/admin-portal");
+    } catch (loginError: any) {
+      setError(loginError?.response?.data?.message || "Unable to sign in locally.");
+    }
+  };
+
   return (
     <div className="flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-xl w-full space-y-8">
@@ -65,6 +85,39 @@ const SignIn = () => {
               </svg>
               Continue with Microsoft
             </Button>
+
+            {localPasswordLoginEnabled && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-left">
+                <p className="text-sm font-semibold text-amber-900">Local development access</p>
+                <p className="mt-1 text-sm text-amber-800">
+                  Enabled only for localhost development to inspect protected admin flows.
+                </p>
+                <div className="mt-4 space-y-3">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(event) => setEmail(event.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">Password</label>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(event) => setPassword(event.target.value)}
+                      className="w-full rounded-md border border-gray-300 px-3 py-2"
+                    />
+                  </div>
+                  {error && <p className="text-sm text-red-600">{error}</p>}
+                  <Button type="button" onClick={handleLocalLogin} className="w-full">
+                    Sign in locally
+                  </Button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
