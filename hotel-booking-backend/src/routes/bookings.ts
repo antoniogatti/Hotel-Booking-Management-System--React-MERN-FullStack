@@ -1210,12 +1210,11 @@ router.post(
   upload.array("documents", 12),
   [
     param("id").notEmpty().withMessage("Booking ID is required"),
-    body("arrivalTime").notEmpty().withMessage("Arrival time is required"),
-    body("phone").trim().notEmpty().withMessage("Phone number is required"),
-    body("email").trim().isEmail().withMessage("Valid email is required"),
-    body("nationality").notEmpty().withMessage("Nationality is required"),
-    body("bookingChannel").notEmpty().withMessage("Booking channel is required"),
-    body("paymentDetails").notEmpty().withMessage("Payment details are required"),
+    body("email")
+      .optional({ values: "falsy" })
+      .trim()
+      .isEmail()
+      .withMessage("Email must be valid when provided"),
   ],
   async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -1250,10 +1249,6 @@ router.post(
 
         if (!firstName || !lastName) {
           return res.status(400).json({ message: "Guest first name and last name are required for imported bookings." });
-        }
-
-        if (!email) {
-          return res.status(400).json({ message: "A guest email is required for imported bookings." });
         }
 
         if (adultCount + childCount < 1) {

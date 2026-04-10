@@ -233,14 +233,9 @@ const BookingCheckIn = () => {
   if (isImportedBooking && formData.adultCount + formData.childCount < 1) {
     missingRequiredFields.push("guest count");
   }
-  if (!formData.arrivalTime.trim()) missingRequiredFields.push("arrival time");
-  if (!formData.phone.trim()) missingRequiredFields.push("phone number");
-  if (!formData.email.trim() || !isValidEmail(formData.email)) {
+  if (formData.email.trim() && !isValidEmail(formData.email)) {
     missingRequiredFields.push("valid email");
   }
-  if (!formData.nationality.trim()) missingRequiredFields.push("nationality");
-  if (!formData.bookingChannel.trim()) missingRequiredFields.push("booking channel");
-  if (!formData.paymentDetails.trim()) missingRequiredFields.push("payment details");
   const isFormValid = missingRequiredFields.length === 0;
 
   return (
@@ -386,7 +381,7 @@ const BookingCheckIn = () => {
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="text-sm font-semibold text-gray-700">Arrival Time *</label>
+              <label className="text-sm font-semibold text-gray-700">Arrival Time</label>
               <input
                 type="time"
                 value={formData.arrivalTime}
@@ -396,7 +391,7 @@ const BookingCheckIn = () => {
             </div>
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Phone className="h-4 w-4" /> Phone Number *
+                <Phone className="h-4 w-4" /> Phone Number
               </label>
               <input
                 type="tel"
@@ -420,7 +415,7 @@ const BookingCheckIn = () => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Mail className="h-4 w-4" /> Email *
+                <Mail className="h-4 w-4" /> Email
               </label>
               <input
                 type="email"
@@ -438,7 +433,7 @@ const BookingCheckIn = () => {
               )}
             </div>
             <div>
-              <label className="text-sm font-semibold text-gray-700">Nationality *</label>
+              <label className="text-sm font-semibold text-gray-700">Nationality</label>
               <select
                 value={formData.nationality}
                 onChange={(e) => setFormData((prev) => ({ ...prev, nationality: e.target.value }))}
@@ -457,7 +452,7 @@ const BookingCheckIn = () => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-                <Globe className="h-4 w-4" /> Booking Channel *
+                <Globe className="h-4 w-4" /> Booking Channel
               </label>
               <select
                 value={formData.bookingChannel}
@@ -475,7 +470,7 @@ const BookingCheckIn = () => {
               </select>
             </div>
             <div>
-              <label className="text-sm font-semibold text-gray-700">Payment Details *</label>
+              <label className="text-sm font-semibold text-gray-700">Payment Details</label>
               <select
                 value={formData.paymentDetails}
                 onChange={(e) =>
