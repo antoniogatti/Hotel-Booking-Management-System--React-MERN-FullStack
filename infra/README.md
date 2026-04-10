@@ -35,7 +35,7 @@ Cutover note:
 Frontend target status:
 - The selected frontend target is Azure Static Web Apps Standard.
 - The current `main.bicep` remains backend-focused so backend hardening can be deployed independently before frontend cutover.
-- Keep `https://palazzopinto-web-2603151048.azurewebsites.net` in `frontendAdditionalOrigins` during transition if the existing Azure App Service frontend still needs to authenticate against the backend.
+- Set `frontendUrl` to `https://www.palazzopintobnb.com` and keep `https://palazzopintobnb.com` plus `https://palazzopinto-web-2603151048.azurewebsites.net` in `frontendAdditionalOrigins` during transition.
 
 Suggested deployment workflow:
 

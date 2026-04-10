@@ -4,7 +4,7 @@ import path from "node:path";
 import mongoose from "mongoose";
 import Hotel from "../models/hotel";
 
-const PALAZZO_SITE_URL = "https://palazzopinto-web-2603151048.azurewebsites.net/";
+const PALAZZO_SITE_URL = "https://palazzopintobnb.com/";
 
 const getFuocorosaImages = (): string[] => {
   const imagesDir = path.resolve(

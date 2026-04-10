@@ -29,10 +29,15 @@ npm run dev
 ## 2) Production Deployment (Azure Web App)
 
 Current apps:
-- Backend: `palazzopinto-api-2603151048`
+- Backend: `palazzopinto-api-secure`
 - Frontend: `palazzopinto-web-2603151048`
 - Shared plan: `palazzopinto-free-plan` (`F1`)
 - Resource group: `PalazzoPintoBnB`
+
+Canonical production URLs:
+- Frontend: `https://www.palazzopintobnb.com`
+- Frontend alternate: `https://palazzopintobnb.com`
+- Backend API: `https://api.palazzopintobnb.com`
 
 ### Backend production settings
 Set app settings on the backend web app:
@@ -40,14 +45,14 @@ Set app settings on the backend web app:
 ```bash
 az webapp config appsettings set \
   --resource-group PalazzoPintoBnB \
-  --name palazzopinto-api-2603151048 \
+  --name palazzopinto-api-secure \
   --settings \
   NODE_ENV=production \
   MONGODB_CONNECTION_STRING="<your-prod-connection-string>" \
   JWT_SECRET_KEY="<your-jwt-secret>" \
-  FRONTEND_URL="https://palazzopinto-web-2603151048.azurewebsites.net" \
-  FRONTEND_URLS="https://palazzopinto-web-2603151048.azurewebsites.net" \
-  BACKEND_URL="https://palazzopinto-api-2603151048.azurewebsites.net" \
+  FRONTEND_URL="https://www.palazzopintobnb.com" \
+  FRONTEND_URLS="https://www.palazzopintobnb.com,https://palazzopintobnb.com,https://palazzopinto-web-2603151048.azurewebsites.net" \
+  BACKEND_URL="https://api.palazzopintobnb.com" \
   MS_ENTRA_CLIENT_ID="<entra-client-id>" \
   MS_ENTRA_CLIENT_SECRET="<entra-client-secret>" \
   MS_ENTRA_TENANT_ID="<tenant-id-or-common>"
@@ -76,7 +81,9 @@ node dist/hotel-booking-backend/src/index.js
 
 In Microsoft Entra app registration:
 - Add backend callback URL:
-  - `https://palazzopinto-api-2603151048.azurewebsites.net/api/auth/callback/microsoft`
+  - `https://api.palazzopintobnb.com/api/auth/callback/microsoft`
+- Keep the legacy callback during transition:
+  - `https://palazzopinto-api-secure.azurewebsites.net/api/auth/callback/microsoft`
 - Keep local callback for testing if needed:
   - `http://localhost:5000/api/auth/callback/microsoft`
 

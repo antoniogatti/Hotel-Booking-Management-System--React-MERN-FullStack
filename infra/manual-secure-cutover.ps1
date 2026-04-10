@@ -4,7 +4,9 @@ $resourceGroup = 'PalazzoPintoBnB'
 $legacyApp = 'palazzopinto-api-2603151048'
 $secureApp = 'palazzopinto-api-secure'
 $clusterName = 'palazzopintodb'
-$secureBackendUrl = 'https://palazzopinto-api-secure.azurewebsites.net'
+$secureBackendUrl = 'https://api.palazzopintobnb.com'
+$frontendUrl = 'https://www.palazzopintobnb.com'
+$frontendAdditionalOrigins = 'https://www.palazzopintobnb.com,https://palazzopintobnb.com,https://palazzopinto-web-2603151048.azurewebsites.net'
 $backendProjectPath = Join-Path (Split-Path $PSScriptRoot -Parent) 'hotel-booking-backend'
 
 function Get-AppSettingValue {
@@ -54,8 +56,8 @@ $appSettingsPayload = @{
   properties = @{
     NODE_ENV = 'production'
     BACKEND_URL = $secureBackendUrl
-    FRONTEND_URL = 'https://palazzopinto-web-2603151048.azurewebsites.net'
-    FRONTEND_URLS = ''
+    FRONTEND_URL = $frontendUrl
+    FRONTEND_URLS = $frontendAdditionalOrigins
     MS_ENTRA_TENANT_ID = 'f0b2f579-2f09-4daf-839f-abf49b0d8dcc'
     APPLICATIONINSIGHTS_CONNECTION_STRING = 'InstrumentationKey=65022624-8a59-4e39-a0ba-1308b674f162;IngestionEndpoint=https://italynorth-0.in.applicationinsights.azure.com/;LiveEndpoint=https://italynorth.livediagnostics.monitor.azure.com/;ApplicationId=85d21d13-22b9-40b5-907c-8d86c9d7cff2'
     WEBSITE_VNET_ROUTE_ALL = '1'

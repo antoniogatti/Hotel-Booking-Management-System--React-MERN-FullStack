@@ -47,11 +47,17 @@
     "mongoPrivateDnsZoneName": {
       "value": "privatelink.mongocluster.cosmos.azure.com"
     },
+    "backendUrl": {
+      "value": "https://api.palazzopintobnb.com"
+    },
     "frontendUrl": {
-      "value": "https://palazzopinto-web-2603151048.azurewebsites.net"
+      "value": "https://www.palazzopintobnb.com"
     },
     "frontendAdditionalOrigins": {
-      "value": []
+      "value": [
+        "https://palazzopintobnb.com",
+        "https://palazzopinto-web-2603151048.azurewebsites.net"
+      ]
     },
     "entraTenantId": {
       "value": "f0b2f579-2f09-4daf-839f-abf49b0d8dcc"

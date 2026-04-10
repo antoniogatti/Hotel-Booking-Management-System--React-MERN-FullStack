@@ -47,11 +47,15 @@
     "mongoPrivateDnsZoneName": {
       "value": "privatelink.mongocluster.cosmos.azure.com"
     },
+    "backendUrl": {
+      "value": "https://api.palazzopintobnb.com"
+    },
     "frontendUrl": {
-      "value": "https://your-frontend-hostname.azurestaticapps.net"
+      "value": "https://www.palazzopintobnb.com"
     },
     "frontendAdditionalOrigins": {
       "value": [
+        "https://palazzopintobnb.com",
         "https://palazzopinto-web-2603151048.azurewebsites.net"
       ]
     },

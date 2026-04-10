@@ -130,6 +130,8 @@ $NamePrefix = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "n
 $BackendAppName = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "backendAppName"
 $KeyVaultName = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "keyVaultName"
 $MongoClusterName = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "mongoClusterName"
+$ConfiguredBackendUrl = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "backendUrl"
+$ConfiguredFrontendUrl = Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "frontendUrl"
 $ConfiguredFrontendAdditionalOrigins = @(Get-ParameterValue -ParameterFile $ParameterFile -ParameterName "frontendAdditionalOrigins")
 
 $Location = az group show --name $ResourceGroup --query location -o tsv
@@ -168,6 +170,9 @@ if (-not $EntraClientId) {
 $EntraClientSecret = Get-RequiredValue -Value $null -EnvironmentName "PALAZZOPINTO_MS_ENTRA_CLIENT_SECRET" -Label "Microsoft Entra client secret"
 
 $AllowedFrontendOrigins = @($ConfiguredFrontendAdditionalOrigins | Where-Object { $_ })
+if ($ConfiguredFrontendUrl -and $AllowedFrontendOrigins -notcontains $ConfiguredFrontendUrl) {
+  $AllowedFrontendOrigins += $ConfiguredFrontendUrl
+}
 if ($AllowedFrontendOrigins -notcontains $LegacyFrontendUrl) {
   $AllowedFrontendOrigins += $LegacyFrontendUrl
 }
@@ -213,11 +218,11 @@ Pop-Location
 az webapp deploy --resource-group $ResourceGroup --name $BackendAppName --src-path $BackendZip --type zip --restart true
 
 $BackendHostname = az webapp show --resource-group $ResourceGroup --name $BackendAppName --query defaultHostName -o tsv
-$BackendUrl = "https://$BackendHostname"
+$BackendValidationUrl = "https://$BackendHostname"
 
 # Validate the secure backend while public access is still available on the cluster.
-$HealthUrl = "$BackendUrl/api/health"
-$RoomsUrl = "$BackendUrl/api/rooms"
+$HealthUrl = "$BackendValidationUrl/api/health"
+$RoomsUrl = "$BackendValidationUrl/api/rooms"
 Invoke-WebRequest -Uri $HealthUrl -UseBasicParsing | Out-Null
 Invoke-WebRequest -Uri $RoomsUrl -UseBasicParsing | Out-Null
 
@@ -240,16 +245,17 @@ Invoke-WebRequest -Uri $RoomsUrl -UseBasicParsing | Out-Null
 
 # Create the Azure Static Web App resource for frontend cutover.
 az staticwebapp create --name $StaticWebAppName --resource-group $ResourceGroup --location $Location --sku Standard
-az staticwebapp appsettings set --name $StaticWebAppName --resource-group $ResourceGroup --setting-names VITE_API_BASE_URL=$BackendUrl
+az staticwebapp appsettings set --name $StaticWebAppName --resource-group $ResourceGroup --setting-names VITE_API_BASE_URL=$ConfiguredBackendUrl
 
 $StaticWebAppHostname = az staticwebapp show --name $StaticWebAppName --resource-group $ResourceGroup --query defaultHostname -o tsv
 $StaticWebAppUrl = "https://$StaticWebAppHostname"
 
 # Switch the secure backend primary frontend origin to the Static Web App while allowing the current App Service frontend during transition.
-az webapp config appsettings set --resource-group $ResourceGroup --name $BackendAppName --settings FRONTEND_URL=$StaticWebAppUrl FRONTEND_URLS=$AllowedFrontendOriginsValue --output none
+az webapp config appsettings set --resource-group $ResourceGroup --name $BackendAppName --settings BACKEND_URL=$ConfiguredBackendUrl FRONTEND_URL=$ConfiguredFrontendUrl FRONTEND_URLS=$AllowedFrontendOriginsValue --output none
 
 # Show the values needed for final frontend deployment and verification.
-Write-Host "Secure backend URL: $BackendUrl"
+Write-Host "Secure backend validation URL: $BackendValidationUrl"
+Write-Host "Secure backend public URL: $ConfiguredBackendUrl"
 Write-Host "Static Web App URL: $StaticWebAppUrl"
 Write-Host "Next step: assign explicit persisted roles before final admin testing, for example:"
 Write-Host "  cd hotel-booking-backend"

@@ -56,7 +56,8 @@ These items are not fully solved by the Bicep foundation alone:
 
 1. Create or import the Key Vault secrets before backend deployment.
 2. Configure the final production frontend origin in the parameter file.
-	- Keep `https://palazzopinto-web-2603151048.azurewebsites.net` as a temporary additional allowed origin while the existing frontend App Service remains in use.
+	- Use `https://www.palazzopintobnb.com` as the primary origin.
+	- Keep `https://palazzopintobnb.com` and `https://palazzopinto-web-2603151048.azurewebsites.net` as temporary additional allowed origins while transition remains in progress.
 3. Re-point the frontend `VITE_API_BASE_URL` to the new backend hostname during cutover.
 4. Deploy the frontend to Azure Static Web Apps Standard and validate auth/cookie behavior against the backend.
 5. Disable or limit SCM exposure on the production App Services after the deployment flow is finalized.

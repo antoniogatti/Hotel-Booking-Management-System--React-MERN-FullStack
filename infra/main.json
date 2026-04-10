@@ -114,6 +114,13 @@
         "description": "Private DNS zone name for Azure Cosmos DB for MongoDB vCore."
       }
     },
+    "backendUrl": {
+      "type": "string",
+      "defaultValue": "https://api.palazzopintobnb.com",
+      "metadata": {
+        "description": "Public backend URL used for OAuth callbacks and frontend API calls."
+      }
+    },
     "frontendUrl": {
       "type": "string",
       "metadata": {
@@ -354,7 +361,7 @@
           "alwaysOn": true,
           "http20Enabled": true,
           "healthCheckPath": "/api/health",
-          "appSettings": "[concat(createArray(createObject('name', 'NODE_ENV', 'value', 'production'), createObject('name', 'BACKEND_URL', 'value', format('https://{0}', variables('backendDefaultHostname'))), createObject('name', 'FRONTEND_URL', 'value', parameters('frontendUrl')), createObject('name', 'FRONTEND_URLS', 'value', join(parameters('frontendAdditionalOrigins'), ',')), createObject('name', 'MS_ENTRA_TENANT_ID', 'value', parameters('entraTenantId')), createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString), createObject('name', 'WEBSITE_VNET_ROUTE_ALL', 'value', '1'), createObject('name', 'APPINSIGHTS_PROFILERFEATURE_VERSION', 'value', 'disabled'), createObject('name', 'APPINSIGHTS_SNAPSHOTFEATURE_VERSION', 'value', 'disabled'), createObject('name', 'MONGODB_CONNECTION_STRING', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('mongoConnectionStringSecretUri'))), createObject('name', 'JWT_SECRET_KEY', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('jwtSecretKeySecretUri'))), createObject('name', 'CLOUDINARY_CLOUD_NAME', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryCloudNameSecretUri'))), createObject('name', 'CLOUDINARY_API_KEY', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryApiKeySecretUri'))), createObject('name', 'CLOUDINARY_API_SECRET', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryApiSecretSecretUri'))), createObject('name', 'MS_ENTRA_CLIENT_ID', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('entraClientIdSecretUri'))), createObject('name', 'MS_ENTRA_CLIENT_SECRET', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('entraClientSecretSecretUri')))), parameters('backendExtraAppSettings'))]"
+          "appSettings": "[concat(createArray(createObject('name', 'NODE_ENV', 'value', 'production'), createObject('name', 'BACKEND_URL', 'value', parameters('backendUrl')), createObject('name', 'FRONTEND_URL', 'value', parameters('frontendUrl')), createObject('name', 'FRONTEND_URLS', 'value', join(parameters('frontendAdditionalOrigins'), ',')), createObject('name', 'MS_ENTRA_TENANT_ID', 'value', parameters('entraTenantId')), createObject('name', 'APPLICATIONINSIGHTS_CONNECTION_STRING', 'value', reference(resourceId('Microsoft.Insights/components', parameters('applicationInsightsName')), '2020-02-02').ConnectionString), createObject('name', 'WEBSITE_VNET_ROUTE_ALL', 'value', '1'), createObject('name', 'APPINSIGHTS_PROFILERFEATURE_VERSION', 'value', 'disabled'), createObject('name', 'APPINSIGHTS_SNAPSHOTFEATURE_VERSION', 'value', 'disabled'), createObject('name', 'MONGODB_CONNECTION_STRING', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('mongoConnectionStringSecretUri'))), createObject('name', 'JWT_SECRET_KEY', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('jwtSecretKeySecretUri'))), createObject('name', 'CLOUDINARY_CLOUD_NAME', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryCloudNameSecretUri'))), createObject('name', 'CLOUDINARY_API_KEY', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryApiKeySecretUri'))), createObject('name', 'CLOUDINARY_API_SECRET', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('cloudinaryApiSecretSecretUri'))), createObject('name', 'MS_ENTRA_CLIENT_ID', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('entraClientIdSecretUri'))), createObject('name', 'MS_ENTRA_CLIENT_SECRET', 'value', format('@Microsoft.KeyVault(SecretUri={0})', parameters('entraClientSecretSecretUri')))), parameters('backendExtraAppSettings'))]"
         }
       },
       "tags": "[union(parameters('tags'), createObject('workload', 'hotel-booking-backend', 'securityBaseline', 'phase-1-4'))]",

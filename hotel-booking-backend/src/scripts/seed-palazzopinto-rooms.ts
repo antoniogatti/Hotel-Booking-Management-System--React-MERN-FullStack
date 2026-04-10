@@ -7,7 +7,7 @@ import Booking from "../models/booking";
 import BookingDayStatus from "../models/booking-day-status";
 import Hotel from "../models/hotel";
 
-const PALAZZO_SITE_URL = "https://palazzopinto-web-2603151048.azurewebsites.net/";
+const PALAZZO_SITE_URL = "https://palazzopintobnb.com/";
 
 const PALAZZO_BASE = {
   userId: "palazzopintobnb-owner",

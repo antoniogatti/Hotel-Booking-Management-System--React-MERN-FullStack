@@ -45,6 +45,9 @@ param privateEndpointSubnetPrefix string = '10.42.0.64/26'
 @description('Private DNS zone name for Azure Cosmos DB for MongoDB vCore.')
 param mongoPrivateDnsZoneName string = 'privatelink.mongocluster.cosmos.azure.com'
 
+@description('Public backend URL used for OAuth callbacks and frontend API calls.')
+param backendUrl string = 'https://api.palazzopintobnb.com'
+
 @description('Primary frontend origin allowed to call the backend API.')
 param frontendUrl string
 
@@ -84,7 +87,6 @@ param tags object = {}
 var keyVaultSecretsUserRoleId = subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '4633458b-17de-408a-b874-0445c86b69e6')
 var appServiceIntegrationSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', virtualNetworkName, appServiceIntegrationSubnetName)
 var privateEndpointSubnetId = resourceId('Microsoft.Network/virtualNetworks/subnets', virtualNetworkName, privateEndpointSubnetName)
-var backendDefaultHostname = '${backendAppName}.azurewebsites.net'
 
 resource mongoCluster 'Microsoft.DocumentDB/mongoClusters@2025-09-01' existing = {
   name: mongoClusterName
@@ -239,7 +241,7 @@ resource backendSite 'Microsoft.Web/sites@2024-04-01' = {
         }
         {
           name: 'BACKEND_URL'
-          value: 'https://${backendDefaultHostname}'
+          value: backendUrl
         }
         {
           name: 'FRONTEND_URL'
