@@ -390,8 +390,8 @@ const Booking = () => {
               <p><strong>Room:</strong> {roomDisplayName}</p>
             </div>
             <div className="border-t pt-3 text-sm text-slate-700 space-y-1">
-              <p className="flex justify-between"><span>Price Summary</span><span>EUR {hotel.pricePerNight * nights}</span></p>
-              <p className="flex justify-between font-semibold text-base"><span>Total Price</span><span>EUR {hotel.pricePerNight * nights}</span></p>
+              <p className="flex justify-between"><span>Price Summary</span><span>€{hotel.pricePerNight * nights}</span></p>
+              <p className="flex justify-between font-semibold text-base"><span>Total Price</span><span>€{hotel.pricePerNight * nights}</span></p>
             </div>
           </div>
         </aside>

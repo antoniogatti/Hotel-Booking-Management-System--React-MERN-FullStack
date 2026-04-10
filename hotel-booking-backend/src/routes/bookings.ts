@@ -133,6 +133,24 @@ const calculateCityTax = (booking: {
   return Number((taxableDays * guests * 2.5).toFixed(2));
 };
 
+const getOverlappingNightCount = (params: {
+  start: string | Date;
+  end: string | Date;
+  rangeStart: Date;
+  rangeEnd: Date;
+}) => {
+  const stayStart = new Date(params.start);
+  const stayEnd = new Date(params.end);
+  const overlapStart = new Date(Math.max(stayStart.getTime(), params.rangeStart.getTime()));
+  const overlapEnd = new Date(Math.min(stayEnd.getTime(), params.rangeEnd.getTime()));
+
+  if (overlapEnd.getTime() <= overlapStart.getTime()) {
+    return 0;
+  }
+
+  return Math.ceil((overlapEnd.getTime() - overlapStart.getTime()) / 86400000);
+};
+
 const toImportedEventResponse = (event: any, hotel?: any) => ({
   _id: String(event._id),
   reservationNumber: event.externalUid,
@@ -141,8 +159,8 @@ const toImportedEventResponse = (event: any, hotel?: any) => ({
   lastName: event.lastName || "",
   email: event.email || "",
   phone: event.phone || "",
-  city: hotel?.city || "",
-  country: hotel?.country || "",
+  city: event.city || hotel?.city || "",
+  country: event.country || hotel?.country || "",
   adultCount: Number(event.adultCount || 0),
   childCount: Number(event.childCount || 0),
   nationality: event.nationality || "",
@@ -151,6 +169,7 @@ const toImportedEventResponse = (event: any, hotel?: any) => ({
   totalCost: Number(event.totalCost || 0),
   specialRequests: event.specialRequests || "",
   checkInInfo: event.checkInInfo,
+  excelSync: event.excelSync,
   status: "imported",
   source: BOOKING_COM_SOURCE,
   sourceLabel: "Booking.com",
@@ -160,6 +179,109 @@ const toImportedEventResponse = (event: any, hotel?: any) => ({
   createdAt: event.createdAt,
   updatedAt: event.updatedAt,
 });
+
+const applyExcelSyncToRecord = (params: {
+  record: any;
+  matchedRow: {
+    rowNumber: number;
+    guestName: string;
+    room: string;
+    date: string;
+    country: string;
+    city: string;
+    pax?: number;
+    totalPrice?: number;
+    unitPrice?: number;
+    netPrice?: number;
+    paymentVia: string;
+    invoiceNumber: string;
+    identifier: string;
+    raw: Record<string, string | number | null>;
+  };
+  syncWorkbook: {
+    itemId?: string;
+    sheetName?: string;
+  };
+  guestName: {
+    firstName: string;
+    lastName: string;
+  };
+  existingCheckInInfo?: any;
+  fallback: {
+    phone?: string;
+    email?: string;
+    nationality?: string;
+    arrivalTime?: string;
+  };
+}) => {
+  const { record, matchedRow, syncWorkbook, guestName, existingCheckInInfo, fallback } = params;
+  const previousTotalCost = Number(record.totalCost || 0);
+
+  if (guestName.firstName) {
+    record.firstName = guestName.firstName;
+  }
+  if (guestName.lastName) {
+    record.lastName = guestName.lastName;
+  }
+  if (matchedRow.city) {
+    record.city = matchedRow.city;
+  }
+  if (matchedRow.country) {
+    record.country = matchedRow.country;
+    record.nationality = matchedRow.country;
+  }
+  if (typeof matchedRow.pax === "number" && matchedRow.pax > 0) {
+    record.adultCount = matchedRow.pax;
+    record.childCount = 0;
+  }
+  if (typeof matchedRow.totalPrice === "number" && matchedRow.totalPrice > 0) {
+    record.totalCost = matchedRow.totalPrice;
+  }
+
+  record.checkInInfo = {
+    arrivalTime: existingCheckInInfo?.arrivalTime || fallback.arrivalTime || "",
+    phone: existingCheckInInfo?.phone || fallback.phone || "",
+    email: existingCheckInInfo?.email || fallback.email || "",
+    nationality: existingCheckInInfo?.nationality || fallback.nationality || matchedRow.country || "",
+    bookingChannel: existingCheckInInfo?.bookingChannel || "",
+    paymentDetails: matchedRow.paymentVia || existingCheckInInfo?.paymentDetails || "",
+    specialNotes: existingCheckInInfo?.specialNotes || "",
+    documents: existingCheckInInfo?.documents || [],
+    cityTax: existingCheckInInfo?.cityTax || 0,
+    checkedInAt: existingCheckInInfo?.checkedInAt,
+  };
+
+  record.excelSync = {
+    lastSyncedAt: new Date(),
+    sheetName: syncWorkbook.sheetName,
+    workbookItemId: syncWorkbook.itemId,
+    matchedRowNumber: matchedRow.rowNumber,
+    matchedRoom: matchedRow.room,
+    matchedDate: new Date(`${matchedRow.date}T00:00:00.000Z`),
+    guestName: matchedRow.guestName,
+    invoiceNumber: matchedRow.invoiceNumber,
+    identifier: matchedRow.identifier,
+    paymentVia: matchedRow.paymentVia,
+    pax: matchedRow.pax,
+    totalPrice: matchedRow.totalPrice,
+    unitPrice: matchedRow.unitPrice,
+    netPrice: matchedRow.netPrice,
+    city: matchedRow.city,
+    country: matchedRow.country,
+    raw: matchedRow.raw,
+  };
+
+  const priceChanged =
+    typeof matchedRow.totalPrice === "number" &&
+    matchedRow.totalPrice > 0 &&
+    previousTotalCost > 0 &&
+    Number(previousTotalCost.toFixed(2)) !== Number(matchedRow.totalPrice.toFixed(2));
+
+  return {
+    priceChanged,
+    previousTotalCost,
+  };
+};
 
 // List rooms available for bookings management (admin: all, owner: own rooms)
 router.get(
@@ -709,12 +831,19 @@ router.post(
   requireRole("hotel_owner", "admin"),
   async (req: Request, res: Response) => {
     try {
-      const booking = await Booking.findById(req.params.id);
+      let booking = await Booking.findById(req.params.id);
+      let importedEvent: any = null;
+
       if (!booking) {
+        importedEvent = await ExternalCalendarEvent.findById(req.params.id);
+      }
+
+      if (!booking && !importedEvent) {
         return res.status(404).json({ message: "Booking not found" });
       }
 
-      const accessCheck = await getAccessibleHotel(String(booking.hotelId), req);
+      const targetHotelId = String(booking ? booking.hotelId : importedEvent.hotelId);
+      const accessCheck = await getAccessibleHotel(targetHotelId, req);
       if (accessCheck.error) {
         return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
       }
@@ -746,7 +875,13 @@ router.post(
 
       const syncResult = await syncBookingFromExcel({
         accessToken: graphAccessToken,
-        booking,
+        booking: booking
+          ? booking
+          : {
+              firstName: importedEvent.firstName || "",
+              lastName: importedEvent.lastName || "",
+              checkIn: importedEvent.startDate,
+            },
         hotel: {
           name: accessCheck.hotel?.name,
           slug: accessCheck.hotel?.slug,
@@ -758,71 +893,45 @@ router.post(
       }
 
       const matchedRow = syncResult.row;
-      if (matchedRow.city) {
-        booking.city = matchedRow.city;
-      }
-      if (matchedRow.country) {
-        booking.country = matchedRow.country;
-        booking.nationality = matchedRow.country;
-      }
-      if (typeof matchedRow.totalPrice === "number" && matchedRow.totalPrice > 0) {
-        booking.totalCost = matchedRow.totalPrice;
-      }
+      const targetRecord = booking || importedEvent;
+      const applyResult = applyExcelSyncToRecord({
+        record: targetRecord,
+        matchedRow,
+        syncWorkbook: syncResult.workbook,
+        guestName: syncResult.guestName,
+        existingCheckInInfo: targetRecord.checkInInfo,
+        fallback: {
+          phone: targetRecord.phone,
+          email: targetRecord.email,
+          nationality: targetRecord.nationality,
+          arrivalTime: booking?.arrivalTime,
+        },
+      });
 
-      booking.checkInInfo = {
-        arrivalTime: booking.checkInInfo?.arrivalTime || booking.arrivalTime || "",
-        phone: booking.checkInInfo?.phone || booking.phone || "",
-        email: booking.checkInInfo?.email || booking.email || "",
-        nationality:
-          booking.checkInInfo?.nationality || booking.nationality || matchedRow.country || "",
-        bookingChannel: booking.checkInInfo?.bookingChannel || "",
-        paymentDetails: matchedRow.paymentVia || booking.checkInInfo?.paymentDetails || "",
-        specialNotes: booking.checkInInfo?.specialNotes || "",
-        documents: booking.checkInInfo?.documents || [],
-        cityTax: booking.checkInInfo?.cityTax || 0,
-        checkedInAt: booking.checkInInfo?.checkedInAt,
-      };
-      booking.excelSync = {
-        lastSyncedAt: new Date(),
-        sheetName: syncResult.workbook.sheetName,
-        workbookItemId: syncResult.workbook.itemId,
-        matchedRowNumber: matchedRow.rowNumber,
-        matchedRoom: matchedRow.room,
-        matchedDate: new Date(`${matchedRow.date}T00:00:00.000Z`),
-        guestName: matchedRow.guestName,
-        invoiceNumber: matchedRow.invoiceNumber,
-        identifier: matchedRow.identifier,
-        paymentVia: matchedRow.paymentVia,
-        pax: matchedRow.pax,
-        totalPrice: matchedRow.totalPrice,
-        unitPrice: matchedRow.unitPrice,
-        netPrice: matchedRow.netPrice,
-        city: matchedRow.city,
-        country: matchedRow.country,
-        raw: matchedRow.raw,
-      };
-
-      await booking.save();
+      await targetRecord.save();
 
       await recordAuditEvent({
         action: "booking.excel-sync.completed",
-        entityType: "booking",
-        entityId: String(booking._id),
-        hotelId: String(booking.hotelId),
+        entityType: booking ? "booking" : "external_booking",
+        entityId: String(targetRecord._id),
+        hotelId: String(targetHotelId),
         actorId: req.userId,
         actorRole: req.userRole,
         req,
         metadata: {
-          reservationNumber: booking.reservationNumber,
+          reservationNumber: booking?.reservationNumber || importedEvent?.externalUid,
           matchedRowNumber: matchedRow.rowNumber,
           matchedRoom: matchedRow.room,
           matchedDate: matchedRow.date,
+          priceChanged: applyResult.priceChanged,
+          previousTotalCost: applyResult.previousTotalCost,
+          newTotalCost: matchedRow.totalPrice,
         },
       });
 
       return res.status(200).json({
         message: "Excel booking data synced successfully",
-        booking,
+        booking: booking ? booking : toImportedEventResponse(importedEvent, accessCheck.hotel),
         matchedRow: {
           rowNumber: matchedRow.rowNumber,
           guestName: matchedRow.guestName,
@@ -831,6 +940,9 @@ router.post(
           paymentVia: matchedRow.paymentVia,
           totalPrice: matchedRow.totalPrice,
         },
+        warning: applyResult.priceChanged
+          ? `Excel total price replaced the stored value (${applyResult.previousTotalCost} -> ${matchedRow.totalPrice}).`
+          : undefined,
       });
     } catch (error) {
       logError("Unable to sync booking from Excel", error, {
@@ -839,6 +951,147 @@ router.post(
         actorId: req.userId,
       });
       return res.status(500).json({ message: "Unable to sync booking from Excel" });
+    }
+  }
+);
+
+router.put(
+  "/:id",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  async (req: Request, res: Response) => {
+    try {
+      const firstName = String(req.body.firstName || "").trim();
+      const lastName = String(req.body.lastName || "").trim();
+      const email = String(req.body.email || "").trim();
+      const phone = String(req.body.phone || "").trim();
+      const nationality = String(req.body.nationality || "").trim();
+      const specialRequests = String(req.body.specialRequests || "").trim();
+      const adultCount = Math.max(0, Number(req.body.adultCount ?? 0));
+      const childCount = Math.max(0, Number(req.body.childCount ?? 0));
+
+      if (!firstName || !lastName) {
+        return res.status(400).json({ message: "First name and last name are required." });
+      }
+
+      if (adultCount + childCount < 1) {
+        return res.status(400).json({ message: "At least one guest is required." });
+      }
+
+      const booking = await Booking.findById(req.params.id);
+
+      if (booking) {
+        const accessCheck = await getAccessibleHotel(booking.hotelId, req);
+        if (accessCheck.error) {
+          return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+        }
+
+        if (!email) {
+          return res.status(400).json({ message: "Email is required for direct bookings." });
+        }
+
+        booking.firstName = firstName;
+        booking.lastName = lastName;
+        booking.email = email;
+        booking.phone = phone;
+        booking.nationality = nationality;
+        booking.specialRequests = specialRequests;
+        booking.adultCount = adultCount;
+        booking.childCount = childCount;
+
+        if (booking.checkInInfo) {
+          booking.checkInInfo.phone = phone;
+          booking.checkInInfo.email = email;
+          booking.checkInInfo.nationality = nationality;
+        }
+
+        await booking.save();
+
+        await recordAuditEvent({
+          action: "booking.updated",
+          entityType: "booking",
+          entityId: String(booking._id),
+          hotelId: String(booking.hotelId),
+          actorId: req.userId,
+          actorRole: req.userRole,
+          req,
+          metadata: {
+            reservationNumber: booking.reservationNumber,
+            fields: [
+              "firstName",
+              "lastName",
+              "email",
+              "phone",
+              "nationality",
+              "specialRequests",
+              "adultCount",
+              "childCount",
+            ],
+          },
+        });
+
+        return res.status(200).json(booking);
+      }
+
+      const importedEvent = await ExternalCalendarEvent.findById(req.params.id);
+      if (!importedEvent) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const accessCheck = await getAccessibleHotel(importedEvent.hotelId, req);
+      if (accessCheck.error) {
+        return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+      }
+
+      importedEvent.firstName = firstName;
+      importedEvent.lastName = lastName;
+      importedEvent.email = email;
+      importedEvent.phone = phone;
+      importedEvent.nationality = nationality;
+      importedEvent.specialRequests = specialRequests;
+      importedEvent.adultCount = adultCount;
+      importedEvent.childCount = childCount;
+
+      if (importedEvent.checkInInfo) {
+        importedEvent.checkInInfo.phone = phone;
+        importedEvent.checkInInfo.email = email;
+        importedEvent.checkInInfo.nationality = nationality;
+      }
+
+      await importedEvent.save();
+
+      await recordAuditEvent({
+        action: "booking.updated",
+        entityType: "external_booking",
+        entityId: String(importedEvent._id),
+        hotelId: String(importedEvent.hotelId),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          reservationNumber: importedEvent.externalUid,
+          source: "booking_com",
+          fields: [
+            "firstName",
+            "lastName",
+            "email",
+            "phone",
+            "nationality",
+            "specialRequests",
+            "adultCount",
+            "childCount",
+          ],
+        },
+      });
+
+      return res.status(200).json(toImportedEventResponse(importedEvent, accessCheck.hotel));
+    } catch (error) {
+      logError("Unable to update booking details", error, {
+        route: "bookings.update-details",
+        bookingId: req.params.id,
+        actorId: req.userId,
+      });
+      return res.status(500).json({ message: "Unable to update booking details" });
     }
   }
 );
@@ -1209,7 +1462,7 @@ router.get(
     query("hotelId").optional().isString().withMessage("Hotel ID must be a string"),
     query("status")
       .optional()
-      .isIn(["pending", "confirmed", "arrived", "completed", "cancelled", "refunded"])
+      .isIn(["pending", "confirmed", "arrived", "completed", "cancelled", "refunded", "imported"])
       .withMessage("Invalid status filter"),
   ],
   async (req: Request, res: Response) => {
@@ -1238,6 +1491,9 @@ router.get(
 
       // Get all accessible hotels
       const hotels = await Hotel.find(hotelQuery).select("_id name city country");
+      const hotelNameById = new Map(
+        hotels.map((hotel) => [String(hotel._id), hotel.name])
+      );
 
       // Build date range
       let dateStart, dateEnd;
@@ -1263,6 +1519,54 @@ router.get(
       }).select(
         "hotelId status checkIn checkOut reservationNumber firstName lastName email phone nationality adultCount childCount createdAt"
       );
+      const importedEvents = await ExternalCalendarEvent.find({
+        hotelId: { $in: hotelIds },
+        status: "active",
+        $or: [
+          { startDate: { $gte: dateStart, $lt: dateEnd } },
+          {
+            endDate: { $gt: dateStart, $lte: dateEnd },
+            startDate: { $lt: dateEnd },
+          },
+        ],
+      }).select(
+        "hotelId externalUid firstName lastName email phone nationality startDate endDate adultCount childCount createdAt"
+      );
+
+      const dashboardBookings = [
+        ...bookings.map((booking) => ({
+          _id: String(booking._id),
+          hotelId: String(booking.hotelId),
+          hotelName: hotelNameById.get(String(booking.hotelId)) || "Unknown room",
+          reservationNumber: booking.reservationNumber || "N/A",
+          firstName: booking.firstName,
+          lastName: booking.lastName,
+          email: booking.email,
+          phone: booking.phone,
+          nationality: booking.nationality || "Unknown",
+          status: booking.status || "pending",
+          checkIn: booking.checkIn,
+          checkOut: booking.checkOut,
+          guests: (booking.adultCount || 0) + (booking.childCount || 0),
+          createdAt: booking.createdAt,
+        })),
+        ...importedEvents.map((event) => ({
+          _id: String(event._id),
+          hotelId: String(event.hotelId),
+          hotelName: hotelNameById.get(String(event.hotelId)) || "Unknown room",
+          reservationNumber: event.externalUid || "N/A",
+          firstName: event.firstName || "",
+          lastName: event.lastName || "",
+          email: event.email || "",
+          phone: event.phone || "",
+          nationality: event.nationality || "Unknown",
+          status: "imported",
+          checkIn: event.startDate,
+          checkOut: event.endDate,
+          guests: (event.adultCount || 0) + (event.childCount || 0),
+          createdAt: event.createdAt,
+        })),
+      ];
 
       // Calculate available nights for occupancy
       const totalDays = Math.ceil(
@@ -1271,17 +1575,18 @@ router.get(
       const availableNights = totalDays * hotelIds.length;
 
       // Calculate booked nights (excluding cancelled/refunded)
-      const bookedNights = bookings
+      const bookedNights = dashboardBookings
         .filter((b) => {
           const status = b.status || "pending";
           return status !== "cancelled" && status !== "refunded";
         })
         .reduce((sum, b) => {
-          const checkIn = new Date(b.checkIn);
-          const checkOut = new Date(b.checkOut);
-          const nights = Math.ceil(
-            (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
-          );
+          const nights = getOverlappingNightCount({
+            start: b.checkIn,
+            end: b.checkOut,
+            rangeStart: dateStart,
+            rangeEnd: dateEnd,
+          });
           return sum + nights;
         }, 0);
 
@@ -1290,7 +1595,7 @@ router.get(
 
       // Build results grouped by hotel
       const results = hotels.map((hotel) => {
-        const hotelBookings = bookings.filter((b) =>
+        const hotelBookings = dashboardBookings.filter((b) =>
           b.hotelId.toString() === hotel._id.toString()
         );
 
@@ -1301,6 +1606,7 @@ router.get(
           completed: 0,
           cancelled: 0,
           refunded: 0,
+          imported: 0,
         };
 
         hotelBookings.forEach((booking) => {
@@ -1330,11 +1636,12 @@ router.get(
         completed: results.reduce((sum, h) => sum + h.statusCounts.completed, 0),
         cancelled: results.reduce((sum, h) => sum + h.statusCounts.cancelled, 0),
         refunded: results.reduce((sum, h) => sum + h.statusCounts.refunded, 0),
+        imported: results.reduce((sum, h) => sum + h.statusCounts.imported, 0),
         total: results.reduce((sum, h) => sum + h.totalBookings, 0),
       };
 
       // Get top nationalities
-      const nationalityStats = bookings
+      const nationalityStats = dashboardBookings
         .filter((b) => b.nationality) // Only count bookings with nationality data
         .reduce(
           (acc, b) => {
@@ -1351,21 +1658,7 @@ router.get(
         .map(([nationality, count]) => ({ nationality, count }));
 
       // Filter bookings by status if requested
-      let detailedBookings = bookings.map((b) => ({
-        _id: b._id.toString(),
-        hotelId: b.hotelId.toString(),
-        reservationNumber: b.reservationNumber || "N/A",
-        firstName: b.firstName,
-        lastName: b.lastName,
-        email: b.email,
-        phone: b.phone,
-        nationality: b.nationality || "Unknown",
-        status: b.status || "pending",
-        checkIn: b.checkIn,
-        checkOut: b.checkOut,
-        guests: (b.adultCount || 0) + (b.childCount || 0),
-        createdAt: b.createdAt,
-      }));
+      let detailedBookings = dashboardBookings;
 
       if (statusFilter) {
         detailedBookings = detailedBookings.filter((b) => b.status === statusFilter);

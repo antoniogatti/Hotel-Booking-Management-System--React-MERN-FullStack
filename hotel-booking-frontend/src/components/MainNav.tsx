@@ -18,7 +18,7 @@ const navLinkClass =
   "flex items-center text-[#2b4463] hover:text-[#ea836c] px-4 py-2 rounded-lg font-medium hover:bg-[#eef1e7] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-white";
 
 const MainNav = () => {
-  const { isLoggedIn, userRole } = useAppContext();
+  const { isLoggedIn, userRole, isOwnerOrAdmin } = useAppContext();
 
   return (
     <nav className="flex items-center gap-1 lg:gap-2">
@@ -40,6 +40,12 @@ const MainNav = () => {
       <Link to="/reach-us" className={navLinkClass}>
         Reach Us
       </Link>
+
+      {isOwnerOrAdmin && (
+        <Link to="/booking-dashboard" className={navLinkClass}>
+          Dashboard
+        </Link>
+      )}
 
       {userRole === "admin" && (
         <>

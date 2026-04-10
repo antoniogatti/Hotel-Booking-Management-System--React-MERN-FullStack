@@ -38,6 +38,7 @@ type DashboardData = {
       completed: number;
       cancelled: number;
       refunded: number;
+      imported: number;
     };
   }>;
   totals: {
@@ -47,6 +48,7 @@ type DashboardData = {
     completed: number;
     cancelled: number;
     refunded: number;
+    imported: number;
     total: number;
   };
   occupancy: {
@@ -61,6 +63,7 @@ type DashboardData = {
   bookings: Array<{
     _id: string;
     hotelId: string;
+    hotelName: string;
     reservationNumber: string;
     firstName: string;
     lastName: string;
@@ -176,6 +179,15 @@ const BookingDashboard = () => {
       label: "Refunded",
       lightBg: "bg-orange-50",
     },
+    imported: {
+      color: "from-slate-500 to-slate-600",
+      bgColor: "bg-slate-100",
+      textColor: "text-slate-900",
+      borderColor: "border-slate-300",
+      icon: Globe,
+      label: "Imported",
+      lightBg: "bg-slate-50",
+    },
   };
 
   // Sorting function
@@ -215,6 +227,18 @@ const BookingDashboard = () => {
       day: "numeric",
       year: "numeric",
     });
+  };
+
+  const calculateNights = (checkIn: string, checkOut: string) => {
+    const start = new Date(checkIn);
+    const end = new Date(checkOut);
+    const diffInMs = end.getTime() - start.getTime();
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || diffInMs <= 0) {
+      return 0;
+    }
+
+    return Math.ceil(diffInMs / (1000 * 60 * 60 * 24));
   };
 
   return (
@@ -550,6 +574,9 @@ const BookingDashboard = () => {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b-2 border-gray-200 bg-gray-50">
+                          <th className="text-left px-4 py-4 font-bold text-gray-800">
+                            Room
+                          </th>
                           <th
                             className="text-left px-4 py-4 font-bold text-gray-800 cursor-pointer hover:bg-gray-100 transition"
                             onClick={() => {
@@ -734,11 +761,17 @@ const BookingDashboard = () => {
                                 ))}
                             </div>
                           </th>
+                          <th className="text-left px-4 py-4 font-bold text-gray-800">
+                            Nights
+                          </th>
                         </tr>
                       </thead>
                       <tbody>
                         {sortBookings(dashboardData.bookings).map((booking) => (
                           <tr key={booking._id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                            <td className="px-4 py-4 font-medium text-gray-900">
+                              {booking.hotelName}
+                            </td>
                             <td className="px-4 py-4 font-mono font-bold">
                               <Link
                                 to={`/booking/${booking._id}`}
@@ -768,6 +801,11 @@ const BookingDashboard = () => {
                             <td className="px-4 py-4 text-center">
                               <span className="px-3 py-1 bg-teal-100 text-teal-800 font-semibold rounded-full">
                                 {booking.guests}
+                              </span>
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              <span className="px-3 py-1 bg-slate-100 text-slate-800 font-semibold rounded-full">
+                                {calculateNights(booking.checkIn, booking.checkOut)}
                               </span>
                             </td>
                           </tr>

@@ -4,7 +4,6 @@ import {
   ArrowRight,
   BedDouble,
   CalendarClock,
-  CheckCircle2,
   Clock3,
   RefreshCw,
   Shield,
@@ -245,14 +244,14 @@ const AdminPortal = () => {
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
-                          <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
+                          <Link to={`/booking/${row._id}`}>
                             <Button size="sm" className="bg-[#ea836c] hover:bg-[#db755f]">
-                              Start check-in
+                              Update Booking
                             </Button>
                           </Link>
                           <Link to="/admin-portal/check-in">
                             <Button size="sm" variant="secondary">
-                              Open desk
+                              Update Booking
                             </Button>
                           </Link>
                         </div>
@@ -304,9 +303,9 @@ const AdminPortal = () => {
                         <div className={`rounded-full px-3 py-1 text-xs font-semibold ${row.isCheckedIn ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                           {row.isCheckedIn ? "Checked in" : "Needs action"}
                         </div>
-                        <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
+                        <Link to={`/booking/${row._id}`}>
                           <Button size="sm" className="bg-slate-900 hover:bg-slate-800">
-                            Open
+                            Update Booking
                           </Button>
                         </Link>
                       </div>
@@ -370,15 +369,6 @@ const AdminPortal = () => {
                 </Link>
               )}
 
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <div className="flex items-center gap-2 text-slate-900">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <p className="font-semibold">Front-desk focus</p>
-                </div>
-                <p className="mt-2 text-sm text-slate-600">
-                  Manage Rooms is intentionally removed from the quick menu. The portal prioritizes arrivals, active stays, and sync visibility.
-                </p>
-              </div>
             </CardContent>
           </Card>
         </section>

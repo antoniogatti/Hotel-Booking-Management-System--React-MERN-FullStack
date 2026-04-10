@@ -17,6 +17,8 @@ export interface IExternalCalendarEvent extends Document {
   adultCount?: number;
   childCount?: number;
   totalCost?: number;
+  city?: string;
+  country?: string;
   nationality?: string;
   specialRequests?: string;
   dtStamp?: Date;
@@ -33,6 +35,25 @@ export interface IExternalCalendarEvent extends Document {
     checkedInAt?: Date;
   };
   status: ExternalCalendarEventStatus;
+  excelSync?: {
+    lastSyncedAt?: Date;
+    sheetName?: string;
+    workbookItemId?: string;
+    matchedRowNumber?: number;
+    matchedRoom?: string;
+    matchedDate?: Date;
+    guestName?: string;
+    invoiceNumber?: string;
+    identifier?: string;
+    paymentVia?: string;
+    pax?: number;
+    totalPrice?: number;
+    unitPrice?: number;
+    netPrice?: number;
+    city?: string;
+    country?: string;
+    raw?: Record<string, string | number | null>;
+  };
   lastSeenAt: Date;
   rawEvent?: string;
   createdAt: Date;
@@ -60,6 +81,8 @@ const externalCalendarEventSchema = new mongoose.Schema(
     adultCount: { type: Number, default: 0 },
     childCount: { type: Number, default: 0 },
     totalCost: { type: Number, default: 0 },
+    city: { type: String, default: "" },
+    country: { type: String, default: "" },
     nationality: { type: String, default: "" },
     specialRequests: { type: String, default: "" },
     dtStamp: { type: Date },
@@ -81,6 +104,25 @@ const externalCalendarEventSchema = new mongoose.Schema(
       required: true,
       default: "active",
       index: true,
+    },
+    excelSync: {
+      lastSyncedAt: { type: Date },
+      sheetName: { type: String },
+      workbookItemId: { type: String },
+      matchedRowNumber: { type: Number },
+      matchedRoom: { type: String },
+      matchedDate: { type: Date },
+      guestName: { type: String },
+      invoiceNumber: { type: String },
+      identifier: { type: String },
+      paymentVia: { type: String },
+      pax: { type: Number },
+      totalPrice: { type: Number },
+      unitPrice: { type: Number },
+      netPrice: { type: Number },
+      city: { type: String },
+      country: { type: String },
+      raw: { type: mongoose.Schema.Types.Mixed },
     },
     lastSeenAt: { type: Date, required: true, default: Date.now },
     rawEvent: { type: String, default: "" },

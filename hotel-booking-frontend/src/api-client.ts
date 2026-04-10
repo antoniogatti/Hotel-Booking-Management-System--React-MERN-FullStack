@@ -261,6 +261,25 @@ export const fetchBooking = async (bookingId: string): Promise<any> => {
   return response.data;
 };
 
+export type BookingDetailsUpdatePayload = {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  nationality?: string;
+  specialRequests?: string;
+  adultCount?: number;
+  childCount?: number;
+};
+
+export const updateBookingDetails = async (
+  bookingId: string,
+  payload: BookingDetailsUpdatePayload
+) => {
+  const response = await axiosInstance.put(`/api/bookings/${bookingId}`, payload);
+  return response.data;
+};
+
 export const syncBookingFromExcel = async (bookingId: string) => {
   const response = await axiosInstance.post(`/api/bookings/${bookingId}/sync-excel`);
   return response.data;

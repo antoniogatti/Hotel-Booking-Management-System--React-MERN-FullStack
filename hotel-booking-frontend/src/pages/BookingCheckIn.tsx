@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "react-query";
 import {
   ArrowLeft,
   Calendar,
-  DollarSign,
+  Euro,
   Globe,
   Mail,
   MapPin,
@@ -293,12 +293,12 @@ const BookingCheckIn = () => {
           </div>
           <div>
             <p className="text-sm text-gray-600 flex items-center gap-1">
-              <DollarSign className="h-4 w-4" /> Total Due Today
+              <Euro className="h-4 w-4" /> Total Due Today
             </p>
-            <p className="font-semibold text-gray-900">EUR {totalWithCityTax.toFixed(2)}</p>
-            <p className="mt-1 text-xs text-gray-600">Room total: EUR {currentTotalCost.toFixed(2)}</p>
+            <p className="font-semibold text-gray-900">€{totalWithCityTax.toFixed(2)}</p>
+            <p className="mt-1 text-xs text-gray-600">Room total: €{currentTotalCost.toFixed(2)}</p>
             <p className="text-xs text-gray-600">
-              City tax: EUR {cityTax.toFixed(2)} ({taxableDays} day{taxableDays > 1 ? "s" : ""} x {guestCount} guest{guestCount > 1 ? "s" : ""} x EUR 2.50, max 7 days)
+              City tax: €{cityTax.toFixed(2)} ({taxableDays} day{taxableDays > 1 ? "s" : ""} x {guestCount} guest{guestCount > 1 ? "s" : ""} x €2.50, max 7 days)
             </p>
           </div>
           <div>

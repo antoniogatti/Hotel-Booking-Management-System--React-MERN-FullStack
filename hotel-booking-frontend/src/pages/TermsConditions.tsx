@@ -74,8 +74,8 @@ const TermsConditions = () => {
           <section className="space-y-2">
             <h2 className="text-xl font-semibold text-[#2b4463]">6. Local Tax</h2>
             <ul className="list-disc pl-6 space-y-1">
-              <li>Low season (January-March): EUR 1.50 per night, up to 7 nights.</li>
-              <li>High season (April-December): EUR 2.50 per night, up to 7 nights.</li>
+              <li>Low season (January-March): €1.50 per night, up to 7 nights.</li>
+              <li>High season (April-December): €2.50 per night, up to 7 nights.</li>
             </ul>
           </section>
 
@@ -107,7 +107,7 @@ const TermsConditions = () => {
           <section className="space-y-2">
             <h2 className="text-xl font-semibold text-[#2b4463]">9. Keys</h2>
             <p>
-              Guests receive room and access keys. Lost keys incur a EUR 300 charge to replace all
+              Guests receive room and access keys. Lost keys incur a €300 charge to replace all
               relevant locks.
             </p>
           </section>
@@ -150,7 +150,7 @@ const TermsConditions = () => {
             <ul className="list-disc pl-6 space-y-1">
               <li>Noise must be minimized, especially during designated quiet hours.</li>
               <li>
-                Smoking is prohibited indoors; evidence of indoor smoking may incur a EUR 250 cleaning
+                Smoking is prohibited indoors; evidence of indoor smoking may incur a €250 cleaning
                 fee.
               </li>
               <li>Pets are not allowed in the premises.</li>

@@ -27,7 +27,7 @@ import {
   Users,
   Building,
   Calendar,
-  DollarSign,
+  Euro,
   Activity,
   BarChart3,
   RefreshCw,
@@ -162,9 +162,9 @@ const AnalyticsDashboard = () => {
   const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884D8"];
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("it-IT", {
       style: "currency",
-      currency: "USD",
+      currency: "EUR",
     }).format(amount);
   };
 
@@ -308,7 +308,7 @@ const AnalyticsDashboard = () => {
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <div className="flex items-center">
                   <div className="p-2 bg-yellow-100 rounded-lg">
-                    <DollarSign className="w-6 h-6 text-yellow-600" />
+                    <Euro className="w-6 h-6 text-yellow-600" />
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">

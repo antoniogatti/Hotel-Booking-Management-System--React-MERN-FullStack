@@ -749,7 +749,7 @@ const ManageBookings = () => {
                             <p className="text-xs text-gray-700">Updated: {formatDateLabel(String(booking.dtStamp))}</p>
                           )}
                           <p className="mt-1 text-xs font-semibold text-gray-900">
-                            {booking.status === "Imported" ? "Imported block" : `EUR ${booking.totalCost}`}
+                            {booking.status === "Imported" ? "Imported block" : `€${booking.totalCost}`}
                           </p>
 
                           {booking.status === "Imported" && (
@@ -875,7 +875,7 @@ const ManageBookings = () => {
                           <Badge className={STATUS_STYLES[booking.status]}>{booking.status}</Badge>
                         </td>
                         <td className="px-2 py-3 font-semibold text-gray-900">
-                          {booking.status === "Imported" ? "Imported block" : `EUR ${booking.totalCost}`}
+                          {booking.status === "Imported" ? "Imported block" : `€${booking.totalCost}`}
                         </td>
                         <td className="px-2 py-3">
                           {booking.status === "Imported" ? (

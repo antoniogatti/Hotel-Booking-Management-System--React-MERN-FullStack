@@ -22,8 +22,9 @@ import {
 } from "lucide-react";
 import { BookingType } from "../../../shared/types";
 
-interface BookingDetailsResponse extends BookingType {
+interface BookingDetailsResponse extends Omit<BookingType, "status"> {
   hotelId: any;
+  status?: BookingType["status"] | "imported";
 }
 
 const BookingDetails = () => {
@@ -37,6 +38,7 @@ const BookingDetails = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [excelSyncMessage, setExcelSyncMessage] = useState<string | null>(null);
   const [excelSyncError, setExcelSyncError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<BookingDetailsResponse>>({});
 
@@ -93,35 +95,48 @@ const BookingDetails = () => {
       icon: Flag,
       badge: "bg-orange-100 text-orange-900",
     },
+    imported: {
+      label: "Imported",
+      color: "slate",
+      icon: Calendar,
+      badge: "bg-slate-100 text-slate-900",
+    },
   };
 
-  const currentStatus = (booking?.status || "pending") as keyof typeof statusConfig;
+  const currentStatus =
+    booking?.status && booking.status in statusConfig
+      ? (booking.status as keyof typeof statusConfig)
+      : "pending";
   const config = statusConfig[currentStatus];
   const StatusIcon = config.icon;
 
   // Mutations
   const updateBookingMutation = useMutation(
-    (data: any) =>
-      fetch(`/api/bookings/${bookingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }).then((res) => res.json()),
+    (data: apiClient.BookingDetailsUpdatePayload) =>
+      apiClient.updateBookingDetails(bookingId || "", data),
     {
       onSuccess: () => {
+        setSaveError(null);
         queryClient.invalidateQueries(["bookingDetails", bookingId]);
         setIsEditing(false);
+      },
+      onError: (mutationError: any) => {
+        setSaveError(
+          mutationError?.response?.data?.message ||
+            mutationError?.response?.data?.reason ||
+            "Unable to save booking changes"
+        );
       },
     }
   );
 
   const makeDecisionMutation = useMutation(
     (data: { action: "confirm" | "reject"; reason?: string }) =>
-      fetch(`/api/bookings/${bookingId}/decision`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      }).then((res) => res.json()),
+      apiClient.processRequestedBooking({
+        bookingId: bookingId || "",
+        action: data.action,
+        reason: data.reason,
+      }),
     {
       onSuccess: () => {
         queryClient.invalidateQueries(["bookingDetails", bookingId]);
@@ -136,7 +151,11 @@ const BookingDetails = () => {
     {
       onSuccess: (data) => {
         setExcelSyncError(null);
-        setExcelSyncMessage(data?.message || "Excel data synced");
+        setExcelSyncMessage(
+          data?.warning
+            ? `${data?.message || "Excel data synced"} ${data.warning}`
+            : data?.message || "Excel data synced"
+        );
         queryClient.invalidateQueries(["bookingDetails", bookingId]);
       },
       onError: (mutationError: any) => {
@@ -149,6 +168,35 @@ const BookingDetails = () => {
       },
     }
   );
+
+  const handleGuestCountChange = (field: "adultCount" | "childCount", value: string) => {
+    const nextValue = Number(value);
+
+    setFormData({
+      ...formData,
+      [field]: Number.isNaN(nextValue) ? 0 : Math.max(0, nextValue),
+    });
+  };
+
+  const handleBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/booking-dashboard");
+  };
+
+  const getWhatsAppUrl = (phone?: string) => {
+    const normalized = String(phone || "").replace(/[^\d+]/g, "");
+    const waNumber = normalized.startsWith("+") ? normalized.slice(1) : normalized;
+
+    if (!waNumber) {
+      return null;
+    }
+
+    return `https://wa.me/${waNumber}`;
+  };
 
   const formatDate = (date: string | Date | undefined) => {
     if (!date) return "-";
@@ -177,7 +225,7 @@ const BookingDetails = () => {
       <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
         <div className="max-w-4xl mx-auto">
           <button
-            onClick={() => navigate("/booking-dashboard")}
+            onClick={handleBack}
             className="flex items-center gap-2 text-teal-600 hover:text-teal-700 mb-8"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -202,7 +250,7 @@ const BookingDetails = () => {
         {/* Header */}
         <div className="mb-8">
           <button
-            onClick={() => navigate("/booking-dashboard")}
+            onClick={handleBack}
             className="flex items-center gap-2 text-teal-600 hover:text-teal-700 mb-4"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -244,7 +292,10 @@ const BookingDetails = () => {
                 </CardTitle>
                 {!isEditing && (
                   <button
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => {
+                      setSaveError(null);
+                      setIsEditing(true);
+                    }}
                     className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-teal-600 hover:bg-teal-50 rounded-lg transition"
                   >
                     <Edit className="h-4 w-4" />
@@ -254,6 +305,11 @@ const BookingDetails = () => {
               </div>
             </CardHeader>
             <CardContent>
+              {saveError && (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {saveError}
+                </div>
+              )}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -325,7 +381,19 @@ const BookingDetails = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
                     />
                   ) : (
-                    <p className="text-gray-900 font-medium">{booking.phone || "-"}</p>
+                    <div className="space-y-1">
+                      <p className="text-gray-900 font-medium">{booking.phone || "-"}</p>
+                      {getWhatsAppUrl(booking.phone) && (
+                        <a
+                          href={getWhatsAppUrl(booking.phone) || undefined}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center text-sm font-medium text-emerald-700 hover:text-emerald-800"
+                        >
+                          Open in WhatsApp
+                        </a>
+                      )}
+                    </div>
                   )}
                 </div>
 
@@ -351,10 +419,39 @@ const BookingDetails = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Guests
                   </label>
-                  <p className="text-gray-900 font-medium">
-                    {booking.adultCount} Adult{booking.adultCount !== 1 ? "s" : ""},{" "}
-                    {booking.childCount} Child{booking.childCount !== 1 ? "ren" : ""}
-                  </p>
+                  {isEditing ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Adults
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.adultCount ?? 0}
+                          onChange={(e) => handleGuestCountChange("adultCount", e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="mb-2 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Children
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={formData.childCount ?? 0}
+                          onChange={(e) => handleGuestCountChange("childCount", e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-teal-500"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-gray-900 font-medium">
+                      {booking.adultCount} Adult{booking.adultCount !== 1 ? "s" : ""},{" "}
+                      {booking.childCount} Child{booking.childCount !== 1 ? "ren" : ""}
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -393,17 +490,6 @@ const BookingDetails = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Hotel
-                  </label>
-                  <p className="text-gray-900 font-medium">
-                    {typeof booking.hotelId === "object"
-                      ? booking.hotelId.name
-                      : "N/A"}
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Check-in
                   </label>
                   <p className="text-gray-900 font-medium">{formatDate(booking.checkIn)}</p>
@@ -423,7 +509,7 @@ const BookingDetails = () => {
                     Total Cost
                   </label>
                   <p className="text-gray-900 font-bold text-lg">
-                    £{booking.totalCost?.toFixed(2) || "0.00"}
+                    €{booking.totalCost?.toFixed(2) || "0.00"}
                   </p>
                 </div>
 
@@ -636,7 +722,17 @@ const BookingDetails = () => {
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  updateBookingMutation.mutate(formData);
+                  setSaveError(null);
+                  updateBookingMutation.mutate({
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    email: formData.email,
+                    phone: formData.phone,
+                    nationality: formData.nationality,
+                    specialRequests: formData.specialRequests,
+                    adultCount: formData.adultCount ?? booking.adultCount,
+                    childCount: formData.childCount ?? booking.childCount,
+                  });
                 }}
                 disabled={updateBookingMutation.isLoading}
                 className="flex items-center gap-2 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition disabled:opacity-50"
@@ -645,7 +741,11 @@ const BookingDetails = () => {
                 Save Changes
               </button>
               <button
-                onClick={() => setIsEditing(false)}
+                onClick={() => {
+                  setSaveError(null);
+                  setFormData(booking);
+                  setIsEditing(false);
+                }}
                 className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
               >
                 Cancel

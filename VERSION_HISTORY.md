@@ -1,5 +1,22 @@
 # Version History
 
+## 1.9.0 - 2026-04-10
+
+### Booking Operations and Excel Sync
+- Added a dedicated booking update flow for both direct bookings and imported Booking.com bookings, including editable guest/contact fields and guest-count updates on the booking details page.
+- Added manual Excel enrichment support for imported bookings, including traceable matched-row metadata, visible sync feedback, and overwrite warnings when Excel totals replace stored values.
+- Added direct WhatsApp launch from booking details when a guest phone number is present.
+
+### Front-Desk and Dashboard Improvements
+- Updated the admin portal front-desk actions so `Update Booking` opens the booking details page with Excel sync instead of the check-in form.
+- Extended the booking dashboard summary to include imported Booking.com stays in counts, occupancy, nationality stats, and detail rows.
+- Added room and nights columns to the booking dashboard details table to make occupancy calculations easier to verify.
+- Added a `Dashboard` navigation link for owner/admin users and removed the obsolete front-desk focus info card from the admin portal.
+
+### UI and Currency Consistency
+- Standardized visible currency formatting to euro presentation across booking, checkout, analytics, check-in, management, and policy pages.
+- Updated booking details navigation so the back action follows browser history with a dashboard fallback.
+
 ## 1.8.6 - 2026-04-09
 
 ### Local Recommendations Guide

@@ -205,7 +205,7 @@ const Checkout = () => {
             <p><strong>Minimum Stay:</strong> {minimumNights} nights</p>
             <p><strong>Location:</strong> {guestDetails.city}, {guestDetails.country}</p>
             <p><strong>Nationality:</strong> {guestDetails.nationality}</p>
-            <p><strong>Total Price:</strong> EUR {bookingDetails.totalPrice}</p>
+            <p><strong>Total Price:</strong> €{bookingDetails.totalPrice}</p>
           </div>
         </div>
 
