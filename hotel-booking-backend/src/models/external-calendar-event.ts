@@ -30,6 +30,11 @@ export interface IExternalCalendarEvent extends Document {
     bookingChannel?: string;
     paymentDetails?: string;
     specialNotes?: string;
+    breakfast?: {
+      time?: string;
+      savouryCount?: number;
+      sweetCount?: number;
+    };
     documents?: string[];
     cityTax?: number;
     checkedInAt?: Date;
@@ -94,6 +99,11 @@ const externalCalendarEventSchema = new mongoose.Schema(
       bookingChannel: { type: String },
       paymentDetails: { type: String },
       specialNotes: { type: String },
+      breakfast: {
+        time: { type: String },
+        savouryCount: { type: Number, default: 0 },
+        sweetCount: { type: Number, default: 0 },
+      },
       documents: [{ type: String }],
       cityTax: { type: Number, default: 0 },
       checkedInAt: { type: Date },

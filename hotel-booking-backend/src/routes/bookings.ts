@@ -133,6 +133,41 @@ const calculateCityTax = (booking: {
   return Number((taxableDays * guests * 2.5).toFixed(2));
 };
 
+const hasBreakfastService = (hotelName?: string) => {
+  const normalizedName = String(hotelName || "").toLowerCase();
+  return normalizedName.includes("malvasia") || normalizedName.includes("verdeca");
+};
+
+const parseBreakfastInfo = (body: Request["body"], guestCount: number) => {
+  const savouryCount = Math.max(0, Number(body.breakfastSavouryCount ?? 0) || 0);
+  const sweetCount = Math.max(0, Number(body.breakfastSweetCount ?? 0) || 0);
+  const totalCount = savouryCount + sweetCount;
+  const time = String(body.breakfastTime || "").trim();
+
+  if (totalCount > guestCount) {
+    return {
+      error: `Breakfast total cannot exceed ${guestCount} guest${guestCount === 1 ? "" : "s"}.`,
+    };
+  }
+
+  if (totalCount > 0 && !time) {
+    return {
+      error: "Breakfast time is required when breakfast is requested.",
+    };
+  }
+
+  return {
+    value:
+      totalCount > 0 || time
+        ? {
+            time,
+            savouryCount,
+            sweetCount,
+          }
+        : undefined,
+  };
+};
+
 const getOverlappingNightCount = (params: {
   start: string | Date;
   end: string | Date;
@@ -155,6 +190,7 @@ const toImportedEventResponse = (event: any, hotel?: any) => ({
   _id: String(event._id),
   reservationNumber: event.externalUid,
   isImported: true,
+  hotelName: hotel?.name || "",
   firstName: event.firstName || "",
   lastName: event.lastName || "",
   email: event.email || "",
@@ -246,6 +282,7 @@ const applyExcelSyncToRecord = (params: {
     bookingChannel: existingCheckInInfo?.bookingChannel || "",
     paymentDetails: matchedRow.paymentVia || existingCheckInInfo?.paymentDetails || "",
     specialNotes: existingCheckInInfo?.specialNotes || "",
+    breakfast: existingCheckInInfo?.breakfast,
     documents: existingCheckInInfo?.documents || [],
     cityTax: existingCheckInInfo?.cityTax || 0,
     checkedInAt: existingCheckInInfo?.checkedInAt,
@@ -815,7 +852,11 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
       return res.status(403).json({ message: "Access denied" });
     }
 
-    res.status(200).json(booking);
+    const bookingObject = booking.toObject();
+    res.status(200).json({
+      ...bookingObject,
+      hotelName: hotel.name,
+    });
   } catch (error) {
     logError("Unable to fetch booking", error, {
       route: "bookings.detail",
@@ -1246,13 +1287,21 @@ router.post(
         const childCount = Math.max(0, Number(req.body.childCount ?? importedEvent.childCount ?? 0));
         const totalCost = Math.max(0, Number(req.body.totalCost ?? importedEvent.totalCost ?? 0));
         const specialRequests = String(req.body.specialRequests || importedEvent.specialRequests || "").trim();
+        const guestCount = adultCount + childCount;
+        const breakfastInfo = hasBreakfastService(accessCheck.hotel?.name)
+          ? parseBreakfastInfo(req.body, guestCount)
+          : { value: undefined as undefined };
 
         if (!firstName || !lastName) {
           return res.status(400).json({ message: "Guest first name and last name are required for imported bookings." });
         }
 
-        if (adultCount + childCount < 1) {
+        if (guestCount < 1) {
           return res.status(400).json({ message: "At least one guest is required for imported bookings." });
+        }
+
+        if (breakfastInfo.error) {
+          return res.status(400).json({ message: breakfastInfo.error });
         }
 
         const uploadedFiles = ((req as any).files as any[]) || [];
@@ -1294,6 +1343,7 @@ router.post(
           bookingChannel,
           paymentDetails,
           specialNotes: req.body.specialNotes || "",
+          breakfast: breakfastInfo.value,
           documents: mergedDocuments,
           cityTax,
           checkedInAt: new Date(),
@@ -1348,6 +1398,14 @@ router.post(
         adultCount: booking.adultCount,
         childCount: booking.childCount,
       });
+      const guestCount = Math.max(0, booking.adultCount + booking.childCount);
+      const breakfastInfo = hasBreakfastService(accessCheck.hotel?.name)
+        ? parseBreakfastInfo(req.body, guestCount)
+        : { value: undefined as undefined };
+
+      if (breakfastInfo.error) {
+        return res.status(400).json({ message: breakfastInfo.error });
+      }
 
       const existingDocumentsRaw = (req.body.existingDocuments || []) as string | string[];
       const existingDocuments = Array.isArray(existingDocumentsRaw)
@@ -1366,6 +1424,7 @@ router.post(
         bookingChannel: req.body.bookingChannel,
         paymentDetails: req.body.paymentDetails,
         specialNotes: req.body.specialNotes || "",
+        breakfast: breakfastInfo.value,
         documents: mergedDocuments,
         cityTax,
         checkedInAt: new Date(),
@@ -1414,6 +1473,7 @@ router.post(
           cityTax,
           documentCount: mergedDocuments.length,
           specialNotes: req.body.specialNotes,
+          breakfast: breakfastInfo.value,
         });
       } catch (emailError) {
         notificationsSent = false;

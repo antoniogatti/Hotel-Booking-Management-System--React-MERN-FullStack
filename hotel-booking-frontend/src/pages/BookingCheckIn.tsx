@@ -21,6 +21,8 @@ import { formatFriendlyDate } from "../lib/utils";
 
 type BookingDetails = {
   _id: string;
+  hotelName?: string;
+  hotelId?: string | { name?: string };
   reservationNumber?: string;
   isImported?: boolean;
   source?: "local" | "booking_com";
@@ -50,6 +52,11 @@ type BookingDetails = {
     bookingChannel?: string;
     paymentDetails?: string;
     specialNotes?: string;
+    breakfast?: {
+      time?: string;
+      savouryCount?: number;
+      sweetCount?: number;
+    };
     documents?: string[];
     checkedInAt?: string;
   };
@@ -69,6 +76,9 @@ type CheckInFormData = {
   bookingChannel: string;
   paymentDetails: string;
   specialNotes: string;
+  breakfastTime: string;
+  breakfastSavouryCount: number;
+  breakfastSweetCount: number;
   documents: File[];
 };
 
@@ -120,6 +130,9 @@ const BookingCheckIn = () => {
     bookingChannel: "",
     paymentDetails: "",
     specialNotes: "",
+    breakfastTime: "",
+    breakfastSavouryCount: 0,
+    breakfastSweetCount: 0,
     documents: [],
   });
   const [existingDocuments, setExistingDocuments] = useState<string[]>([]);
@@ -159,6 +172,9 @@ const BookingCheckIn = () => {
       bookingChannel: booking.checkInInfo?.bookingChannel || (booking.source === "booking_com" ? "Booking.com" : prev.bookingChannel),
       paymentDetails: booking.checkInInfo?.paymentDetails || prev.paymentDetails,
       specialNotes: booking.checkInInfo?.specialNotes || "",
+      breakfastTime: booking.checkInInfo?.breakfast?.time || "",
+      breakfastSavouryCount: booking.checkInInfo?.breakfast?.savouryCount || 0,
+      breakfastSweetCount: booking.checkInInfo?.breakfast?.sweetCount || 0,
     }));
 
     setExistingDocuments(booking.checkInInfo?.documents || []);
@@ -180,6 +196,9 @@ const BookingCheckIn = () => {
       payload.append("bookingChannel", formData.bookingChannel);
       payload.append("paymentDetails", formData.paymentDetails);
       payload.append("specialNotes", formData.specialNotes);
+      payload.append("breakfastTime", formData.breakfastTime);
+      payload.append("breakfastSavouryCount", String(formData.breakfastSavouryCount));
+      payload.append("breakfastSweetCount", String(formData.breakfastSweetCount));
       existingDocuments.forEach((url) => payload.append("existingDocuments", url));
       formData.documents.forEach((doc) => payload.append("documents", doc));
 
@@ -218,6 +237,10 @@ const BookingCheckIn = () => {
   const mailSubject = encodeURIComponent(
     `Palazzo Pinto Brindisi - ${booking.reservationNumber || "Booking"}`
   );
+  const hotelName = booking.hotelName || (typeof booking.hotelId === "object" ? booking.hotelId?.name || "" : "");
+  const normalizedHotelName = hotelName.toLowerCase();
+  const supportsBreakfast = normalizedHotelName.includes("malvasia") || normalizedHotelName.includes("verdeca");
+  const breakfastTotal = formData.breakfastSavouryCount + formData.breakfastSweetCount;
   const whatsappHref = `https://wa.me/${(formData.phone || "").replace(/\D/g, "")}`;
   const ms = new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime();
   const nights = Math.max(1, Math.ceil(ms / 86400000));
@@ -236,6 +259,12 @@ const BookingCheckIn = () => {
   if (formData.email.trim() && !isValidEmail(formData.email)) {
     missingRequiredFields.push("valid email");
   }
+  if (supportsBreakfast && breakfastTotal > guestCount) {
+    missingRequiredFields.push(`breakfast total must not exceed ${guestCount} guests`);
+  }
+  if (supportsBreakfast && breakfastTotal > 0 && !formData.breakfastTime) {
+    missingRequiredFields.push("breakfast time");
+  }
   const isFormValid = missingRequiredFields.length === 0;
 
   return (
@@ -250,7 +279,9 @@ const BookingCheckIn = () => {
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Guest Check-in</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            Guest Check-in{hotelName ? ` - ${hotelName}` : ""}
+          </h1>
           <p className="text-gray-600">Ref: {booking.reservationNumber || "N/A"}</p>
         </div>
       </div>
@@ -488,16 +519,67 @@ const BookingCheckIn = () => {
             </div>
           </div>
 
-          <div>
-            <label className="text-sm font-semibold text-gray-700">Special Notes</label>
-            <textarea
-              rows={3}
-              value={formData.specialNotes}
-              onChange={(e) => setFormData((prev) => ({ ...prev, specialNotes: e.target.value }))}
-              className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
-              placeholder="Optional notes"
-            />
-          </div>
+          {supportsBreakfast ? (
+            <div className="space-y-4 rounded-lg border border-amber-100 bg-amber-50/70 p-4">
+              <div>
+                <label className="text-sm font-semibold text-gray-700">Breakfast Time</label>
+                <input
+                  type="time"
+                  value={formData.breakfastTime}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, breakfastTime: e.target.value }))}
+                  className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 md:max-w-xs"
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="text-sm font-semibold text-gray-700">Savoury</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={guestCount}
+                    value={formData.breakfastSavouryCount}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        breakfastSavouryCount: Math.max(0, Number(e.target.value) || 0),
+                      }))
+                    }
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-semibold text-gray-700">Sweet</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={guestCount}
+                    value={formData.breakfastSweetCount}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        breakfastSweetCount: Math.max(0, Number(e.target.value) || 0),
+                      }))
+                    }
+                    className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-amber-800">
+                Total breakfasts selected: {breakfastTotal} / {guestCount} guests.
+              </p>
+            </div>
+          ) : (
+            <div>
+              <label className="text-sm font-semibold text-gray-700">Special Notes</label>
+              <textarea
+                rows={3}
+                value={formData.specialNotes}
+                onChange={(e) => setFormData((prev) => ({ ...prev, specialNotes: e.target.value }))}
+                className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2"
+                placeholder="Optional notes"
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 

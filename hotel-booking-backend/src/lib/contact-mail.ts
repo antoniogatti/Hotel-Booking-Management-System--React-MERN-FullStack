@@ -57,6 +57,11 @@ type CheckInNotificationPayload = {
   cityTax: number;
   documentCount: number;
   specialNotes?: string;
+  breakfast?: {
+    time?: string;
+    savouryCount?: number;
+    sweetCount?: number;
+  };
 };
 
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
@@ -372,6 +377,9 @@ const toCheckInAdminHtml = (payload: CheckInNotificationPayload) => {
     <p><strong>Payment Details:</strong> ${escapeHtml(payload.paymentDetails)}</p>
     <p><strong>City Tax:</strong> EUR ${payload.cityTax.toFixed(2)}</p>
     <p><strong>Uploaded Documents:</strong> ${payload.documentCount}</p>
+    <p><strong>Breakfast:</strong> ${payload.breakfast && ((payload.breakfast.savouryCount || 0) + (payload.breakfast.sweetCount || 0) > 0)
+      ? `${escapeHtml(payload.breakfast.time || "Time not set")} | Savoury: ${payload.breakfast.savouryCount || 0}, Sweet: ${payload.breakfast.sweetCount || 0}`
+      : "None"}</p>
     <p><strong>Special Notes:</strong></p>
     <p style="white-space: pre-wrap;">${payload.specialNotes ? escapeHtml(payload.specialNotes) : "None"}</p>
   `;
