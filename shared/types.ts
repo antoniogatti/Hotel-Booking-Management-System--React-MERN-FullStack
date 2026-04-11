@@ -166,6 +166,25 @@ export type BookingType = {
     country?: string;
     raw?: Record<string, string | number | null>;
   };
+  oneNoteSync?: {
+    lastSyncedAt?: Date;
+    matchedPageId?: string;
+    matchedPageTitle?: string;
+    matchedSectionName?: string;
+    room?: string;
+    guestName?: string;
+    arrivalNote?: string;
+    nationality?: string;
+    phone?: string;
+    whatsapp?: string;
+    nights?: number;
+    checkOutNote?: string;
+    bookingSource?: string;
+    paymentNote?: string;
+    amountDueEUR?: number;
+    notes?: string;
+    rawLines?: string[];
+  };
   createdAt?: Date;
   updatedAt?: Date;
 };

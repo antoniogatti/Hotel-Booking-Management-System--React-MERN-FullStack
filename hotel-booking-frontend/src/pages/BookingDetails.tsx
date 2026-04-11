@@ -24,6 +24,7 @@ import { BookingType } from "../../../shared/types";
 
 interface BookingDetailsResponse extends Omit<BookingType, "status"> {
   hotelId: any;
+  hotelName?: string;
   status?: BookingType["status"] | "imported";
 }
 
@@ -38,6 +39,8 @@ const BookingDetails = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [excelSyncMessage, setExcelSyncMessage] = useState<string | null>(null);
   const [excelSyncError, setExcelSyncError] = useState<string | null>(null);
+  const [oneNoteSyncMessage, setOneNoteSyncMessage] = useState<string | null>(null);
+  const [oneNoteSyncError, setOneNoteSyncError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState<Partial<BookingDetailsResponse>>({});
@@ -169,6 +172,25 @@ const BookingDetails = () => {
     }
   );
 
+  const syncOneNoteMutation = useMutation(
+    () => apiClient.syncBookingFromOneNote(bookingId || ""),
+    {
+      onSuccess: (data) => {
+        setOneNoteSyncError(null);
+        setOneNoteSyncMessage(data?.message || "OneNote data synced");
+        queryClient.invalidateQueries(["bookingDetails", bookingId]);
+      },
+      onError: (mutationError: any) => {
+        setOneNoteSyncMessage(null);
+        setOneNoteSyncError(
+          mutationError?.response?.data?.message ||
+            mutationError?.response?.data?.reason ||
+            "Unable to sync booking from OneNote"
+        );
+      },
+    }
+  );
+
   const handleGuestCountChange = (field: "adultCount" | "childCount", value: string) => {
     const nextValue = Number(value);
 
@@ -206,6 +228,9 @@ const BookingDetails = () => {
       year: "numeric",
     });
   };
+
+  const roomName =
+    booking?.hotelName || booking?.oneNoteSync?.room || booking?.excelSync?.matchedRoom || "";
 
   if (isLoading) {
     return (
@@ -262,6 +287,11 @@ const BookingDetails = () => {
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 Booking #{booking.reservationNumber}
               </h1>
+              {roomName && (
+                <div className="mb-3 inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-4 py-1.5 text-sm font-semibold tracking-wide text-cyan-800">
+                  Room: {roomName}
+                </div>
+              )}
               <p className="text-gray-600">
                 Reservation Number: {booking.reservationNumber}
               </p>
@@ -465,17 +495,38 @@ const BookingDetails = () => {
                   <Calendar className="h-5 w-5 text-teal-600" />
                   Booking Details
                 </CardTitle>
-                <button
-                  onClick={() => syncExcelMutation.mutate()}
-                  disabled={syncExcelMutation.isLoading}
-                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <FileText className="h-4 w-4" />
-                  {syncExcelMutation.isLoading ? "Syncing Excel..." : "Sync Excel"}
-                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => syncOneNoteMutation.mutate()}
+                    disabled={syncOneNoteMutation.isLoading}
+                    className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-800 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {syncOneNoteMutation.isLoading ? "Syncing OneNote..." : "Sync OneNote"}
+                  </button>
+                  <button
+                    onClick={() => syncExcelMutation.mutate()}
+                    disabled={syncExcelMutation.isLoading}
+                    className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <FileText className="h-4 w-4" />
+                    {syncExcelMutation.isLoading ? "Syncing Excel..." : "Sync Excel"}
+                  </button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
+              {(oneNoteSyncMessage || oneNoteSyncError) && (
+                <div
+                  className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+                    oneNoteSyncError
+                      ? "border-red-200 bg-red-50 text-red-700"
+                      : "border-cyan-200 bg-cyan-50 text-cyan-700"
+                  }`}
+                >
+                  {oneNoteSyncError || oneNoteSyncMessage}
+                </div>
+              )}
               {(excelSyncMessage || excelSyncError) && (
                 <div
                   className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
@@ -528,15 +579,120 @@ const BookingDetails = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
+                    OneNote Sync
+                  </label>
+                  <p className="text-gray-900 font-medium">
+                    {booking.oneNoteSync?.lastSyncedAt
+                      ? `${booking.oneNoteSync.matchedPageTitle || "Matched page"} on ${formatDate(
+                          booking.oneNoteSync.lastSyncedAt
+                        )}`
+                      : "Not synced yet"}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
                     Payment Via
                   </label>
                   <p className="text-gray-900 font-medium">
-                    {booking.excelSync?.paymentVia || booking.checkInInfo?.paymentDetails || "-"}
+                    {booking.oneNoteSync?.bookingSource || booking.excelSync?.paymentVia || booking.checkInInfo?.paymentDetails || "-"}
                   </p>
                 </div>
               </div>
             </CardContent>
           </Card>
+
+          {booking.oneNoteSync && (
+            <Card className="border-0 shadow-lg">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-cyan-600" />
+                  OneNote Match
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Matched Page
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.oneNoteSync.matchedPageTitle || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Matched Room
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.oneNoteSync.room || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Guest Name
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.oneNoteSync.guestName || `${booking.firstName} ${booking.lastName}`}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Arrival
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.oneNoteSync.arrivalNote || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Phone / WhatsApp
+                    </label>
+                    <p className="text-gray-900 font-medium break-words">
+                      {booking.oneNoteSync.phone || "-"}
+                      {booking.oneNoteSync.whatsapp ? ` · ${booking.oneNoteSync.whatsapp}` : ""}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nationality
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.oneNoteSync.nationality || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Nights / Check-out
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.oneNoteSync.nights || "-"} / {booking.oneNoteSync.checkOutNote || "-"}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Payment
+                    </label>
+                    <p className="text-gray-900 font-medium">
+                      {booking.oneNoteSync.paymentNote || "-"}
+                      {typeof booking.oneNoteSync.amountDueEUR === "number"
+                        ? ` · EUR ${booking.oneNoteSync.amountDueEUR.toFixed(2)}`
+                        : ""}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Notes
+                  </label>
+                  <p className="whitespace-pre-wrap text-gray-700">
+                    {booking.oneNoteSync.notes || "-"}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {booking.excelSync && (
             <Card className="border-0 shadow-lg">

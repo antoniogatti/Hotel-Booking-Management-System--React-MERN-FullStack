@@ -59,6 +59,25 @@ export interface IExternalCalendarEvent extends Document {
     country?: string;
     raw?: Record<string, string | number | null>;
   };
+  oneNoteSync?: {
+    lastSyncedAt?: Date;
+    matchedPageId?: string;
+    matchedPageTitle?: string;
+    matchedSectionName?: string;
+    room?: string;
+    guestName?: string;
+    arrivalNote?: string;
+    nationality?: string;
+    phone?: string;
+    whatsapp?: string;
+    nights?: number;
+    checkOutNote?: string;
+    bookingSource?: string;
+    paymentNote?: string;
+    amountDueEUR?: number;
+    notes?: string;
+    rawLines?: string[];
+  };
   lastSeenAt: Date;
   rawEvent?: string;
   createdAt: Date;
@@ -133,6 +152,25 @@ const externalCalendarEventSchema = new mongoose.Schema(
       city: { type: String },
       country: { type: String },
       raw: { type: mongoose.Schema.Types.Mixed },
+    },
+    oneNoteSync: {
+      lastSyncedAt: { type: Date },
+      matchedPageId: { type: String },
+      matchedPageTitle: { type: String },
+      matchedSectionName: { type: String },
+      room: { type: String },
+      guestName: { type: String },
+      arrivalNote: { type: String },
+      nationality: { type: String },
+      phone: { type: String },
+      whatsapp: { type: String },
+      nights: { type: Number },
+      checkOutNote: { type: String },
+      bookingSource: { type: String },
+      paymentNote: { type: String },
+      amountDueEUR: { type: Number },
+      notes: { type: String },
+      rawLines: [{ type: String }],
     },
     lastSeenAt: { type: Date, required: true, default: Date.now },
     rawEvent: { type: String, default: "" },

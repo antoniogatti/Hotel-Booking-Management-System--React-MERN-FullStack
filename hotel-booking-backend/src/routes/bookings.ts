@@ -20,6 +20,7 @@ import {
 } from "../lib/contact-mail";
 import { getValidMicrosoftGraphAccessToken } from "../lib/microsoft-graph-auth";
 import { syncBookingFromExcel } from "../lib/excel-booking-sync";
+import { syncBookingFromOneNote } from "../lib/onenote-booking-sync";
 import { body, param, query, validationResult } from "express-validator";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
@@ -206,6 +207,7 @@ const toImportedEventResponse = (event: any, hotel?: any) => ({
   specialRequests: event.specialRequests || "",
   checkInInfo: event.checkInInfo,
   excelSync: event.excelSync,
+  oneNoteSync: event.oneNoteSync,
   status: "imported",
   source: BOOKING_COM_SOURCE,
   sourceLabel: "Booking.com",
@@ -317,6 +319,98 @@ const applyExcelSyncToRecord = (params: {
   return {
     priceChanged,
     previousTotalCost,
+  };
+};
+
+const applyOneNoteSyncToRecord = (params: {
+  record: any;
+  matchedPage: {
+    pageId: string;
+    title?: string;
+    sectionName?: string;
+    parsed: {
+      room?: string;
+      guestName?: string;
+      arrivalNote?: string;
+      adults?: number;
+      children?: number;
+      nationality?: string;
+      phone?: string;
+      whatsapp?: string;
+      nights?: number;
+      checkOutNote?: string;
+      bookingSource?: string;
+      paymentNote?: string;
+      amountDueEUR?: number;
+      notes?: string;
+      rawLines: string[];
+    };
+  };
+  guestName: {
+    firstName: string;
+    lastName: string;
+  };
+  fallback: {
+    phone?: string;
+    email?: string;
+    nationality?: string;
+  };
+}) => {
+  const { record, matchedPage, guestName, fallback } = params;
+  const parsed = matchedPage.parsed;
+
+  if (guestName.firstName) {
+    record.firstName = guestName.firstName;
+  }
+  if (guestName.lastName) {
+    record.lastName = guestName.lastName;
+  }
+  if (parsed.phone) {
+    record.phone = parsed.phone;
+  }
+  if (parsed.nationality) {
+    record.nationality = parsed.nationality;
+  }
+  if (typeof parsed.adults === "number") {
+    record.adultCount = parsed.adults;
+  }
+  if (typeof parsed.children === "number") {
+    record.childCount = parsed.children;
+  }
+
+  record.checkInInfo = {
+    ...(record.checkInInfo || {}),
+    arrivalTime: parsed.arrivalNote || record.checkInInfo?.arrivalTime || "",
+    phone: parsed.phone || record.checkInInfo?.phone || fallback.phone || "",
+    email: record.checkInInfo?.email || fallback.email || "",
+    nationality: parsed.nationality || record.checkInInfo?.nationality || fallback.nationality || "",
+    bookingChannel: parsed.bookingSource || record.checkInInfo?.bookingChannel || "",
+    paymentDetails: parsed.paymentNote || record.checkInInfo?.paymentDetails || "",
+    specialNotes: record.checkInInfo?.specialNotes || "",
+    breakfast: record.checkInInfo?.breakfast,
+    documents: record.checkInInfo?.documents || [],
+    cityTax: record.checkInInfo?.cityTax || 0,
+    checkedInAt: record.checkInInfo?.checkedInAt,
+  };
+
+  record.oneNoteSync = {
+    lastSyncedAt: new Date(),
+    matchedPageId: matchedPage.pageId,
+    matchedPageTitle: matchedPage.title,
+    matchedSectionName: matchedPage.sectionName,
+    room: parsed.room,
+    guestName: parsed.guestName,
+    arrivalNote: parsed.arrivalNote,
+    nationality: parsed.nationality,
+    phone: parsed.phone,
+    whatsapp: parsed.whatsapp,
+    nights: parsed.nights,
+    checkOutNote: parsed.checkOutNote,
+    bookingSource: parsed.bookingSource,
+    paymentNote: parsed.paymentNote,
+    amountDueEUR: parsed.amountDueEUR,
+    notes: parsed.notes,
+    rawLines: parsed.rawLines,
   };
 };
 
@@ -992,6 +1086,126 @@ router.post(
         actorId: req.userId,
       });
       return res.status(500).json({ message: "Unable to sync booking from Excel" });
+    }
+  }
+);
+
+router.post(
+  "/:id/sync-onenote",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  async (req: Request, res: Response) => {
+    try {
+      let booking = await Booking.findById(req.params.id);
+      let importedEvent: any = null;
+
+      if (!booking) {
+        importedEvent = await ExternalCalendarEvent.findById(req.params.id);
+      }
+
+      if (!booking && !importedEvent) {
+        return res.status(404).json({ message: "Booking not found" });
+      }
+
+      const targetHotelId = String(booking ? booking.hotelId : importedEvent.hotelId);
+      const accessCheck = await getAccessibleHotel(targetHotelId, req);
+      if (accessCheck.error) {
+        return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+      }
+
+      const user = await User.findById(req.userId);
+      if (!user) {
+        return res.status(401).json({ message: "unauthorized" });
+      }
+
+      let graphAccessToken: string | null = null;
+      try {
+        graphAccessToken = await getValidMicrosoftGraphAccessToken(user);
+      } catch (tokenError) {
+        logError("Unable to refresh Microsoft Graph token", tokenError, {
+          route: "bookings.sync-onenote",
+          bookingId: req.params.id,
+          actorId: req.userId,
+        });
+        return res.status(401).json({
+          message: "Microsoft Graph access expired. Sign in with Microsoft again to continue OneNote sync.",
+        });
+      }
+
+      if (!graphAccessToken) {
+        return res.status(409).json({
+          message: "Microsoft Graph access is not connected for this account. Sign in with Microsoft again and grant Notes.Read access.",
+        });
+      }
+
+      const targetRecord = booking || importedEvent;
+      const syncResult = await syncBookingFromOneNote({
+        accessToken: graphAccessToken,
+        booking: {
+          firstName: targetRecord.firstName || "",
+          lastName: targetRecord.lastName || "",
+          phone: targetRecord.phone || "",
+          adultCount: targetRecord.adultCount,
+          childCount: targetRecord.childCount,
+          checkIn: booking ? booking.checkIn : importedEvent.startDate,
+          checkOut: booking ? booking.checkOut : importedEvent.endDate,
+        },
+        hotel: {
+          name: accessCheck.hotel?.name,
+          slug: accessCheck.hotel?.slug,
+        },
+      });
+
+      if (!syncResult.matched) {
+        return res.status(409).json(syncResult);
+      }
+
+      applyOneNoteSyncToRecord({
+        record: targetRecord,
+        matchedPage: syncResult.page,
+        guestName: syncResult.guestName,
+        fallback: {
+          phone: targetRecord.phone,
+          email: targetRecord.email,
+          nationality: targetRecord.nationality,
+        },
+      });
+
+      await targetRecord.save();
+
+      await recordAuditEvent({
+        action: "booking.onenote-sync.completed",
+        entityType: booking ? "booking" : "external_booking",
+        entityId: String(targetRecord._id),
+        hotelId: String(targetHotelId),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          reservationNumber: booking?.reservationNumber || importedEvent?.externalUid,
+          matchedPageId: syncResult.page.pageId,
+          matchedPageTitle: syncResult.page.title,
+          matchedSectionName: syncResult.page.sectionName,
+          bookingSource: syncResult.page.parsed.bookingSource,
+        },
+      });
+
+      return res.status(200).json({
+        message: "OneNote booking data synced successfully",
+        booking: booking ? booking : toImportedEventResponse(importedEvent, accessCheck.hotel),
+        matchedPage: {
+          pageId: syncResult.page.pageId,
+          title: syncResult.page.title,
+          sectionName: syncResult.page.sectionName,
+        },
+      });
+    } catch (error) {
+      logError("Unable to sync booking from OneNote", error, {
+        route: "bookings.sync-onenote",
+        bookingId: req.params.id,
+        actorId: req.userId,
+      });
+      return res.status(500).json({ message: "Unable to sync booking from OneNote" });
     }
   }
 );

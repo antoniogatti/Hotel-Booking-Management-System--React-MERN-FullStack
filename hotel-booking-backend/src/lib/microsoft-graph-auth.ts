@@ -4,7 +4,7 @@ const MICROSOFT_CLIENT_ID = process.env.MS_ENTRA_CLIENT_ID;
 const MICROSOFT_CLIENT_SECRET = process.env.MS_ENTRA_CLIENT_SECRET;
 const MICROSOFT_TENANT_ID = process.env.MS_ENTRA_TENANT_ID || "common";
 const microsoftBaseUrl = `https://login.microsoftonline.com/${MICROSOFT_TENANT_ID}/oauth2/v2.0`;
-const graphTokenScope = "openid profile email offline_access User.Read Files.Read";
+const graphTokenScope = "openid profile email offline_access User.Read Files.Read Notes.Read";
 
 type TokenPayload = {
   access_token?: string;

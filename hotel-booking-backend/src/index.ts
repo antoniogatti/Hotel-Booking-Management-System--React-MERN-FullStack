@@ -15,6 +15,7 @@ import healthRoutes from "./routes/health";
 import businessInsightsRoutes from "./routes/business-insights";
 import contactRoutes from "./routes/contact";
 import bookingComSyncRoutes from "./routes/booking-com-sync";
+import oneNoteRoutes from "./routes/onenote";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./swagger";
 import helmet from "helmet";
@@ -313,6 +314,7 @@ app.use("/api/integrations/booking-com", bookingComSyncRoutes);
 app.use("/api/health", healthRoutes);
 app.use("/api/business-insights", businessInsightsRoutes);
 app.use("/api/contact", contactRoutes);
+app.use("/api/onenote", oneNoteRoutes);
 
 // Swagger API Documentation
 const swaggerEnabled = !isProduction || process.env.ENABLE_SWAGGER === "true";
