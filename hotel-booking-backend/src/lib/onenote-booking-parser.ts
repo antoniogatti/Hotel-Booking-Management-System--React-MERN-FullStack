@@ -111,6 +111,7 @@ const parseAmountDue = (value: string) => {
 export const parseOneNoteBookingPage = (params: { title?: string; html: string }) => {
   try {
     const rawLines = extractPlainTextLinesFromOneNoteHtml(params.html);
+    const normalizedTitle = String(params.title || "").replace(/\s+/g, " ").trim().toLowerCase();
     const parsed: ParsedOneNoteBooking = {
       rawLines,
       dateRange: parseDateRangeFromTitle(params.title),
@@ -120,6 +121,10 @@ export const parseOneNoteBookingPage = (params: { title?: string; html: string }
 
     rawLines.forEach((line) => {
       try {
+        if (normalizedTitle && line.replace(/\s+/g, " ").trim().toLowerCase() === normalizedTitle) {
+          return;
+        }
+
         if (!parsed.room && /^(ALEATICO|MALVASIA|VERDECA|FUOCOROSA)\b/i.test(line)) {
           parsed.room = line.split(/\s+/)[0].trim();
           return;
@@ -161,7 +166,7 @@ export const parseOneNoteBookingPage = (params: { title?: string; html: string }
 
         const whatsappMatch = line.match(/^Whatsapp\s*:\s*(.+)$/i);
         if (whatsappMatch) {
-          parsed.whatsapp = whatsappMatch[1].trim();
+          parsed.whatsapp = whatsappMatch[1].replace(/\s+/g, "").trim();
           return;
         }
 
@@ -173,7 +178,7 @@ export const parseOneNoteBookingPage = (params: { title?: string; html: string }
 
         const checkoutMatch = line.match(/^CHECK-OUT\s+(.+)$/i);
         if (checkoutMatch) {
-          parsed.checkOutNote = checkoutMatch[1].trim();
+          parsed.checkOutNote = `CHECK-OUT ${checkoutMatch[1].trim()}`;
           return;
         }
 

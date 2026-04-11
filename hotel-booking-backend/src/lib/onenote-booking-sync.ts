@@ -63,20 +63,28 @@ const fetchParsedPages = async (accessToken: string) => {
     const batch = pages.slice(index, index + BATCH_SIZE);
     const batchResults = await Promise.all(
       batch.map(async (page) => {
-        const html = await getOneNotePageContent(accessToken, page.id);
-        return {
-          pageId: page.id,
-          title: page.title,
-          sectionName: page.parentSection?.displayName,
-          parsed: parseOneNoteBookingPage({
+        try {
+          const html = await getOneNotePageContent(accessToken, page.id);
+          return {
+            pageId: page.id,
             title: page.title,
-            html,
-          }),
-        } satisfies ParsedPrenotazioniPage;
+            sectionName: page.parentSection?.displayName,
+            parsed: parseOneNoteBookingPage({
+              title: page.title,
+              html,
+            }),
+          } satisfies ParsedPrenotazioniPage;
+        } catch {
+          return null;
+        }
       })
     );
 
-    parsedPages.push(...batchResults);
+    for (const entry of batchResults) {
+      if (entry) {
+        parsedPages.push(entry);
+      }
+    }
   }
 
   return {
