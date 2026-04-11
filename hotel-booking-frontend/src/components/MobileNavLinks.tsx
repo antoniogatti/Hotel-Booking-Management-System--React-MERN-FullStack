@@ -19,7 +19,7 @@ const linkClass =
   "flex items-center gap-2 w-full py-3 font-bold text-gray-900 hover:text-primary-600 transition-colors";
 
 const MobileNavLinks = () => {
-  const { isLoggedIn, userRole, isOwnerOrAdmin } = useAppContext();
+  const { isLoggedIn, userRole } = useAppContext();
 
   return (
     <div className="flex flex-col gap-1">
@@ -42,13 +42,6 @@ const MobileNavLinks = () => {
         <MapPin className="h-4 w-4" />
         Reach Us
       </Link>
-
-      {isOwnerOrAdmin && (
-        <Link to="/booking-dashboard" className={linkClass}>
-          <BarChart3 className="h-4 w-4" />
-          Dashboard
-        </Link>
-      )}
 
       {userRole === "admin" && (
         <>

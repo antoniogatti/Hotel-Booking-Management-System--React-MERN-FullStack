@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "react-query";
 import { useLocation, useNavigate } from "react-router-dom";
 import * as apiClient from "../api-client";
@@ -22,9 +22,14 @@ type DashboardData = {
     end: string;
   };
   occupancy: {
+    grossNights: number;
+    closedNights: number;
+    sellableNights: number;
     bookedNights: number;
     availableNights: number;
+    remainingNights: number;
     percentage: number;
+    vacancyPercentage: number;
   };
   bookings: Array<{
     _id: string;
@@ -65,12 +70,6 @@ const VacancyDashboard = () => {
       loadingMessage: "Loading hotels...",
     }
   );
-
-  useEffect(() => {
-    if (!selectedHotelId && rooms && rooms.length > 0) {
-      setSelectedHotelId(rooms[0]._id);
-    }
-  }, [rooms, selectedHotelId]);
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading: dataLoading } = useQuery<DashboardData>(
@@ -263,13 +262,13 @@ const VacancyDashboard = () => {
                         Vacancy Rate
                       </p>
                       <p className="text-4xl font-bold mt-2">
-                        {100 - dashboardData.occupancy.percentage}%
+                        {dashboardData.occupancy.vacancyPercentage}%
                       </p>
                     </div>
                     <TrendingDown className="h-12 w-12 opacity-30" />
                   </div>
                   <p className="text-emerald-100 text-sm">
-                    {dashboardData.occupancy.availableNights} slots unfilled
+                    {dashboardData.occupancy.remainingNights} sellable nights still open
                   </p>
                 </div>
               </Card>
@@ -283,13 +282,13 @@ const VacancyDashboard = () => {
                         Available Slots
                       </p>
                       <p className="text-4xl font-bold mt-2">
-                        {dashboardData.occupancy.availableNights}
+                        {dashboardData.occupancy.remainingNights}
                       </p>
                     </div>
                     <Calendar className="h-12 w-12 opacity-30" />
                   </div>
                   <p className="text-blue-100 text-sm">
-                    Out of {dashboardData.occupancy.availableNights + dashboardData.occupancy.bookedNights} total
+                    Out of {dashboardData.occupancy.sellableNights} sellable nights
                   </p>
                 </div>
               </Card>
@@ -303,12 +302,7 @@ const VacancyDashboard = () => {
                         Marketing Priority
                       </p>
                       <p className="text-4xl font-bold mt-2">
-                        {Math.round(
-                          (dashboardData.occupancy.availableNights /
-                            (dashboardData.occupancy.availableNights +
-                              dashboardData.occupancy.bookedNights)) *
-                            100
-                        )}
+                        {dashboardData.occupancy.vacancyPercentage}
                         %
                       </p>
                     </div>
@@ -320,6 +314,26 @@ const VacancyDashboard = () => {
                 </div>
               </Card>
             </div>
+
+            <Card className="border-0 shadow-lg overflow-hidden mb-8">
+              <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 p-6 text-white">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                  <div>
+                    <p className="text-slate-300 text-sm font-medium uppercase tracking-wide">
+                      Closed Nights
+                    </p>
+                    <p className="text-4xl font-bold mt-2">
+                      {dashboardData.occupancy.closedNights}
+                    </p>
+                  </div>
+                  <div className="text-sm text-slate-200 space-y-1">
+                    <p>Gross room-nights: {dashboardData.occupancy.grossNights}</p>
+                    <p>Sellable room-nights: {dashboardData.occupancy.sellableNights}</p>
+                    <p>Booked room-nights: {dashboardData.occupancy.bookedNights}</p>
+                  </div>
+                </div>
+              </div>
+            </Card>
 
             {/* Available Dates by Month */}
             {Object.keys(monthGroups).length > 0 ? (

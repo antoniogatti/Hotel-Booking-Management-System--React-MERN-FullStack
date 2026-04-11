@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "react-query";
 import { Link, useNavigate } from "react-router-dom";
 import * as apiClient from "../api-client";
@@ -16,6 +16,16 @@ import {
   ArrowUp,
   ArrowDown,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 type DashboardData = {
   year: number;
@@ -40,6 +50,14 @@ type DashboardData = {
       refunded: number;
       imported: number;
     };
+    occupancy: {
+      grossNights: number;
+      closedNights: number;
+      sellableNights: number;
+      bookedNights: number;
+      remainingNights: number;
+      percentage: number;
+    };
   }>;
   totals: {
     pending: number;
@@ -52,9 +70,14 @@ type DashboardData = {
     total: number;
   };
   occupancy: {
+    grossNights: number;
+    closedNights: number;
+    sellableNights: number;
     bookedNights: number;
     availableNights: number;
+    remainingNights: number;
     percentage: number;
+    vacancyPercentage: number;
   };
   topNationalities: Array<{
     nationality: string;
@@ -99,12 +122,6 @@ const BookingDashboard = () => {
       loadingMessage: "Loading rooms...",
     }
   );
-
-  useEffect(() => {
-    if (!selectedHotelId && rooms && rooms.length > 0) {
-      setSelectedHotelId(rooms[0]._id);
-    }
-  }, [rooms, selectedHotelId]);
 
   // Fetch dashboard data
   const { data: dashboardData, isLoading: dataLoading } = useQuery<DashboardData>(
@@ -220,6 +237,13 @@ const BookingDashboard = () => {
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  const occupancyChartData = dashboardData?.hotels.map((hotel) => ({
+    name: hotel.hotelName,
+    occupancyPercentage: hotel.occupancy.percentage,
+    bookedNights: hotel.occupancy.bookedNights,
+    sellableNights: hotel.occupancy.sellableNights,
+    closedNights: hotel.occupancy.closedNights,
+  })) || [];
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
@@ -251,7 +275,7 @@ const BookingDashboard = () => {
               <BarChart3 className="h-7 w-7 text-white" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold text-gray-900">Booking Dashboard</h1>
+              <h1 className="text-4xl font-bold text-gray-900">Dashboard</h1>
               <p className="text-gray-600 text-sm mt-1">
                 Real-time analytics and occupancy insights
               </p>
@@ -338,6 +362,51 @@ const BookingDashboard = () => {
           </div>
         </div>
 
+        {!isLoading && dashboardData && occupancyChartData.length > 0 && (
+          <Card className="border-0 shadow-lg mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-lg">
+                  <TrendingUp className="h-5 w-5 text-white" />
+                </div>
+                Occupancy by Room
+              </CardTitle>
+              <p className="text-sm text-gray-500">
+                Occupancy percentage for the selected period and filters.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={320}>
+                <BarChart data={occupancyChartData} margin={{ top: 8, right: 24, left: 8, bottom: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                  <XAxis dataKey="name" tick={{ fill: "#475569", fontSize: 12 }} />
+                  <YAxis
+                    domain={[0, 100]}
+                    tickFormatter={(value) => `${value}%`}
+                    tick={{ fill: "#475569", fontSize: 12 }}
+                  />
+                  <Tooltip
+                    formatter={(value: number, _name, item) => [
+                      `${value}%`,
+                      `${item.payload.bookedNights} / ${item.payload.sellableNights} sellable nights`,
+                    ]}
+                    labelFormatter={(label) => `Room: ${label}`}
+                    contentStyle={{ borderRadius: 12, borderColor: "#CBD5E1" }}
+                  />
+                  <Bar dataKey="occupancyPercentage" radius={[10, 10, 0, 0]}>
+                    {occupancyChartData.map((entry) => (
+                      <Cell
+                        key={entry.name}
+                        fill={entry.occupancyPercentage >= 75 ? "#0F766E" : entry.occupancyPercentage >= 45 ? "#14B8A6" : "#67E8F9"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
+
         {isLoading ? (
           <div className="flex items-center justify-center min-h-96">
             <div className="text-center">
@@ -363,7 +432,7 @@ const BookingDashboard = () => {
                         </p>
                         <p className="text-teal-100 text-sm">
                           {dashboardData.occupancy.bookedNights} of{" "}
-                          {dashboardData.occupancy.availableNights} nights booked
+                          {dashboardData.occupancy.sellableNights} sellable nights booked
                         </p>
                       </div>
                       <div className="relative w-40 h-40 flex-shrink-0">
@@ -422,13 +491,11 @@ const BookingDashboard = () => {
                             Vacancy Rate
                           </p>
                           <p className="text-5xl font-bold mb-2">
-                            {100 - dashboardData.occupancy.percentage}%
+                            {dashboardData.occupancy.vacancyPercentage}%
                           </p>
                           <p className="text-emerald-100 text-sm">
-                            {dashboardData.occupancy.availableNights} of{" "}
-                            {dashboardData.occupancy.availableNights +
-                              dashboardData.occupancy.bookedNights}{" "}
-                            slots available
+                            {dashboardData.occupancy.remainingNights} of{" "}
+                            {dashboardData.occupancy.sellableNights} sellable nights open
                           </p>
                         </div>
                         <div className="relative w-40 h-40 flex-shrink-0">
@@ -451,14 +518,14 @@ const BookingDashboard = () => {
                               strokeDasharray={`${
                                 3.14 *
                                 100 *
-                                ((100 - dashboardData.occupancy.percentage) / 100)
+                                (dashboardData.occupancy.vacancyPercentage / 100)
                               } 314`}
                               strokeLinecap="round"
                             />
                           </svg>
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span className="text-3xl font-bold text-white">
-                              {100 - dashboardData.occupancy.percentage}%
+                              {dashboardData.occupancy.vacancyPercentage}%
                             </span>
                           </div>
                         </div>
@@ -513,6 +580,34 @@ const BookingDashboard = () => {
                 </Card>
               )}
             </div>
+
+            {dashboardData.occupancy && (
+              <Card className="border-0 shadow-lg mb-8 overflow-hidden">
+                <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 p-6 text-white">
+                  <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                    <div>
+                      <p className="text-slate-300 font-medium mb-2 text-sm uppercase tracking-wide">
+                        Closed Nights
+                      </p>
+                      <p className="text-4xl font-bold">
+                        {dashboardData.occupancy.closedNights}
+                      </p>
+                    </div>
+                    <div className="text-sm text-slate-200 space-y-1">
+                      <p>
+                        Gross room-nights: {dashboardData.occupancy.grossNights}
+                      </p>
+                      <p>
+                        Sellable room-nights after closures: {dashboardData.occupancy.sellableNights}
+                      </p>
+                      <p>
+                        Remaining open nights: {dashboardData.occupancy.remainingNights}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            )}
 
             {/* Status Cards Grid - Clickable */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">

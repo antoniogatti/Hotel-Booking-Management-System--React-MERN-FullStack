@@ -332,17 +332,6 @@ const AdminPortal = () => {
                 <ArrowRight className="h-4 w-4 text-slate-500" />
               </Link>
 
-              <Link
-                to="/booking-dashboard"
-                className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-4 transition hover:border-teal-300 hover:bg-teal-50/60"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">Booking Overview</p>
-                  <p className="text-sm text-slate-600">Existing booking analytics and occupancy trends.</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-slate-500" />
-              </Link>
-
               {userRole === "admin" && (
                 <Link
                   to="/manage-bookings"
@@ -368,6 +357,17 @@ const AdminPortal = () => {
                   <ArrowRight className="h-4 w-4 text-slate-500" />
                 </Link>
               )}
+
+              <Link
+                to="/booking-dashboard"
+                className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-4 transition hover:border-teal-300 hover:bg-teal-50/60"
+              >
+                <div>
+                  <p className="font-semibold text-slate-900">Dashboard</p>
+                  <p className="text-sm text-slate-600">Existing booking analytics and occupancy trends.</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-slate-500" />
+              </Link>
 
             </CardContent>
           </Card>

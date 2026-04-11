@@ -76,7 +76,7 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/sign-in") return `${BRAND_NAME} | Sign In`;
   if (pathname === "/auth/callback") return `${BRAND_NAME} | Sign In`;
   if (pathname === "/my-hotels") return `${BRAND_NAME} | My Properties`;
-  if (pathname === "/booking-dashboard") return `${BRAND_NAME} | Booking Dashboard`;
+  if (pathname === "/booking-dashboard") return `${BRAND_NAME} | Dashboard`;
   if (pathname === "/admin-portal") return `${BRAND_NAME} | Admin Portal`;
   if (pathname === "/admin-portal/check-in") return `${BRAND_NAME} | Check-In Desk`;
   if (pathname.startsWith("/booking/")) return `${BRAND_NAME} | Booking Details`;

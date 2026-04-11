@@ -46,11 +46,22 @@ const getWhatsappHref = (phone: string) => {
 };
 
 type CheckInStatusFilter = "all" | "needs-action" | "checked-in";
+type HorizonFilter = "1" | "7" | "14" | "30" | "past";
 
 const AdminPortalCheckIns = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [selectedHotelId, setSelectedHotelId] = useState("");
-  const [days, setDays] = useState(() => Number(searchParams.get("days")) || 1);
+  const [selectedHotelId, setSelectedHotelId] = useState(searchParams.get("hotelId") || "");
+  const [horizon, setHorizon] = useState<HorizonFilter>(() => {
+    const requestedHorizon = searchParams.get("horizon");
+    if (requestedHorizon === "past") {
+      return "past";
+    }
+
+    const requestedDays = searchParams.get("days");
+    return requestedDays === "7" || requestedDays === "14" || requestedDays === "30"
+      ? requestedDays
+      : "1";
+  });
   const [statusFilter, setStatusFilter] = useState<CheckInStatusFilter>(() => {
     const requested = searchParams.get("status");
     return requested === "needs-action" || requested === "checked-in" ? requested : "all";
@@ -65,17 +76,26 @@ const AdminPortalCheckIns = () => {
   );
 
   const { data, isLoading } = useQuery(
-    ["upcomingCheckIns", days, selectedHotelId],
-    () => apiClient.fetchUpcomingCheckIns({ days, hotelId: selectedHotelId || undefined })
+    ["upcomingCheckIns", horizon, selectedHotelId],
+    () =>
+      apiClient.fetchUpcomingCheckIns({
+        days: horizon === "past" ? undefined : Number(horizon),
+        horizon: horizon === "past" ? "past" : "upcoming",
+        hotelId: selectedHotelId || undefined,
+      })
   );
 
   useEffect(() => {
     const nextParams = new URLSearchParams();
     if (selectedHotelId) nextParams.set("hotelId", selectedHotelId);
-    nextParams.set("days", String(days));
+    if (horizon === "past") {
+      nextParams.set("horizon", "past");
+    } else {
+      nextParams.set("days", horizon);
+    }
     if (statusFilter !== "all") nextParams.set("status", statusFilter);
     setSearchParams(nextParams, { replace: true });
-  }, [days, selectedHotelId, setSearchParams, statusFilter]);
+  }, [horizon, selectedHotelId, setSearchParams, statusFilter]);
 
   const rows = useMemo(() => {
     const baseRows = data?.rows || [];
@@ -126,14 +146,15 @@ const AdminPortalCheckIns = () => {
             <label className="text-sm font-medium text-slate-700">
               Horizon
               <select
-                value={days}
-                onChange={(event) => setDays(Number(event.target.value))}
+                value={horizon}
+                onChange={(event) => setHorizon(event.target.value as HorizonFilter)}
                 className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
               >
-                <option value={1}>Today</option>
-                <option value={7}>Next 7 days</option>
-                <option value={14}>Next 14 days</option>
-                <option value={30}>Next 30 days</option>
+                <option value="1">Today</option>
+                <option value="7">Next 7 days</option>
+                <option value="14">Next 14 days</option>
+                <option value="30">Next 30 days</option>
+                <option value="past">All Past</option>
               </select>
             </label>
 
@@ -183,14 +204,20 @@ const AdminPortalCheckIns = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-xl text-slate-900">
               <CalendarClock className="h-5 w-5 text-teal-600" />
-              Upcoming arrivals table
+              {horizon === "past" ? "Past bookings table" : "Upcoming arrivals table"}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoading ? (
-              <p className="text-sm text-slate-500">Loading arrivals...</p>
+              <p className="text-sm text-slate-500">
+                {horizon === "past" ? "Loading past bookings..." : "Loading arrivals..."}
+              </p>
             ) : rows.length === 0 ? (
-              <p className="text-sm text-slate-500">No arrivals match the current filters.</p>
+              <p className="text-sm text-slate-500">
+                {horizon === "past"
+                  ? "No past bookings match the current filters."
+                  : "No arrivals match the current filters."}
+              </p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-slate-200 text-sm">

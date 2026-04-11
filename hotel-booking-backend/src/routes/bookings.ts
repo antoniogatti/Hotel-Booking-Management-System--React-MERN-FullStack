@@ -1567,7 +1567,15 @@ router.get(
       const totalDays = Math.ceil(
         (dateEnd.getTime() - dateStart.getTime()) / (1000 * 60 * 60 * 24)
       );
-      const availableNights = totalDays * hotelIds.length;
+      const grossNights = totalDays * hotelIds.length;
+
+      const closedNightEntries = await BookingDayStatus.find({
+        hotelId: { $in: hotelIds },
+        status: "closed",
+        date: { $gte: dateStart, $lt: dateEnd },
+      }).select("hotelId date");
+      const closedNights = closedNightEntries.length;
+      const sellableNights = Math.max(grossNights - closedNights, 0);
 
       // Calculate booked nights (excluding cancelled/refunded)
       const bookedNights = dashboardBookings
@@ -1585,14 +1593,45 @@ router.get(
           return sum + nights;
         }, 0);
 
+      const remainingNights = Math.max(sellableNights - bookedNights, 0);
       const occupancyPercentage =
-        availableNights > 0 ? Math.round((bookedNights / availableNights) * 100) : 0;
+        sellableNights > 0
+          ? Math.min(Math.round((bookedNights / sellableNights) * 100), 100)
+          : 0;
+      const vacancyPercentage =
+        sellableNights > 0
+          ? Math.min(Math.round((remainingNights / sellableNights) * 100), 100)
+          : 0;
 
       // Build results grouped by hotel
       const results = hotels.map((hotel) => {
         const hotelBookings = dashboardBookings.filter((b) =>
           b.hotelId.toString() === hotel._id.toString()
         );
+        const hotelClosedNights = closedNightEntries.filter(
+          (entry) => String(entry.hotelId) === hotel._id.toString()
+        ).length;
+        const hotelGrossNights = totalDays;
+        const hotelSellableNights = Math.max(hotelGrossNights - hotelClosedNights, 0);
+        const hotelBookedNights = hotelBookings
+          .filter((booking) => {
+            const status = booking.status || "pending";
+            return status !== "cancelled" && status !== "refunded";
+          })
+          .reduce((sum, booking) => {
+            const nights = getOverlappingNightCount({
+              start: booking.checkIn,
+              end: booking.checkOut,
+              rangeStart: dateStart,
+              rangeEnd: dateEnd,
+            });
+            return sum + nights;
+          }, 0);
+        const hotelRemainingNights = Math.max(hotelSellableNights - hotelBookedNights, 0);
+        const hotelOccupancyPercentage =
+          hotelSellableNights > 0
+            ? Math.min(Math.round((hotelBookedNights / hotelSellableNights) * 100), 100)
+            : 0;
 
         const statusCounts = {
           pending: 0,
@@ -1620,6 +1659,14 @@ router.get(
           country: hotel.country,
           totalBookings,
           statusCounts,
+          occupancy: {
+            grossNights: hotelGrossNights,
+            closedNights: hotelClosedNights,
+            sellableNights: hotelSellableNights,
+            bookedNights: hotelBookedNights,
+            remainingNights: hotelRemainingNights,
+            percentage: hotelOccupancyPercentage,
+          },
         };
       });
 
@@ -1670,9 +1717,14 @@ router.get(
         hotels: results,
         totals,
         occupancy: {
+          grossNights,
+          closedNights,
+          sellableNights,
           bookedNights,
-          availableNights,
+          availableNights: remainingNights,
+          remainingNights,
           percentage: occupancyPercentage,
+          vacancyPercentage,
         },
         topNationalities,
         bookings: detailedBookings.slice(0, 100), // Limit to 100 for API response
@@ -1696,6 +1748,10 @@ router.get(
       .optional()
       .isInt({ min: 1, max: 180 })
       .withMessage("Days must be between 1 and 180"),
+    query("horizon")
+      .optional()
+      .isIn(["upcoming", "past"])
+      .withMessage("Horizon must be either upcoming or past"),
     query("hotelId").optional().isString().withMessage("Hotel ID must be a string"),
   ],
   async (req: Request, res: Response) => {
@@ -1706,6 +1762,7 @@ router.get(
 
     try {
       const days = req.query.days ? Number(req.query.days) : 7;
+      const horizon = req.query.horizon === "past" ? "past" : "upcoming";
       const hotelId = req.query.hotelId ? String(req.query.hotelId) : "";
       let hotelQuery: Record<string, unknown> = req.userRole === "admin" ? {} : { userId: req.userId };
 
@@ -1743,10 +1800,17 @@ router.get(
         await Promise.all([
           Booking.find({
             hotelId: { $in: hotelIds },
-            status: { $in: ["pending", "confirmed", "arrived"] },
-            checkIn: { $gte: today, $lt: windowEnd },
+            ...(horizon === "past"
+              ? {
+                  status: { $nin: ["cancelled", "refunded"] },
+                  checkIn: { $lt: today },
+                }
+              : {
+                  status: { $in: ["pending", "confirmed", "arrived"] },
+                  checkIn: { $gte: today, $lt: windowEnd },
+                }),
           })
-            .sort({ checkIn: 1, createdAt: 1 })
+            .sort(horizon === "past" ? { checkIn: -1, createdAt: -1 } : { checkIn: 1, createdAt: 1 })
             .select(
               "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
             ),
@@ -1754,9 +1818,11 @@ router.get(
             hotelId: { $in: hotelIds },
             source: BOOKING_COM_SOURCE,
             status: "active",
-            startDate: { $gte: today, $lt: windowEnd },
+            ...(horizon === "past"
+              ? { startDate: { $lt: today } }
+              : { startDate: { $gte: today, $lt: windowEnd } }),
           })
-            .sort({ startDate: 1, createdAt: 1 })
+            .sort(horizon === "past" ? { startDate: -1, createdAt: -1 } : { startDate: 1, createdAt: 1 })
             .select(
               "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
             ),
@@ -1870,7 +1936,10 @@ router.get(
       });
 
       const rows = [...rowMap.values()].sort(
-        (left, right) => new Date(left.checkIn).getTime() - new Date(right.checkIn).getTime()
+        (left, right) =>
+          horizon === "past"
+            ? new Date(right.checkIn).getTime() - new Date(left.checkIn).getTime()
+            : new Date(left.checkIn).getTime() - new Date(right.checkIn).getTime()
       );
 
       const arrivalsToday = upcomingRows.filter((row) => {
@@ -1890,8 +1959,8 @@ router.get(
 
       return res.status(200).json({
         range: {
-          start: today.toISOString(),
-          end: windowEnd.toISOString(),
+          start: (horizon === "past" ? new Date(0) : today).toISOString(),
+          end: (horizon === "past" ? today : windowEnd).toISOString(),
           days,
         },
         summary: {

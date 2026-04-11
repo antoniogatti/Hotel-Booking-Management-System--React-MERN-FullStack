@@ -446,10 +446,12 @@ export type UpcomingCheckInsResponse = {
 export const fetchUpcomingCheckIns = async (filters?: {
   days?: number;
   hotelId?: string;
+  horizon?: "upcoming" | "past";
 }): Promise<UpcomingCheckInsResponse> => {
   const params = new URLSearchParams();
   if (filters?.days) params.append("days", String(filters.days));
   if (filters?.hotelId) params.append("hotelId", filters.hotelId);
+  if (filters?.horizon) params.append("horizon", filters.horizon);
 
   const response = await axiosInstance.get(
     `/api/bookings/dashboard/upcoming-check-ins?${params.toString()}`
