@@ -1,0 +1,20 @@
+User-agent: *
+Allow: /
+
+# Exclude admin, private, and API-related frontend routes
+Disallow: /admin-portal
+Disallow: /booking-dashboard
+Disallow: /booking/
+Disallow: /booking-com-sync
+Disallow: /manage-bookings
+Disallow: /my-hotels
+Disallow: /vacancy-management
+Disallow: /add-hotel
+Disallow: /edit-hotel/
+Disallow: /hotel/*/check-in/
+Disallow: /api-docs
+Disallow: /api-status
+Disallow: /sign-in
+Disallow: /auth/callback
+
+Sitemap: https://www.palazzopintobnb.com/sitemap.xml

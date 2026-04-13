@@ -21,6 +21,7 @@ import {
 import { getValidMicrosoftGraphAccessToken } from "../lib/microsoft-graph-auth";
 import { syncBookingFromExcel } from "../lib/excel-booking-sync";
 import { syncBookingFromOneNote } from "../lib/onenote-booking-sync";
+import { applyOneNoteSyncToRecord } from "../lib/onenote-booking-apply";
 import { body, param, query, validationResult } from "express-validator";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
@@ -319,98 +320,6 @@ const applyExcelSyncToRecord = (params: {
   return {
     priceChanged,
     previousTotalCost,
-  };
-};
-
-const applyOneNoteSyncToRecord = (params: {
-  record: any;
-  matchedPage: {
-    pageId: string;
-    title?: string;
-    sectionName?: string;
-    parsed: {
-      room?: string;
-      guestName?: string;
-      arrivalNote?: string;
-      adults?: number;
-      children?: number;
-      nationality?: string;
-      phone?: string;
-      whatsapp?: string;
-      nights?: number;
-      checkOutNote?: string;
-      bookingSource?: string;
-      paymentNote?: string;
-      amountDueEUR?: number;
-      notes?: string;
-      rawLines: string[];
-    };
-  };
-  guestName: {
-    firstName: string;
-    lastName: string;
-  };
-  fallback: {
-    phone?: string;
-    email?: string;
-    nationality?: string;
-  };
-}) => {
-  const { record, matchedPage, guestName, fallback } = params;
-  const parsed = matchedPage.parsed;
-
-  if (guestName.firstName) {
-    record.firstName = guestName.firstName;
-  }
-  if (guestName.lastName) {
-    record.lastName = guestName.lastName;
-  }
-  if (parsed.phone) {
-    record.phone = parsed.phone;
-  }
-  if (parsed.nationality) {
-    record.nationality = parsed.nationality;
-  }
-  if (typeof parsed.adults === "number") {
-    record.adultCount = parsed.adults;
-  }
-  if (typeof parsed.children === "number") {
-    record.childCount = parsed.children;
-  }
-
-  record.checkInInfo = {
-    ...(record.checkInInfo || {}),
-    arrivalTime: parsed.arrivalNote || record.checkInInfo?.arrivalTime || "",
-    phone: parsed.phone || record.checkInInfo?.phone || fallback.phone || "",
-    email: record.checkInInfo?.email || fallback.email || "",
-    nationality: parsed.nationality || record.checkInInfo?.nationality || fallback.nationality || "",
-    bookingChannel: parsed.bookingSource || record.checkInInfo?.bookingChannel || "",
-    paymentDetails: parsed.paymentNote || record.checkInInfo?.paymentDetails || "",
-    specialNotes: record.checkInInfo?.specialNotes || "",
-    breakfast: record.checkInInfo?.breakfast,
-    documents: record.checkInInfo?.documents || [],
-    cityTax: record.checkInInfo?.cityTax || 0,
-    checkedInAt: record.checkInInfo?.checkedInAt,
-  };
-
-  record.oneNoteSync = {
-    lastSyncedAt: new Date(),
-    matchedPageId: matchedPage.pageId,
-    matchedPageTitle: matchedPage.title,
-    matchedSectionName: matchedPage.sectionName,
-    room: parsed.room,
-    guestName: parsed.guestName,
-    arrivalNote: parsed.arrivalNote,
-    nationality: parsed.nationality,
-    phone: parsed.phone,
-    whatsapp: parsed.whatsapp,
-    nights: parsed.nights,
-    checkOutNote: parsed.checkOutNote,
-    bookingSource: parsed.bookingSource,
-    paymentNote: parsed.paymentNote,
-    amountDueEUR: parsed.amountDueEUR,
-    notes: parsed.notes,
-    rawLines: parsed.rawLines,
   };
 };
 

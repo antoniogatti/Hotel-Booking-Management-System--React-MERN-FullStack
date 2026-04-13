@@ -18,27 +18,32 @@ import { siteConfig } from "../config/siteConfig";
 const linkClass =
   "flex items-center gap-2 w-full py-3 font-bold text-gray-900 hover:text-primary-600 transition-colors";
 
-const MobileNavLinks = () => {
+type MobileNavLinksProps = {
+  onNavigate?: () => void;
+};
+
+const MobileNavLinks = ({ onNavigate }: MobileNavLinksProps) => {
   const { isLoggedIn, userRole } = useAppContext();
 
   return (
     <div className="flex flex-col gap-1">
       <Link
         to={siteConfig.singlePropertyMode ? "/rooms" : getHotelsSearchUrl()}
+        onClick={onNavigate}
         className={linkClass}
       >
         <Hotel className="h-4 w-4" />
         {siteConfig.singlePropertyMode ? "Rooms" : "Hotels"}
       </Link>
-      <Link to="/contact-us" className={linkClass}>
+      <Link to="/contact-us" onClick={onNavigate} className={linkClass}>
         <Mail className="h-4 w-4" />
         Contact Us
       </Link>
-      <Link to="/our-recommendations" className={linkClass}>
+      <Link to="/our-recommendations" onClick={onNavigate} className={linkClass}>
         <Sparkles className="h-4 w-4" />
         Our Recommendations
       </Link>
-      <Link to="/reach-us" className={linkClass}>
+      <Link to="/reach-us" onClick={onNavigate} className={linkClass}>
         <MapPin className="h-4 w-4" />
         Reach Us
       </Link>
@@ -47,7 +52,7 @@ const MobileNavLinks = () => {
         <>
           {!siteConfig.singlePropertyMode && (
             <>
-              <Link to="/business-insights" className={linkClass}>
+              <Link to="/business-insights" onClick={onNavigate} className={linkClass}>
                 <BarChart3 className="h-4 w-4" />
                 Business Insights
               </Link>
@@ -55,11 +60,11 @@ const MobileNavLinks = () => {
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1 mb-2">
                   API
                 </p>
-                <Link to="/api-docs" className={`${linkClass} pl-4`}>
+                <Link to="/api-docs" onClick={onNavigate} className={`${linkClass} pl-4`}>
                   <FileText className="h-4 w-4" />
                   API Docs
                 </Link>
-                <Link to="/api-status" className={`${linkClass} pl-4`}>
+                <Link to="/api-status" onClick={onNavigate} className={`${linkClass} pl-4`}>
                   <Activity className="h-4 w-4" />
                   API Status
                 </Link>
@@ -73,9 +78,9 @@ const MobileNavLinks = () => {
 
       <div className="min-h-[52px] flex items-center justify-center">
         {isLoggedIn ? (
-          <UsernameMenu />
+          <UsernameMenu onNavigate={onNavigate} />
         ) : (
-          <Link to="/sign-in" className="w-full">
+          <Link to="/sign-in" onClick={onNavigate} className="w-full">
             <Button className="w-full font-bold">
               <LogIn className="h-4 w-4 mr-2" />
               Log In

@@ -8,10 +8,13 @@ import {
 } from "./ui/sheet";
 import { Separator } from "./ui/separator";
 import MobileNavLinks from "./MobileNavLinks";
+import { useState } from "react";
 
 const MobileNav = () => {
+  const [isOpen, setIsOpen] = useState(false);
+
   return (
-    <Sheet>
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
       <SheetTrigger
         aria-label="Open menu"
         className="rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#aab09a] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
@@ -22,7 +25,7 @@ const MobileNav = () => {
         <SheetTitle className="text-left text-gray-900">Menu</SheetTitle>
         <Separator />
         <SheetDescription className="flex-1 pt-4 flex flex-col text-left">
-          <MobileNavLinks />
+          <MobileNavLinks onNavigate={() => setIsOpen(false)} />
         </SheetDescription>
       </SheetContent>
     </Sheet>

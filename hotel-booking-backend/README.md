@@ -103,6 +103,12 @@ CONTACT_MAIL_INBOX=info@palazzopintobnb.com
 CONTACT_MAIL_SUBJECT_PREFIX=[PalazzoPinto][ContactForm]
 CONTACT_MAIL_CONFIRMATION_SUBJECT=Message Sent - Confirmation
 
+# Azure OpenAI booking extraction
+AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com/
+AZURE_OPENAI_API_KEY=your_azure_openai_api_key
+AZURE_OPENAI_DEPLOYMENT_NAME=gpt-5-mini
+AZURE_OPENAI_API_VERSION=2024-12-01-preview
+
 ```
 
 ---

@@ -3,9 +3,11 @@ import {
   listPrenotazioniPages,
 } from "./onenote-service";
 import {
+  extractPlainTextLinesFromOneNoteHtml,
   ParsedOneNoteBooking,
   parseOneNoteBookingPage,
 } from "./onenote-booking-parser";
+import { extractBookingDataWithAzureOpenAI } from "./azure-openai-booking-extractor";
 
 type SyncBookingTarget = {
   firstName?: string;
@@ -30,6 +32,27 @@ type ParsedPrenotazioniPage = {
 };
 
 const BATCH_SIZE = 5;
+
+const mergeParsedBooking = (preferred: ParsedOneNoteBooking, fallback: ParsedOneNoteBooking): ParsedOneNoteBooking => ({
+  room: preferred.room || fallback.room,
+  guestName: preferred.guestName || fallback.guestName,
+  arrivalNote: preferred.arrivalNote || fallback.arrivalNote,
+  adults: typeof preferred.adults === "number" ? preferred.adults : fallback.adults,
+  children: typeof preferred.children === "number" ? preferred.children : fallback.children,
+  childDetails: preferred.childDetails || fallback.childDetails,
+  nationality: preferred.nationality || fallback.nationality,
+  phone: preferred.phone || fallback.phone,
+  whatsapp: preferred.whatsapp || fallback.whatsapp,
+  nights: typeof preferred.nights === "number" ? preferred.nights : fallback.nights,
+  checkOutNote: preferred.checkOutNote || fallback.checkOutNote,
+  bookingSource: preferred.bookingSource || fallback.bookingSource,
+  paymentNote: preferred.paymentNote || fallback.paymentNote,
+  amountDueEUR:
+    typeof preferred.amountDueEUR === "number" ? preferred.amountDueEUR : fallback.amountDueEUR,
+  notes: preferred.notes || fallback.notes,
+  dateRange: preferred.dateRange?.checkInDate || preferred.dateRange?.checkOutDate ? preferred.dateRange : fallback.dateRange,
+  rawLines: preferred.rawLines.length > 0 ? preferred.rawLines : fallback.rawLines,
+});
 
 const normalizeText = (value?: string) =>
   String(value || "")
@@ -164,6 +187,31 @@ const splitGuestName = (guestName?: string) => {
   };
 };
 
+const enhanceMatchedPageWithAzureOpenAI = async (params: {
+  accessToken: string;
+  page: ParsedPrenotazioniPage;
+}) => {
+  try {
+    const html = await getOneNotePageContent(params.accessToken, params.page.pageId);
+    const text = extractPlainTextLinesFromOneNoteHtml(html).join("\n");
+    if (!text.trim()) {
+      return params.page;
+    }
+
+    const aiParsed = await extractBookingDataWithAzureOpenAI({
+      text,
+      pageTitle: params.page.title,
+    });
+
+    return {
+      ...params.page,
+      parsed: mergeParsedBooking(aiParsed, params.page.parsed),
+    } satisfies ParsedPrenotazioniPage;
+  } catch {
+    return params.page;
+  }
+};
+
 export const syncBookingFromOneNote = async (params: {
   accessToken: string;
   booking: SyncBookingTarget;
@@ -189,7 +237,10 @@ export const syncBookingFromOneNote = async (params: {
   }
 
   if (exactDateMatches.length === 1) {
-    const matchedPage = exactDateMatches[0];
+    const matchedPage = await enhanceMatchedPageWithAzureOpenAI({
+      accessToken: params.accessToken,
+      page: exactDateMatches[0],
+    });
     return {
       matched: true as const,
       pageCount: parsedPages.length,
@@ -234,11 +285,16 @@ export const syncBookingFromOneNote = async (params: {
     };
   }
 
+  const enhancedBestMatch = await enhanceMatchedPageWithAzureOpenAI({
+    accessToken: params.accessToken,
+    page: bestMatch.page,
+  });
+
   return {
     matched: true as const,
     pageCount: parsedPages.length,
     sectionCount,
-    page: bestMatch.page,
-    guestName: splitGuestName(bestMatch.page.parsed.guestName),
+    page: enhancedBestMatch,
+    guestName: splitGuestName(enhancedBestMatch.parsed.guestName),
   };
 };

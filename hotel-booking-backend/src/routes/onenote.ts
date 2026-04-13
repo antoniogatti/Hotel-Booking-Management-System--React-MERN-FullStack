@@ -1,8 +1,10 @@
 import express, { Request, Response } from "express";
-import { param, query, validationResult } from "express-validator";
+import { body, param, query, validationResult } from "express-validator";
 import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
 import User from "../models/user";
+import Booking from "../models/booking";
+import ExternalCalendarEvent from "../models/external-calendar-event";
 import { getValidMicrosoftGraphAccessToken } from "../lib/microsoft-graph-auth";
 import {
   getOneNotePage,
@@ -12,7 +14,13 @@ import {
   listPrenotazioniPages,
   listOneNoteSections,
 } from "../lib/onenote-service";
-import { parseOneNoteBookingPage } from "../lib/onenote-booking-parser";
+import {
+  extractPlainTextLinesFromOneNoteHtml,
+  parseOneNoteBookingPage,
+} from "../lib/onenote-booking-parser";
+import { extractBookingDataWithAzureOpenAI } from "../lib/azure-openai-booking-extractor";
+import { applyOneNoteSyncToRecord, splitGuestName } from "../lib/onenote-booking-apply";
+import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
 
 const router = express.Router();
@@ -251,6 +259,150 @@ router.get(
         pageId: req.params.pageId,
       });
       res.status(500).json({ message: "Unable to fetch OneNote page content" });
+    }
+  }
+);
+
+router.post(
+  "/ai/extract-booking",
+  [
+    body("text").optional().isString().withMessage("Text must be a string"),
+    body("pageId").optional().isString().withMessage("Page ID must be a string"),
+    body("bookingId").optional().isString().withMessage("Booking ID must be a string"),
+    body("saveToBooking").optional().isBoolean().withMessage("saveToBooking must be a boolean"),
+    body("systemPrompt").optional().isString().withMessage("System prompt must be a string"),
+  ],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const rawText = typeof req.body.text === "string" ? req.body.text.trim() : "";
+    const pageId = typeof req.body.pageId === "string" ? req.body.pageId.trim() : "";
+    const bookingId = typeof req.body.bookingId === "string" ? req.body.bookingId.trim() : "";
+    const saveToBooking = req.body.saveToBooking === true;
+
+    if (!rawText && !pageId) {
+      return res.status(400).json({
+        message: "Provide either text or pageId to extract booking data",
+      });
+    }
+
+    if (saveToBooking && !bookingId) {
+      return res.status(400).json({
+        message: "bookingId is required when saveToBooking is true",
+      });
+    }
+
+    try {
+      let sourceText = rawText;
+      let pageTitle: string | undefined;
+      let ruleBased: ReturnType<typeof parseOneNoteBookingPage> | undefined;
+
+      if (!sourceText) {
+        const accessToken = await getUserGraphAccessToken(req, res);
+        if (!accessToken) {
+          return;
+        }
+
+        const [page, html] = await Promise.all([
+          getOneNotePage(accessToken, pageId),
+          getOneNotePageContent(accessToken, pageId),
+        ]);
+
+        pageTitle = page.title;
+        sourceText = extractPlainTextLinesFromOneNoteHtml(html).join("\n");
+        ruleBased = parseOneNoteBookingPage({
+          title: page.title,
+          html,
+        });
+      }
+
+      const extracted = await extractBookingDataWithAzureOpenAI({
+        text: sourceText,
+        pageTitle,
+        systemPrompt: typeof req.body.systemPrompt === "string" ? req.body.systemPrompt : undefined,
+      });
+
+      let savedRecord: any = null;
+      let recordType: "booking" | "external_booking" | null = null;
+
+      if (saveToBooking && bookingId) {
+        let booking = await Booking.findById(bookingId);
+        let importedEvent: any = null;
+
+        if (!booking) {
+          importedEvent = await ExternalCalendarEvent.findById(bookingId);
+        }
+
+        if (!booking && !importedEvent) {
+          return res.status(404).json({ message: "Booking not found" });
+        }
+
+        const targetRecord = booking || importedEvent;
+        recordType = booking ? "booking" : "external_booking";
+
+        applyOneNoteSyncToRecord({
+          record: targetRecord,
+          matchedPage: {
+            pageId: pageId || `azure-openai:${new Date().toISOString()}`,
+            title: pageTitle || "Azure OpenAI extraction",
+            sectionName: "Prenotazioni",
+            parsed: extracted,
+          },
+          guestName: splitGuestName(
+            extracted.guestName || `${targetRecord.firstName || ""} ${targetRecord.lastName || ""}`.trim()
+          ),
+          fallback: {
+            phone: targetRecord.phone,
+            email: targetRecord.email,
+            nationality: targetRecord.nationality,
+          },
+        });
+
+        await targetRecord.save();
+        savedRecord = targetRecord;
+
+        await recordAuditEvent({
+          action: "booking.onenote-ai-sync.completed",
+          entityType: recordType,
+          entityId: String(targetRecord._id),
+          hotelId: String(targetRecord.hotelId),
+          actorId: req.userId,
+          actorRole: req.userRole,
+          req,
+          metadata: {
+            bookingId,
+            pageId: pageId || undefined,
+            pageTitle,
+            bookingSource: extracted.bookingSource,
+            guestName: extracted.guestName,
+          },
+        });
+      }
+
+      return res.status(200).json({
+        message: saveToBooking
+          ? "Azure OpenAI booking data extracted and applied successfully"
+          : "Azure OpenAI booking data extracted successfully",
+        extracted,
+        source: {
+          pageId: pageId || null,
+          pageTitle: pageTitle || null,
+          textLength: sourceText.length,
+        },
+        ruleBased,
+        booking: savedRecord,
+      });
+    } catch (error) {
+      logError("Unable to extract booking data with Azure OpenAI", error, {
+        route: "onenote.ai.extract-booking",
+        actorId: req.userId,
+        pageId: req.body.pageId,
+        bookingId: req.body.bookingId,
+      });
+      return res.status(500).json({ message: "Unable to extract booking data with Azure OpenAI" });
     }
   }
 );

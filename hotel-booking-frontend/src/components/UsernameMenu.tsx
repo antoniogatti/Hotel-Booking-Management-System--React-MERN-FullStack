@@ -18,7 +18,11 @@ const getAvatarUrl = () => {
   return apiClient.DEFAULT_PROFILE_IMAGE;
 };
 
-const UsernameMenu = () => {
+type UsernameMenuProps = {
+  onNavigate?: () => void;
+};
+
+const UsernameMenu = ({ onNavigate }: UsernameMenuProps) => {
   const { isOwnerOrAdmin } = useAppContext();
   const [isOpen, setIsOpen] = useState(false);
   const [imgError, setImgError] = useState(false);
@@ -30,11 +34,15 @@ const UsernameMenu = () => {
     ? apiClient.DEFAULT_PROFILE_IMAGE
     : getAvatarUrl();
 
-  const handleMenuClick = () => setIsOpen(false);
+  const handleMenuClick = () => {
+    setIsOpen(false);
+    onNavigate?.();
+  };
 
   const handleLogout = async () => {
     await apiClient.signOut();
     setIsOpen(false);
+    onNavigate?.();
     window.location.href = "/";
   };
 
@@ -66,6 +74,7 @@ const UsernameMenu = () => {
             >
               <Link
                 to="/admin-portal"
+                onClick={handleMenuClick}
                 className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
               >
                 <Shield className="h-4 w-4" />
@@ -79,6 +88,7 @@ const UsernameMenu = () => {
             >
               <Link
                 to="/manage-bookings"
+                onClick={handleMenuClick}
                 className="flex items-center gap-2 w-full font-bold hover:text-primary-600"
               >
                 <CalendarDays className="h-4 w-4" />

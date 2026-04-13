@@ -7,6 +7,7 @@ import {
   Clock,
   CheckCircle2,
   CheckCheck,
+  Loader2,
   Mail,
   Phone,
   Calendar,
@@ -26,6 +27,10 @@ interface BookingDetailsResponse extends Omit<BookingType, "status"> {
   hotelId: any;
   hotelName?: string;
   status?: BookingType["status"] | "imported";
+  isImported?: boolean;
+  summary?: string;
+  source?: "local" | "booking_com";
+  sourceLabel?: string;
 }
 
 const BookingDetails = () => {
@@ -175,10 +180,14 @@ const BookingDetails = () => {
   const syncOneNoteMutation = useMutation(
     () => apiClient.syncBookingFromOneNote(bookingId || ""),
     {
-      onSuccess: (data) => {
+      onMutate: () => {
+        setOneNoteSyncMessage(null);
+        setOneNoteSyncError(null);
+      },
+      onSuccess: async (data) => {
         setOneNoteSyncError(null);
         setOneNoteSyncMessage(data?.message || "OneNote data synced");
-        queryClient.invalidateQueries(["bookingDetails", bookingId]);
+        await queryClient.invalidateQueries(["bookingDetails", bookingId]);
       },
       onError: (mutationError: any) => {
         setOneNoteSyncMessage(null);
@@ -231,6 +240,7 @@ const BookingDetails = () => {
 
   const roomName =
     booking?.hotelName || booking?.oneNoteSync?.room || booking?.excelSync?.matchedRoom || "";
+  const isOneNoteLoading = syncOneNoteMutation.isLoading;
 
   if (isLoading) {
     return (
@@ -602,22 +612,44 @@ const BookingDetails = () => {
             </CardContent>
           </Card>
 
-          {booking.oneNoteSync && (
+          {(booking.oneNoteSync || isOneNoteLoading) && (
             <Card className="border-0 shadow-lg">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-cyan-600" />
-                  OneNote Match
-                </CardTitle>
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-cyan-600" />
+                    OneNote Match
+                  </CardTitle>
+                  {isOneNoteLoading && (
+                    <div className="inline-flex items-center gap-2 rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-cyan-700">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading
+                    </div>
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
+                {isOneNoteLoading && (
+                  <div className="mb-6 rounded-2xl border border-cyan-100 bg-gradient-to-r from-cyan-50 via-white to-sky-50 px-4 py-4">
+                    <div className="flex items-center gap-3 text-cyan-800">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <div>
+                        <p className="text-sm font-semibold">Syncing OneNote details</p>
+                        <p className="text-xs text-cyan-700">
+                          Matching the page and refreshing extracted booking data.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Matched Page
                     </label>
                     <p className="text-gray-900 font-medium">
-                      {booking.oneNoteSync.matchedPageTitle || "-"}
+                      {booking.oneNoteSync?.matchedPageTitle || (isOneNoteLoading ? "Loading..." : "-")}
                     </p>
                   </div>
                   <div>
@@ -625,7 +657,7 @@ const BookingDetails = () => {
                       Matched Room
                     </label>
                     <p className="text-gray-900 font-medium">
-                      {booking.oneNoteSync.room || "-"}
+                      {booking.oneNoteSync?.room || (isOneNoteLoading ? "Loading..." : "-")}
                     </p>
                   </div>
                   <div>
@@ -633,7 +665,7 @@ const BookingDetails = () => {
                       Guest Name
                     </label>
                     <p className="text-gray-900 font-medium">
-                      {booking.oneNoteSync.guestName || `${booking.firstName} ${booking.lastName}`}
+                      {booking.oneNoteSync?.guestName || `${booking.firstName} ${booking.lastName}`}
                     </p>
                   </div>
                   <div>
@@ -641,7 +673,7 @@ const BookingDetails = () => {
                       Arrival
                     </label>
                     <p className="text-gray-900 font-medium">
-                      {booking.oneNoteSync.arrivalNote || "-"}
+                      {booking.oneNoteSync?.arrivalNote || (isOneNoteLoading ? "Loading..." : "-")}
                     </p>
                   </div>
                   <div>
@@ -649,8 +681,8 @@ const BookingDetails = () => {
                       Phone / WhatsApp
                     </label>
                     <p className="text-gray-900 font-medium break-words">
-                      {booking.oneNoteSync.phone || "-"}
-                      {booking.oneNoteSync.whatsapp ? ` · ${booking.oneNoteSync.whatsapp}` : ""}
+                      {booking.oneNoteSync?.phone || (isOneNoteLoading ? "Loading..." : "-")}
+                      {booking.oneNoteSync?.whatsapp ? ` · ${booking.oneNoteSync.whatsapp}` : ""}
                     </p>
                   </div>
                   <div>
@@ -658,7 +690,7 @@ const BookingDetails = () => {
                       Nationality
                     </label>
                     <p className="text-gray-900 font-medium">
-                      {booking.oneNoteSync.nationality || "-"}
+                      {booking.oneNoteSync?.nationality || (isOneNoteLoading ? "Loading..." : "-")}
                     </p>
                   </div>
                   <div>
@@ -666,7 +698,7 @@ const BookingDetails = () => {
                       Nights / Check-out
                     </label>
                     <p className="text-gray-900 font-medium">
-                      {booking.oneNoteSync.nights || "-"} / {booking.oneNoteSync.checkOutNote || "-"}
+                      {booking.oneNoteSync?.nights || (isOneNoteLoading ? "Loading..." : "-")} / {booking.oneNoteSync?.checkOutNote || (isOneNoteLoading ? "Loading..." : "-")}
                     </p>
                   </div>
                   <div>
@@ -674,8 +706,8 @@ const BookingDetails = () => {
                       Payment
                     </label>
                     <p className="text-gray-900 font-medium">
-                      {booking.oneNoteSync.paymentNote || "-"}
-                      {typeof booking.oneNoteSync.amountDueEUR === "number"
+                      {booking.oneNoteSync?.paymentNote || (isOneNoteLoading ? "Loading..." : "-")}
+                      {typeof booking.oneNoteSync?.amountDueEUR === "number"
                         ? ` · EUR ${booking.oneNoteSync.amountDueEUR.toFixed(2)}`
                         : ""}
                     </p>
@@ -687,7 +719,7 @@ const BookingDetails = () => {
                     Notes
                   </label>
                   <p className="whitespace-pre-wrap text-gray-700">
-                    {booking.oneNoteSync.notes || "-"}
+                    {booking.oneNoteSync?.notes || (isOneNoteLoading ? "Loading..." : "-")}
                   </p>
                 </div>
               </CardContent>
