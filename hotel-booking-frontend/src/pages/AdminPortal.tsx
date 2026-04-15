@@ -94,19 +94,19 @@ const AdminPortal = () => {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link to="/admin-portal/check-in">
-                <Button className="bg-[#ea836c] hover:bg-[#db755f]">
+              <Button asChild className="bg-[#ea836c] hover:bg-[#db755f]">
+                <Link to="/admin-portal/check-in">
                   <CalendarClock className="mr-2 h-4 w-4" />
                   Open Check-In Desk
-                </Button>
-              </Link>
+                </Link>
+              </Button>
               {userRole === "admin" && (
-                <Link to="/booking-com-sync">
-                  <Button variant="secondary">
+                <Button asChild variant="secondary">
+                  <Link to="/booking-com-sync">
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Open Sync Center
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
               )}
             </div>
           </div>
@@ -244,16 +244,16 @@ const AdminPortal = () => {
                         </div>
 
                         <div className="mt-4 flex flex-wrap gap-2">
-                          <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
-                            <Button size="sm" className="bg-[#ea836c] hover:bg-[#db755f]">
+                          <Button asChild size="sm" className="bg-[#ea836c] hover:bg-[#db755f]">
+                            <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
                               Start check-in
-                            </Button>
-                          </Link>
-                          <Link to="/admin-portal/check-in">
-                            <Button size="sm" variant="secondary">
+                            </Link>
+                          </Button>
+                          <Button asChild size="sm" variant="secondary">
+                            <Link to={`/booking/${row._id}`}>
                               Update Booking
-                            </Button>
-                          </Link>
+                            </Link>
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -303,11 +303,11 @@ const AdminPortal = () => {
                         <div className={`rounded-full px-3 py-1 text-xs font-semibold ${row.isCheckedIn ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
                           {row.isCheckedIn ? "Checked in" : "Needs action"}
                         </div>
-                        <Link to={`/booking/${row._id}`}>
-                          <Button size="sm" className="bg-slate-900 hover:bg-slate-800">
+                        <Button asChild size="sm" className="bg-slate-900 hover:bg-slate-800">
+                          <Link to={`/booking/${row._id}`}>
                             Update Booking
-                          </Button>
-                        </Link>
+                          </Link>
+                        </Button>
                       </div>
                     </div>
                   ))}

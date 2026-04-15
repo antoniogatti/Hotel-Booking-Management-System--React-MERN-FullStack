@@ -1,5 +1,21 @@
 # Version History
 
+## 1.10.0 - 2026-04-15
+
+### Admin Mobile Reliability and Navigation
+- Replaced the mobile admin drawer implementation to remove the interaction issues that blocked taps on mobile devices.
+- Redesigned the mobile admin menu with an inline second level for admin tools and API links.
+- Fixed admin portal `Update Booking` actions so they open the booking details page directly instead of sending users to the check-in flow.
+
+### Front-Desk and Check-In UX
+- Reworked the Check-In Desk into a responsive mobile-first layout with card-based rows on small screens and the full table on larger screens.
+- Removed the editable `Room Total` field from the guest check-in form and now rely on the stored booking total for payment summary calculations.
+- Made the guest check-in page mobile-first with clearer card layout, stacked actions, and less cramped document and form sections.
+
+### OneNote-Enriched Check-In Details
+- Added a collapsed `OneNote Details` card after the booking summary on the guest check-in page.
+- Prefill arrival time, nationality, booking channel, payment details, and phone from synced OneNote and Excel metadata when available.
+
 ## 1.9.0 - 2026-04-10
 
 ### Booking Operations and Excel Sync

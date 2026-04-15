@@ -27,6 +27,12 @@
     --ring: 222.2 84% 4.9%;
     --radius: 0.5rem;
   }
+
+  a,
+  button,
+  [role="button"] {
+    touch-action: manipulation;
+  }
 }
 
 /* Cookie consent brand theme */

@@ -7,6 +7,17 @@ import { Button } from "../components/ui/button";
 import { useQueryWithLoading } from "../hooks/useLoadingHooks";
 import * as apiClient from "../api-client";
 
+const statusBadgeClass = (isCheckedIn: boolean) =>
+  isCheckedIn
+    ? "bg-emerald-100 text-emerald-700"
+    : "bg-amber-100 text-amber-700";
+
+const statusLabel = (isCheckedIn: boolean) =>
+  isCheckedIn ? "Checked in" : "Pending check-in";
+
+const actionLinkClass =
+  "inline-flex items-center gap-1 rounded-full px-2.5 py-1.5 text-sm font-medium transition-colors";
+
 const formatDateTime = (value?: string) => {
   if (!value) {
     return "Not set";
@@ -112,27 +123,27 @@ const AdminPortalCheckIns = () => {
   }, [data, statusFilter]);
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="flex flex-col gap-4 rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200 lg:flex-row lg:items-end lg:justify-between">
+    <div className="min-h-screen bg-slate-50 px-3 py-4 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-4 sm:space-y-6">
+        <div className="flex flex-col gap-4 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Link to="/admin-portal" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-800">
               <ArrowLeft className="h-4 w-4" />
               Back to Admin Portal
             </Link>
-            <h1 className="text-3xl font-bold text-slate-900">Check-In Desk</h1>
-            <p className="mt-2 text-sm text-slate-600">
+            <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Check-In Desk</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               Upcoming arrivals with room, arrival time, WhatsApp, email, and direct access to booking updates or the check-in procedure.
             </p>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:min-w-[32rem]">
             <label className="text-sm font-medium text-slate-700">
               Room
               <select
                 value={selectedHotelId}
                 onChange={(event) => setSelectedHotelId(event.target.value)}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
               >
                 <option value="">All rooms</option>
                 {rooms?.map((room) => (
@@ -148,7 +159,7 @@ const AdminPortalCheckIns = () => {
               <select
                 value={horizon}
                 onChange={(event) => setHorizon(event.target.value as HorizonFilter)}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
               >
                 <option value="1">Today</option>
                 <option value="7">Next 7 days</option>
@@ -163,7 +174,7 @@ const AdminPortalCheckIns = () => {
               <select
                 value={statusFilter}
                 onChange={(event) => setStatusFilter(event.target.value as CheckInStatusFilter)}
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm"
               >
                 <option value="all">All rows</option>
                 <option value="needs-action">Needs check-in</option>
@@ -173,8 +184,8 @@ const AdminPortalCheckIns = () => {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <Card className="rounded-2xl">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-slate-700">Arrivals Today</CardTitle>
             </CardHeader>
@@ -182,7 +193,7 @@ const AdminPortalCheckIns = () => {
               <p className="text-3xl font-bold text-slate-900">{data?.summary.arrivalsToday || 0}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="rounded-2xl">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-slate-700">Checked In Today</CardTitle>
             </CardHeader>
@@ -190,7 +201,7 @@ const AdminPortalCheckIns = () => {
               <p className="text-3xl font-bold text-slate-900">{data?.summary.checkedInToday || 0}</p>
             </CardContent>
           </Card>
-          <Card>
+          <Card className="rounded-2xl sm:col-span-2 xl:col-span-1">
             <CardHeader className="pb-2">
               <CardTitle className="text-base text-slate-700">Stays In House</CardTitle>
             </CardHeader>
@@ -200,9 +211,9 @@ const AdminPortalCheckIns = () => {
           </Card>
         </div>
 
-        <Card>
+        <Card className="overflow-hidden rounded-3xl">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-xl text-slate-900">
+            <CardTitle className="flex items-center gap-2 text-lg text-slate-900 sm:text-xl">
               <CalendarClock className="h-5 w-5 text-teal-600" />
               {horizon === "past" ? "Past bookings table" : "Upcoming arrivals table"}
             </CardTitle>
@@ -219,8 +230,111 @@ const AdminPortalCheckIns = () => {
                   : "No arrivals match the current filters."}
               </p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200 text-sm">
+              <>
+                <div className="space-y-4 md:hidden">
+                  {rows.map((row) => {
+                    const whatsappHref = getWhatsappHref(row.phone);
+                    return (
+                      <article
+                        key={row._id}
+                        className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-base font-semibold text-slate-900">{getGuestName(row)}</p>
+                            <p className="mt-1 text-sm font-medium text-slate-700">{row.hotelName}</p>
+                            <p className="truncate text-xs text-slate-500">{row.reservationNumber}</p>
+                          </div>
+                          <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(row.isCheckedIn)}`}>
+                            {statusLabel(row.isCheckedIn)}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                            {getChannelLabel(row)}
+                          </span>
+                          <span className="inline-flex rounded-full bg-[#eef7f6] px-2.5 py-1 text-xs font-semibold text-teal-700">
+                            Arrival {row.arrivalTime || "Missing"}
+                          </span>
+                        </div>
+
+                        <div className="mt-4 grid gap-3 rounded-2xl bg-slate-50 p-3 sm:grid-cols-2">
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Stay</p>
+                            <p className="mt-1 text-sm font-semibold text-slate-900">{formatStayDate(row.checkIn)}</p>
+                            <p className="text-sm text-slate-600">{formatStayDate(row.checkOut)}</p>
+                            {row.checkedInAt && (
+                              <p className="mt-1 text-xs text-slate-500">Checked in at {formatDateTime(row.checkedInAt)}</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Location</p>
+                            <p className="mt-1 text-sm font-semibold text-slate-900">{row.hotelName}</p>
+                            <p className="text-sm text-slate-600">
+                              {row.hotelCity}{row.hotelCountry ? `, ${row.hotelCountry}` : ""}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Contact</p>
+                          <div className="flex flex-wrap gap-2">
+                            {row.phone ? (
+                              <>
+                                <a href={`tel:${row.phone}`} className={`${actionLinkClass} bg-teal-50 text-teal-700 hover:bg-teal-100`}>
+                                  <Phone className="h-4 w-4" />
+                                  Call
+                                </a>
+                                {whatsappHref && (
+                                  <a
+                                    href={whatsappHref}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className={`${actionLinkClass} bg-emerald-50 text-emerald-700 hover:bg-emerald-100`}
+                                  >
+                                    <MessageCircleMore className="h-4 w-4" />
+                                    WhatsApp
+                                  </a>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-sm text-slate-400">No phone</span>
+                            )}
+                            {row.email ? (
+                              <a
+                                href={`mailto:${row.email}`}
+                                className={`${actionLinkClass} bg-sky-50 text-sky-700 hover:bg-sky-100`}
+                              >
+                                <Mail className="h-4 w-4" />
+                                Email guest
+                              </a>
+                            ) : (
+                              <span className="text-sm text-slate-400">No email</span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 grid gap-2">
+                          <Button asChild variant="secondary" size="sm" className="w-full justify-center sm:justify-start">
+                            <Link to={`/booking/${row._id}`}>
+                              Update booking
+                            </Link>
+                          </Button>
+                          <Button asChild size="sm" className="w-full justify-center bg-[#ea836c] hover:bg-[#db755f] sm:justify-start">
+                            <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
+                              <CheckCircle2 className="mr-2 h-4 w-4" />
+                              Check-In procedure
+                            </Link>
+                          </Button>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                <div className="hidden overflow-x-auto md:block">
+                  <table className="min-w-[980px] divide-y divide-slate-200 text-sm">
                   <thead>
                     <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                       <th className="px-3 py-3">Room</th>
@@ -252,8 +366,8 @@ const AdminPortalCheckIns = () => {
                           <td className="px-3 py-4 text-slate-700">
                             <div className="font-semibold text-slate-900">{formatStayDate(row.checkIn)}</div>
                             <div>{formatStayDate(row.checkOut)}</div>
-                            <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${row.isCheckedIn ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                              {row.isCheckedIn ? "Checked in" : "Pending check-in"}
+                            <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(row.isCheckedIn)}`}>
+                              {statusLabel(row.isCheckedIn)}
                             </div>
                             {row.checkedInAt && (
                               <div className="mt-1 text-xs text-slate-500">{formatDateTime(row.checkedInAt)}</div>
@@ -293,25 +407,26 @@ const AdminPortalCheckIns = () => {
                           </td>
                           <td className="px-3 py-4">
                             <div className="flex flex-col gap-2">
-                              <Link to={`/booking/${row._id}`}>
-                                <Button variant="secondary" size="sm" className="w-full justify-start">
+                              <Button asChild variant="secondary" size="sm" className="w-full justify-start">
+                                <Link to={`/booking/${row._id}`}>
                                   Update booking
-                                </Button>
-                              </Link>
-                              <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
-                                <Button size="sm" className="w-full justify-start bg-[#ea836c] hover:bg-[#db755f]">
+                                </Link>
+                              </Button>
+                              <Button asChild size="sm" className="w-full justify-start bg-[#ea836c] hover:bg-[#db755f]">
+                                <Link to={`/hotel/${row.hotelId}/check-in/${row._id}`}>
                                   <CheckCircle2 className="mr-2 h-4 w-4" />
                                   Check-In procedure
-                                </Button>
-                              </Link>
+                                </Link>
+                              </Button>
                             </div>
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                </table>
-              </div>
+                  </table>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

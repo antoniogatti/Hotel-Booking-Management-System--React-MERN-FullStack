@@ -52,10 +52,30 @@ export const AppContextProvider = ({
     | null
     | undefined;
 
+  const storedSessionToken =
+    typeof window !== "undefined" ? localStorage.getItem("session_id") : null;
+  const storedRoleValue =
+    typeof window !== "undefined" ? localStorage.getItem("user_role") : null;
+  const storedRole =
+    storedRoleValue === "user" ||
+    storedRoleValue === "hotel_owner" ||
+    storedRoleValue === "admin"
+      ? storedRoleValue
+      : null;
+
   const finalIsLoggedIn = !isLoading && !!authData && !isError;
   const resolvedRole = authData?.role ?? null;
 
-  const userRole = finalIsLoggedIn ? resolvedRole || "user" : null;
+  // Keep the last known auth state during token validation so protected routes
+  // do not immediately redirect on refresh or direct entry.
+  const isRestoringSession = isLoading && !!storedSessionToken;
+
+  const isLoggedIn = finalIsLoggedIn || isRestoringSession;
+  const userRole = finalIsLoggedIn
+    ? resolvedRole || "user"
+    : isRestoringSession
+    ? storedRole
+    : null;
   const isOwnerOrAdmin =
     userRole === "hotel_owner" || userRole === "admin";
 
@@ -89,7 +109,7 @@ export const AppContextProvider = ({
     <AppContext.Provider
       value={{
         showToast,
-        isLoggedIn: finalIsLoggedIn,
+        isLoggedIn,
         userRole,
         isOwnerOrAdmin,
         showGlobalLoading,
