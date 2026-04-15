@@ -38,6 +38,7 @@ import VacancyDashboard from "./pages/VacancyDashboard";
 import RoomLanding from "./pages/RoomLanding";
 import AdminPortal from "./pages/AdminPortal";
 import AdminPortalCheckIns from "./pages/AdminPortalCheckIns";
+import GuestBookPoc from "./pages/GuestBookPoc";
 import { siteConfig } from "./config/siteConfig";
 import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
 
@@ -62,6 +63,9 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/reach-us") return `${BRAND_NAME} | Reach Us`;
   if (pathname === "/our-recommendations") {
     return `${BRAND_NAME} | Our Recommendations`;
+  }
+  if (pathname === "/guest-book-poc") {
+    return `${BRAND_NAME} | Guest Book Prototype`;
   }
   if (pathname === "/privacy-cookie-policy") {
     return `${BRAND_NAME} | Privacy and Cookie Policy`;
@@ -218,6 +222,14 @@ const App = () => {
           element={
             <Layout>
               <OurRecommendations />
+            </Layout>
+          }
+        />
+        <Route
+          path="/guest-book-poc"
+          element={
+            <Layout>
+              <GuestBookPoc />
             </Layout>
           }
         />
