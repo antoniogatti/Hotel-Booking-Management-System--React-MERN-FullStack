@@ -1,5 +1,12 @@
 # Version History
 
+## 1.11.2 - 2026-05-20
+
+### Sync Scheduler
+- Enabled automatic sync scheduler to run 2 times per day (12:00 and 18:00 CET/Europe-Rome).
+- Target scope is imported bookings with missing first name or last name only.
+- Processing window is limited to arrivals from the job run date up to 2 days ahead.
+
 ## 1.11.1 - 2026-05-20
 
 ### Frontend Deployment Hotfix

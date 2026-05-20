@@ -1,7 +1,7 @@
 export const siteConfig = {
   app: {
-    version: "1.11.1",
-    releaseDate: "2026-04-15",
+    version: "1.11.2",
+    releaseDate: "2026-05-20",
   },
   singlePropertyMode: true,
   brand: {

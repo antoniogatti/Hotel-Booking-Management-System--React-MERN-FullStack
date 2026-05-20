@@ -23,6 +23,7 @@ import morgan from "morgan";
 import compression from "compression";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { startBookingComSyncScheduler } from "./lib/booking-com-ical";
+import { startBookingEnrichmentScheduler } from "./lib/booking-enrichment-scheduler";
 import { logError, logInfo, logWarn } from "./lib/logger";
 
 const isProduction = process.env.NODE_ENV === "production";
@@ -120,6 +121,7 @@ const connectDB = async () => {
       database: mongoose.connection.db.databaseName,
     });
     startBookingComSyncScheduler();
+    startBookingEnrichmentScheduler();
   } catch (error) {
     logError("MongoDB connection failed", error);
     process.exit(1);
