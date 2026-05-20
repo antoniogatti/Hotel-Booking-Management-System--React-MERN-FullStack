@@ -23,6 +23,7 @@ import { formatFriendlyDate } from "../lib/utils";
 
 type BookingDetails = {
   _id: string;
+  closedAt?: string | Date;
   hotelName?: string;
   hotelId?: string | { name?: string };
   reservationNumber?: string;

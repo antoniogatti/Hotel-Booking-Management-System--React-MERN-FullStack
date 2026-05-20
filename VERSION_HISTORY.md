@@ -1,5 +1,11 @@
 # Version History
 
+## 1.11.1 - 2026-05-20
+
+### Frontend Deployment Hotfix
+- Fixed a TypeScript typing mismatch in guest check-in booking details (`closedAt`) that caused frontend CI/deployment to fail.
+- Confirmed frontend production build succeeds after the fix.
+
 ## 1.11.0 - 2026-05-20
 
 ### Booking Date Accuracy Fix
