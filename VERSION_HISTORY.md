@@ -1,5 +1,11 @@
 # Version History
 
+## 1.11.3 - 2026-05-20
+
+### Sync Scheduler Operability
+- Added a manual run entrypoint for the booking enrichment scheduler to execute on demand outside scheduled slots.
+- Added a read-only simulation script to preview tomorrow's scheduler target set without applying updates.
+
 ## 1.11.2 - 2026-05-20
 
 ### Sync Scheduler

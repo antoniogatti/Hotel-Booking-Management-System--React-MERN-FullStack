@@ -22,6 +22,18 @@ let schedulerHandle: NodeJS.Timeout | null = null;
 let syncInProgress = false;
 let lastRunSlotKey = "";
 
+export type BookingEnrichmentRunSummary = {
+  slotKey: string;
+  timeZone: string;
+  processed: number;
+  syncedOneNote: number;
+  syncedExcel: number;
+  enrichedNames: number;
+  errors: number;
+  status: "completed" | "skipped";
+  reason?: string;
+};
+
 type TimeParts = {
   year: number;
   month: number;
@@ -190,9 +202,19 @@ const applyExcelSyncToImportedEvent = (params: {
   };
 };
 
-const runScheduledSync = async (slotKey: string) => {
+const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSummary> => {
   if (syncInProgress) {
-    return;
+    return {
+      slotKey,
+      timeZone: AUTO_SYNC_TIME_ZONE,
+      processed: 0,
+      syncedOneNote: 0,
+      syncedExcel: 0,
+      enrichedNames: 0,
+      errors: 0,
+      status: "skipped",
+      reason: "sync already in progress",
+    };
   }
 
   syncInProgress = true;
@@ -205,7 +227,17 @@ const runScheduledSync = async (slotKey: string) => {
     const automationUser = await getAutomationUser();
     if (!automationUser) {
       logWarn("Booking enrichment scheduler skipped: no Microsoft-connected admin/hotel owner");
-      return;
+      return {
+        slotKey,
+        timeZone: AUTO_SYNC_TIME_ZONE,
+        processed: 0,
+        syncedOneNote: 0,
+        syncedExcel: 0,
+        enrichedNames: 0,
+        errors: 0,
+        status: "skipped",
+        reason: "no Microsoft-connected admin/hotel owner",
+      };
     }
 
     const graphAccessToken = await getValidMicrosoftGraphAccessToken(automationUser);
@@ -213,7 +245,17 @@ const runScheduledSync = async (slotKey: string) => {
       logWarn("Booking enrichment scheduler skipped: Microsoft Graph token unavailable", {
         userId: String(automationUser._id),
       });
-      return;
+      return {
+        slotKey,
+        timeZone: AUTO_SYNC_TIME_ZONE,
+        processed: 0,
+        syncedOneNote: 0,
+        syncedExcel: 0,
+        enrichedNames: 0,
+        errors: 0,
+        status: "skipped",
+        reason: "Microsoft Graph token unavailable",
+      };
     }
 
     const candidates = await ExternalCalendarEvent.find({
@@ -239,7 +281,16 @@ const runScheduledSync = async (slotKey: string) => {
         slotKey,
         timeZone: AUTO_SYNC_TIME_ZONE,
       });
-      return;
+      return {
+        slotKey,
+        timeZone: AUTO_SYNC_TIME_ZONE,
+        processed: 0,
+        syncedOneNote: 0,
+        syncedExcel: 0,
+        enrichedNames: 0,
+        errors: 0,
+        status: "completed",
+      };
     }
 
     const hotelIds = Array.from(new Set(scopedCandidates.map((entry) => String(entry.hotelId))));
@@ -347,11 +398,34 @@ const runScheduledSync = async (slotKey: string) => {
       enrichedNames,
       errors,
     });
+
+    return {
+      slotKey,
+      timeZone: AUTO_SYNC_TIME_ZONE,
+      processed,
+      syncedOneNote,
+      syncedExcel,
+      enrichedNames,
+      errors,
+      status: "completed",
+    };
   } catch (error) {
     logError("Booking enrichment scheduler run failed", error, {
       slotKey,
       timeZone: AUTO_SYNC_TIME_ZONE,
     });
+
+    return {
+      slotKey,
+      timeZone: AUTO_SYNC_TIME_ZONE,
+      processed: 0,
+      syncedOneNote: 0,
+      syncedExcel: 0,
+      enrichedNames: 0,
+      errors: 1,
+      status: "skipped",
+      reason: error instanceof Error ? error.message : "unknown run failure",
+    };
   } finally {
     syncInProgress = false;
   }
@@ -388,4 +462,10 @@ export const startBookingEnrichmentScheduler = () => {
     targetFilter: "booking.com imports missing firstName/lastName",
     maxBookingsPerRun: AUTO_SYNC_MAX_BOOKINGS,
   });
+};
+
+export const runBookingEnrichmentSyncNow = async () => {
+  const now = new Date();
+  const slotKey = `manual-${now.toISOString()}`;
+  return runScheduledSync(slotKey);
 };
