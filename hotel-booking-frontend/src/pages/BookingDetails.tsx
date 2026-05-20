@@ -34,6 +34,23 @@ interface BookingDetailsResponse extends Omit<BookingType, "status"> {
 }
 
 const BookingDetails = () => {
+    // Mutations for close/open booking
+    const closeBookingMutation = useMutation(
+      () => apiClient.closeBooking(bookingId || ""),
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries(["bookingDetails", bookingId]);
+        },
+      }
+    );
+    const openBookingMutation = useMutation(
+      () => apiClient.openBooking(bookingId || ""),
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries(["bookingDetails", bookingId]);
+        },
+      }
+    );
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -305,6 +322,11 @@ const BookingDetails = () => {
               <p className="text-gray-600">
                 Reservation Number: {booking.reservationNumber}
               </p>
+              {booking.closedAt && (
+                <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-red-100 text-red-700 rounded-full text-xs font-semibold">
+                  <X className="h-4 w-4" /> Booking Closed
+                </div>
+              )}
             </div>
             <div className="text-right">
               <div className={`px-4 py-2 rounded-lg font-semibold ${config.badge}`}>
@@ -317,6 +339,51 @@ const BookingDetails = () => {
                 Created {formatDate(booking.createdAt)}
               </p>
             </div>
+          </div>
+
+          {/* Action Menu Bar */}
+          <div className="mt-6 flex flex-wrap gap-3 items-center border-b pb-4 mb-4">
+            {/* Sync buttons only if not closed */}
+            {!booking.closedAt && (
+              <>
+                <button
+                  onClick={() => syncOneNoteMutation.mutate()}
+                  disabled={syncOneNoteMutation.isLoading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-sm font-medium text-cyan-800 transition hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <FileText className="h-4 w-4" />
+                  {syncOneNoteMutation.isLoading ? "Syncing OneNote..." : "Sync OneNote"}
+                </button>
+                <button
+                  onClick={() => syncExcelMutation.mutate()}
+                  disabled={syncExcelMutation.isLoading}
+                  className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <FileText className="h-4 w-4" />
+                  {syncExcelMutation.isLoading ? "Syncing Excel..." : "Sync Excel"}
+                </button>
+              </>
+            )}
+            {/* Close/Open button */}
+            {!booking.closedAt ? (
+              <button
+                onClick={() => closeBookingMutation.mutate()}
+                disabled={closeBookingMutation.isLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <X className="h-4 w-4" />
+                {closeBookingMutation.isLoading ? "Closing..." : "Close"}
+              </button>
+            ) : (
+              <button
+                onClick={() => openBookingMutation.mutate()}
+                disabled={openBookingMutation.isLoading}
+                className="inline-flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 transition hover:bg-green-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Check className="h-4 w-4" />
+                {openBookingMutation.isLoading ? "Opening..." : "Open"}
+              </button>
+            )}
           </div>
         </div>
 

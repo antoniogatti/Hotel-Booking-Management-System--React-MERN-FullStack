@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { MongoClient } from "mongodb";
 
 const UI_URL = "http://localhost:5174";
 const API_URL = "http://localhost:5000";
@@ -14,6 +17,72 @@ type HotelRecord = {
   type?: string[];
 };
 
+type AvailabilityResponse = {
+  available: boolean;
+  reason?: string;
+  minimumNights?: number;
+};
+
+const TEST_BOOKING_EMAIL_REGEX =
+  /^antoniogatti\+(palazzopintotest|2a-|duplicate-|2a2c-).*@gmail\.com$/i;
+
+const readBackendEnvValue = (key: string) => {
+  const envPath = join(__dirname, "..", "..", "..", "hotel-booking-backend", ".env");
+  const content = readFileSync(envPath, "utf8");
+  const lines = content.split(/\r?\n/);
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex <= 0) {
+      continue;
+    }
+
+    const variableName = trimmed.slice(0, separatorIndex).trim();
+    if (variableName !== key) {
+      continue;
+    }
+
+    return trimmed.slice(separatorIndex + 1).trim();
+  }
+
+  return "";
+};
+
+const cleanupTestBookings = async () => {
+  const connectionString =
+    process.env.MONGODB_CONNECTION_STRING || readBackendEnvValue("MONGODB_CONNECTION_STRING");
+
+  if (!connectionString) {
+    throw new Error("MONGODB_CONNECTION_STRING is required to clean up test bookings.");
+  }
+
+  const client = new MongoClient(connectionString);
+
+  try {
+    await client.connect();
+    const database = client.db("PalazzoPinto_DB");
+    await database.collection("bookings").deleteMany({
+      userId: "guest-request",
+      email: { $regex: TEST_BOOKING_EMAIL_REGEX },
+    });
+  } finally {
+    await client.close();
+  }
+};
+
+test.beforeAll(async () => {
+  await cleanupTestBookings();
+});
+
+test.afterAll(async () => {
+  await cleanupTestBookings();
+});
+
 const getMinimumNights = (hotel: Pick<HotelRecord, "minimumNights">) =>
   Math.max(1, hotel.minimumNights || 1);
 
@@ -23,6 +92,98 @@ const toUiDate = (date: Date) =>
     month: "2-digit",
     year: "numeric",
   });
+
+const toLocalDateOnly = (date: Date) => {
+  const year = String(date.getFullYear());
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const seedSearchAndOpenBooking = async (params: {
+  page: Parameters<typeof test>[0]["page"];
+  hotelId: string;
+  checkIn: string;
+  checkOut: string;
+  adultCount: number;
+  childCount: number;
+}) => {
+  const { page, hotelId, checkIn, checkOut, adultCount, childCount } = params;
+
+  await page.goto(UI_URL);
+  await page.evaluate(
+    ({ seedHotelId, seedCheckIn, seedCheckOut, seedAdults, seedChildren }) => {
+      sessionStorage.setItem("destination", "");
+      sessionStorage.setItem("checkIn", seedCheckIn);
+      sessionStorage.setItem("checkOut", seedCheckOut);
+      sessionStorage.setItem("adultCount", String(seedAdults));
+      sessionStorage.setItem("childCount", String(seedChildren));
+      sessionStorage.setItem("hotelId", seedHotelId);
+    },
+    {
+      seedHotelId: hotelId,
+      seedCheckIn: checkIn,
+      seedCheckOut: checkOut,
+      seedAdults: adultCount,
+      seedChildren: childCount,
+    }
+  );
+
+  await page.goto(`${UI_URL}/hotel/${hotelId}/booking`);
+};
+
+const findAvailableStay = async (params: {
+  request: Parameters<typeof test>[0]["request"];
+  hotelId: string;
+  nights: number;
+  adultCount: number;
+  childCount: number;
+  startOffsetDays: number;
+  maxAttempts: number;
+}) => {
+  const {
+    request,
+    hotelId,
+    nights,
+    adultCount,
+    childCount,
+    startOffsetDays,
+    maxAttempts,
+  } = params;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const checkIn = new Date();
+    checkIn.setDate(checkIn.getDate() + startOffsetDays + attempt * 7);
+    const checkOut = new Date(checkIn);
+    checkOut.setDate(checkIn.getDate() + nights);
+
+    const checkInValue = toLocalDateOnly(checkIn);
+    const checkOutValue = toLocalDateOnly(checkOut);
+
+    const availabilityResponse = await request.get(
+      `${API_URL}/api/rooms/${hotelId}/availability`,
+      {
+        params: {
+          checkIn: checkInValue,
+          checkOut: checkOutValue,
+          adultCount: String(adultCount),
+          childCount: String(childCount),
+        },
+      }
+    );
+
+    if (!availabilityResponse.ok()) {
+      continue;
+    }
+
+    const availability = (await availabilityResponse.json()) as AvailabilityResponse;
+    if (availability.available) {
+      return { checkInValue, checkOutValue };
+    }
+  }
+
+  throw new Error("Unable to find an available stay window for this test run.");
+};
 
 const buildStay = (offsetDays: number, nights: number) => {
   const checkIn = new Date();
@@ -34,8 +195,8 @@ const buildStay = (offsetDays: number, nights: number) => {
   return {
     checkIn,
     checkOut,
-    checkInValue: checkIn.toISOString().split("T")[0],
-    checkOutValue: checkOut.toISOString().split("T")[0],
+    checkInValue: toLocalDateOnly(checkIn),
+    checkOutValue: toLocalDateOnly(checkOut),
     dateRangeValue: `${toUiDate(checkIn)} - ${toUiDate(checkOut)}`,
   };
 };
@@ -50,16 +211,26 @@ test("should complete the guest booking flow and surface a booking reference", a
   const hotel = hotels[0];
   const minimumNights = getMinimumNights(hotel);
 
-  const runOffsetDays = (Math.floor(Date.now() / 60000) % 15) + 40;
-  const { dateRangeValue } = buildStay(runOffsetDays, minimumNights);
+  const { checkInValue, checkOutValue } = await findAvailableStay({
+    request,
+    hotelId: hotel._id,
+    nights: minimumNights,
+    adultCount: 1,
+    childCount: 0,
+    startOffsetDays: 35,
+    maxAttempts: 15,
+  });
 
-  await page.goto(`${UI_URL}/detail/${hotel._id}`);
+  await seedSearchAndOpenBooking({
+    page,
+    hotelId: hotel._id,
+    checkIn: checkInValue,
+    checkOut: checkOutValue,
+    adultCount: 1,
+    childCount: 0,
+  });
 
-  await page.getByPlaceholder("Check In  →  Check Out").fill(dateRangeValue);
-  await page.locator('input[name="adultCount"]').fill("1");
-  await page.locator('input[name="childCount"]').fill("0");
-  await page.getByRole("button", { name: "Check Availability" }).click();
-  await expect(page).toHaveURL(new RegExp(`/hotel/${hotel._id}/booking`));
+  await expect(page.getByRole("heading", { name: "Billing Details" })).toBeVisible();
 
   await page.locator('input[name="firstName"]').fill("Guest");
   await page.locator('input[name="lastName"]').fill("Flow");
@@ -67,13 +238,46 @@ test("should complete the guest booking flow and surface a booking reference", a
   await page.locator('input[name="phone"]').fill("1234567890");
   await page.locator('input[name="city"]').fill("Brindisi");
   await page.locator('input[name="country"]').fill("Italy");
+  await page.locator('input[name="nationality"]').fill("Italian");
   await page.locator('textarea[name="specialRequests"]').fill("Late arrival if possible");
   await page.locator('input[name="termsAccepted"]').check();
 
   await page.getByRole("button", { name: "Proceed to Checkout" }).click();
   await expect(page).toHaveURL(new RegExp(`/hotel/${hotel._id}/checkout`));
 
+  const bookingRequestPromise = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().includes(`/api/rooms/${hotel._id}/booking-request`)
+  );
+
   await page.getByRole("button", { name: "Send Booking Request" }).click();
+
+  const bookingRequestResponse = await bookingRequestPromise;
+  expect(bookingRequestResponse.ok()).toBeTruthy();
+
+  const bookingRequestPayload = bookingRequestResponse.request().postDataJSON() as {
+    checkIn: string;
+    checkOut: string;
+    roomName: string;
+    hotelName: string;
+  };
+
+  expect(bookingRequestPayload.checkIn).toBe(checkInValue);
+  expect(bookingRequestPayload.checkOut).toBe(checkOutValue);
+  expect(bookingRequestPayload.roomName).toBe(hotel.name);
+  expect(bookingRequestPayload.hotelName).toBe(hotel.name);
+
+  const bookingResponseBody = (await bookingRequestResponse.json()) as {
+    reservationNumber: string;
+    emailsSent?: boolean;
+    warning?: string;
+  };
+
+  expect(bookingResponseBody.reservationNumber).toMatch(/^PP-\d{8}-[A-F0-9]{6}$/);
+  // Treat delayed/failed email dispatch as a failing verification signal in this core flow.
+  expect(bookingResponseBody.emailsSent).toBe(true);
+  expect(bookingResponseBody.warning || "").toBe("");
 
   const confirmationBox = page.locator(".bg-emerald-50").first();
   await expect(confirmationBox.getByText("Booking Reference:")).toBeVisible();
@@ -91,16 +295,26 @@ test("should complete guest booking for 2 adults using the room minimum stay", a
   const hotel = hotels[0];
   const minimumNights = getMinimumNights(hotel);
 
-  const runOffsetDays = (Math.floor(Date.now() / 60000) % 12) + 20;
-  const { dateRangeValue } = buildStay(runOffsetDays, Math.max(2, minimumNights));
+  const { checkInValue, checkOutValue } = await findAvailableStay({
+    request,
+    hotelId: hotel._id,
+    nights: Math.max(2, minimumNights),
+    adultCount: 2,
+    childCount: 0,
+    startOffsetDays: 28,
+    maxAttempts: 16,
+  });
 
-  await page.goto(`${UI_URL}/detail/${hotel._id}`);
+  await seedSearchAndOpenBooking({
+    page,
+    hotelId: hotel._id,
+    checkIn: checkInValue,
+    checkOut: checkOutValue,
+    adultCount: 2,
+    childCount: 0,
+  });
 
-  await page.getByPlaceholder("Check In  →  Check Out").fill(dateRangeValue);
-  await page.locator('input[name="adultCount"]').fill("2");
-  await page.locator('input[name="childCount"]').fill("0");
-  await page.getByRole("button", { name: "Check Availability" }).click();
-  await expect(page).toHaveURL(new RegExp(`/hotel/${hotel._id}/booking`));
+  await expect(page.getByRole("heading", { name: "Billing Details" })).toBeVisible();
 
   const uniqueEmail = `antoniogatti+2a-${Date.now()}@gmail.com`;
   await page.locator('input[name="firstName"]').fill("Couple");
@@ -109,6 +323,7 @@ test("should complete guest booking for 2 adults using the room minimum stay", a
   await page.locator('input[name="phone"]').fill("1234567890");
   await page.locator('input[name="city"]').fill("Brindisi");
   await page.locator('input[name="country"]').fill("Italy");
+  await page.locator('input[name="nationality"]').fill("Italian");
   await page.locator('textarea[name="specialRequests"]').fill("Weekend getaway for two");
   await page.locator('input[name="termsAccepted"]').check();
 
@@ -144,6 +359,7 @@ test("should reject a repeated guest booking request in the duplicate protection
     phone: string;
     city: string;
     country: string;
+    nationality: string;
     specialRequests: string;
     arrivalTime: "Morning";
     adultCount: number;
@@ -157,7 +373,7 @@ test("should reject a repeated guest booking request in the duplicate protection
   let firstResponse: Awaited<ReturnType<typeof request.post>> | null = null;
 
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    const checkIn = new Date(Date.UTC(2027, 0, 10 + attempt * 14));
+    const checkIn = new Date(Date.UTC(2027, 0, 10 + attempt * 21));
     const checkOut = new Date(checkIn);
     checkOut.setUTCDate(checkIn.getUTCDate() + Math.max(2, minimumNights));
 
@@ -171,12 +387,13 @@ test("should reject a repeated guest booking request in the duplicate protection
       phone: "1234567890",
       city: "Brindisi",
       country: "Italy",
+      nationality: "Italian",
       specialRequests: "None",
       arrivalTime: "Morning" as const,
       adultCount: 1,
       childCount: 0,
-      checkIn: checkIn.toISOString(),
-      checkOut: checkOut.toISOString(),
+      checkIn: checkIn.toISOString().slice(0, 10),
+      checkOut: checkOut.toISOString().slice(0, 10),
       nights: Math.max(2, minimumNights),
       totalCost: 0,
     };
@@ -226,29 +443,26 @@ test("should complete guest booking for 2 adults and 2 children for 4 nights in 
   test.skip(!hotel, "No room currently supports 2 adults and 2 children.");
   const minimumNights = getMinimumNights(hotel!);
 
-  // Build a check-in date in the week after the current week, with a rotating weekday offset.
-  const now = new Date();
-  const dayOfWeek = now.getDay(); // 0 Sun ... 6 Sat
-  const daysUntilNextMonday = ((8 - dayOfWeek) % 7) || 7;
-  const nextWeekMonday = new Date(now);
-  nextWeekMonday.setDate(now.getDate() + daysUntilNextMonday);
+  const { checkInValue, checkOutValue } = await findAvailableStay({
+    request,
+    hotelId: hotel!._id,
+    nights: Math.max(4, minimumNights),
+    adultCount: 2,
+    childCount: 2,
+    startOffsetDays: 21,
+    maxAttempts: 20,
+  });
 
-  const weekdayOffset = Math.floor(Date.now() / 60000) % 2; // 0..1 keeps checkout mostly in/near that week
-  const checkIn = new Date(nextWeekMonday);
-  checkIn.setDate(nextWeekMonday.getDate() + weekdayOffset);
+  await seedSearchAndOpenBooking({
+    page,
+    hotelId: hotel!._id,
+    checkIn: checkInValue,
+    checkOut: checkOutValue,
+    adultCount: 2,
+    childCount: 2,
+  });
 
-  const checkOut = new Date(checkIn);
-  checkOut.setDate(checkIn.getDate() + Math.max(4, minimumNights));
-
-  const dateRangeValue = `${toUiDate(checkIn)} - ${toUiDate(checkOut)}`;
-
-  await page.goto(`${UI_URL}/detail/${hotel._id}`);
-
-  await page.getByPlaceholder("Check In  →  Check Out").fill(dateRangeValue);
-  await page.locator('input[name="adultCount"]').fill("2");
-  await page.locator('input[name="childCount"]').fill("2");
-  await page.getByRole("button", { name: "Check Availability" }).click();
-  await expect(page).toHaveURL(new RegExp(`/hotel/${hotel._id}/booking`));
+  await expect(page.getByRole("heading", { name: "Billing Details" })).toBeVisible();
 
   const uniqueEmail = `antoniogatti+2a2c-${Date.now()}@gmail.com`;
   await page.locator('input[name="firstName"]').fill("Family");
@@ -257,6 +471,7 @@ test("should complete guest booking for 2 adults and 2 children for 4 nights in 
   await page.locator('input[name="phone"]').fill("1234567890");
   await page.locator('input[name="city"]').fill("Brindisi");
   await page.locator('input[name="country"]').fill("Italy");
+  await page.locator('input[name="nationality"]').fill("Italian");
   await page.locator('textarea[name="specialRequests"]').fill("Family stay for 5 nights");
   await page.locator('input[name="termsAccepted"]').check();
 

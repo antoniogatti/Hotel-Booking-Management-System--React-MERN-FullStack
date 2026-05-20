@@ -1,4 +1,5 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response } from 'express';
+const router = express.Router();
 import multer from "multer";
 import Booking from "../models/booking";
 import Hotel from "../models/hotel";
@@ -26,7 +27,7 @@ import { body, param, query, validationResult } from "express-validator";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
 
-const router = express.Router();
+
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -2170,4 +2171,116 @@ router.get(
   }
 );
 
+
+
+// Close a booking (set closedAt) for both local and imported bookings
+router.patch(
+  "/:id/close",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  async (req: Request, res: Response) => {
+    try {
+      // Try local booking first
+      let booking = await Booking.findById(req.params.id);
+      let importedEvent = null;
+      let hotel = null;
+      if (!booking) {
+        importedEvent = await ExternalCalendarEvent.findById(req.params.id);
+        if (!importedEvent) {
+          return res.status(404).json({ message: "Booking not found" });
+        }
+        hotel = await Hotel.findById(importedEvent.hotelId);
+        if (!hotel) {
+          return res.status(404).json({ message: "Hotel not found" });
+        }
+        if (req.userRole !== "admin" && hotel.userId !== req.userId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (importedEvent.closedAt) {
+          return res.status(409).json({ message: "Booking already closed" });
+        }
+        importedEvent.closedAt = new Date();
+        await importedEvent.save();
+        return res.status(200).json({ message: "Imported booking closed", closedAt: importedEvent.closedAt });
+      } else {
+        hotel = await Hotel.findById(booking.hotelId);
+        if (!hotel) {
+          return res.status(404).json({ message: "Hotel not found" });
+        }
+        if (req.userRole !== "admin" && hotel.userId !== req.userId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (booking.closedAt) {
+          return res.status(409).json({ message: "Booking already closed" });
+        }
+        booking.closedAt = new Date();
+        await booking.save();
+        return res.status(200).json({ message: "Booking closed", closedAt: booking.closedAt });
+      }
+    } catch (error) {
+      logError("Unable to close booking", error, {
+        route: "bookings.close",
+        bookingId: req.params.id,
+      });
+      res.status(500).json({ message: "Unable to close booking" });
+    }
+  }
+);
+
+// Open a booking (unset closedAt) for both local and imported bookings
+router.patch(
+  "/:id/open",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  async (req: Request, res: Response) => {
+    try {
+      // Try local booking first
+      let booking = await Booking.findById(req.params.id);
+      let importedEvent = null;
+      let hotel = null;
+      if (!booking) {
+        importedEvent = await ExternalCalendarEvent.findById(req.params.id);
+        if (!importedEvent) {
+          return res.status(404).json({ message: "Booking not found" });
+        }
+        hotel = await Hotel.findById(importedEvent.hotelId);
+        if (!hotel) {
+          return res.status(404).json({ message: "Hotel not found" });
+        }
+        if (req.userRole !== "admin" && hotel.userId !== req.userId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (!importedEvent.closedAt) {
+          return res.status(409).json({ message: "Booking is not closed" });
+        }
+        importedEvent.closedAt = undefined;
+        await importedEvent.save();
+        return res.status(200).json({ message: "Imported booking opened" });
+      } else {
+        hotel = await Hotel.findById(booking.hotelId);
+        if (!hotel) {
+          return res.status(404).json({ message: "Hotel not found" });
+        }
+        if (req.userRole !== "admin" && hotel.userId !== req.userId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        if (!booking.closedAt) {
+          return res.status(409).json({ message: "Booking is not closed" });
+        }
+        booking.closedAt = undefined;
+        await booking.save();
+        return res.status(200).json({ message: "Booking opened" });
+      }
+    } catch (error) {
+      logError("Unable to open booking", error, {
+        route: "bookings.open",
+        bookingId: req.params.id,
+      });
+      res.status(500).json({ message: "Unable to open booking" });
+    }
+  }
+);
+
 export default router;
+
+

@@ -4,7 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useQueryWithLoading } from "../hooks/useLoadingHooks";
 import * as apiClient from "../api-client";
 import useSearchContext from "../hooks/useSearchContext";
-import { formatFriendlyDate } from "../lib/utils";
+import { formatFriendlyDate, toIsoDateOnly } from "../lib/utils";
 
 type BookingDetailsFormData = {
   firstName: string;
@@ -26,8 +26,8 @@ const Booking = () => {
   const search = useSearchContext();
   const checkIn = search.checkIn;
   const checkOut = search.checkOut;
-  const checkInIso = Number.isNaN(checkIn.getTime()) ? "" : checkIn.toISOString();
-  const checkOutIso = Number.isNaN(checkOut.getTime()) ? "" : checkOut.toISOString();
+  const checkInIso = Number.isNaN(checkIn.getTime()) ? "" : toIsoDateOnly(checkIn);
+  const checkOutIso = Number.isNaN(checkOut.getTime()) ? "" : toIsoDateOnly(checkOut);
 
   const savedDraft = (() => {
     const raw = sessionStorage.getItem("bookingDraft");
@@ -106,7 +106,7 @@ const Booking = () => {
     return Math.max(1, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }, [checkIn, checkOut]);
   const minimumNights = hotel?.minimumNights || 1;
-  const roomDisplayName = hotel?.name?.trim() || hotel?.type?.[0] || "Room";
+  const roomDisplayName = hotel?.name?.trim() || "Room";
   const isBelowMinimumStay = nights < minimumNights;
 
   useEffect(() => {
@@ -154,8 +154,8 @@ const Booking = () => {
         hotelId,
         hotelName: hotel.name,
         roomName: roomDisplayName,
-        checkIn: checkIn.toISOString(),
-        checkOut: checkOut.toISOString(),
+        checkIn: toIsoDateOnly(checkIn),
+        checkOut: toIsoDateOnly(checkOut),
         adultCount: search.adultCount,
         childCount: search.childCount,
         minimumNights,

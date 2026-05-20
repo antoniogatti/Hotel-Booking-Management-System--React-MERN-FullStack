@@ -185,6 +185,8 @@ export type BookingType = {
     notes?: string;
     rawLines?: string[];
   };
+  /** If set, this booking is closed and should not appear in check-in desk */
+  closedAt?: Date;
   createdAt?: Date;
   updatedAt?: Date;
 };

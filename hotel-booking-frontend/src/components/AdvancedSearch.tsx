@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import useSearchContext from "../hooks/useSearchContext";
 import { siteConfig } from "../config/siteConfig";
+import { toIsoDateOnly } from "../lib/utils";
 
 interface AdvancedSearchProps {
   onSearch: (searchData: any) => void;
@@ -185,8 +186,8 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       );
 
       const searchParams = new URLSearchParams();
-      searchParams.append("checkIn", searchData.checkIn.toISOString());
-      searchParams.append("checkOut", searchData.checkOut.toISOString());
+      searchParams.append("checkIn", toIsoDateOnly(searchData.checkIn));
+      searchParams.append("checkOut", toIsoDateOnly(searchData.checkOut));
       searchParams.append("adultCount", searchData.adultCount.toString());
       searchParams.append("childCount", searchData.childCount.toString());
 
@@ -213,8 +214,8 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
       // Navigate to search page with advanced filters
       const searchParams = new URLSearchParams();
       searchParams.append("destination", ""); // Empty destination
-      searchParams.append("checkIn", searchData.checkIn.toISOString());
-      searchParams.append("checkOut", searchData.checkOut.toISOString());
+      searchParams.append("checkIn", toIsoDateOnly(searchData.checkIn));
+      searchParams.append("checkOut", toIsoDateOnly(searchData.checkOut));
       searchParams.append("adultCount", searchData.adultCount.toString());
       searchParams.append("childCount", searchData.childCount.toString());
 
@@ -279,8 +280,8 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
     // Navigate to search page with advanced filters
     const searchParams = new URLSearchParams();
     searchParams.append("destination", searchData.destination.trim());
-    searchParams.append("checkIn", searchData.checkIn.toISOString());
-    searchParams.append("checkOut", searchData.checkOut.toISOString());
+    searchParams.append("checkIn", toIsoDateOnly(searchData.checkIn));
+    searchParams.append("checkOut", toIsoDateOnly(searchData.checkOut));
     searchParams.append("adultCount", searchData.adultCount.toString());
     searchParams.append("childCount", searchData.childCount.toString());
 

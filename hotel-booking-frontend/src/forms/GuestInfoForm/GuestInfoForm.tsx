@@ -9,6 +9,7 @@ import * as apiClient from "../../api-client";
 import useAppContext from "../../hooks/useAppContext";
 import { User, Baby, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { getCancellationPolicyMessage } from "../../lib/cancellation-policy";
+import { toIsoDateOnly } from "../../lib/utils";
 
 type Props = {
   hotelId: string;
@@ -172,8 +173,8 @@ const GuestInfoForm = ({
     try {
       const availability = await apiClient.checkHotelAvailability({
         hotelId,
-        checkIn: normalizedCheckIn.toISOString(),
-        checkOut: normalizedCheckOut.toISOString(),
+        checkIn: toIsoDateOnly(normalizedCheckIn),
+        checkOut: toIsoDateOnly(normalizedCheckOut),
         adultCount: data.adultCount,
         childCount: data.childCount,
       });

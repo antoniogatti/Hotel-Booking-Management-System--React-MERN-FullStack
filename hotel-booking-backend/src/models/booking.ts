@@ -79,6 +79,8 @@ export interface IBooking extends Document {
   country?: string;
   arrivalTime?: "Morning" | "Afternoon" | "Evening" | "Night";
   nationality?: string;
+  /** If set, this booking is closed and should not appear in check-in desk */
+  closedAt?: Date;
 }
 
 const bookingSchema = new mongoose.Schema(
@@ -115,6 +117,8 @@ const bookingSchema = new mongoose.Schema(
       enum: ["Morning", "Afternoon", "Evening", "Night"],
     },
     nationality: { type: String },
+    // Booking closed logic
+    closedAt: { type: Date },
     // Check-in Information
     checkInInfo: {
       arrivalTime: { type: String },

@@ -1,3 +1,5 @@
+import { toIsoDateOnly } from "./utils";
+
 /**
  * Build the Hotels search URL with default params (all hotels, no filters)
  */
@@ -7,8 +9,8 @@ export const getHotelsSearchUrl = () => {
   checkOut.setDate(checkOut.getDate() + 1);
   const params = new URLSearchParams({
     destination: "",
-    checkIn: checkIn.toISOString(),
-    checkOut: checkOut.toISOString(),
+    checkIn: toIsoDateOnly(checkIn),
+    checkOut: toIsoDateOnly(checkOut),
     adultCount: "1",
     childCount: "1",
     sortOption: "",

@@ -1,5 +1,12 @@
 # Version History
 
+## 1.11.0 - 2026-05-20
+
+### Booking Date Accuracy Fix
+- Fixed the booking flow date-shift bug where selected check-in/check-out could be saved one day ahead in some timezone scenarios.
+- Standardized booking date handling to use date-only values (`YYYY-MM-DD`) across frontend search, booking, checkout, and backend availability/request parsing.
+- Hardened booking confirmation email room labeling to always use the canonical room name from the hotel record.
+
 ## 1.10.0 - 2026-04-15
 
 ### Admin Mobile Reliability and Navigation

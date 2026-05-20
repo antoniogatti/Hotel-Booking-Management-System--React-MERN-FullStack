@@ -19,6 +19,8 @@
     "reset:bookingcom-imports": "ts-node src/scripts/reset-booking-com-imports.ts",
     "reset:booking-master": "ts-node src/scripts/reset-booking-master-data.ts",
     "cleanup:legacy-booking-fields": "ts-node src/scripts/cleanup-legacy-booking-fields.ts",
+    "cleanup:test-bookings": "ts-node src/scripts/cleanup-test-bookings.ts",
+    "fix:shifted-booking-dates": "ts-node src/scripts/fix-shifted-booking-dates.ts",
     "set-user-role": "ts-node src/scripts/set-user-role.ts",
     "ensure-user-role": "ts-node src/scripts/ensure-user-role.ts"
   },

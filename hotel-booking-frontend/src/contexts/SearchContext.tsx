@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { toIsoDateOnly } from "../lib/utils";
 
 const getStartOfToday = (): Date => {
   const today = new Date();
@@ -96,8 +97,8 @@ export const SearchContextProvider = ({
     }
 
     sessionStorage.setItem("destination", destination);
-    sessionStorage.setItem("checkIn", normalizedRange.checkIn.toISOString());
-    sessionStorage.setItem("checkOut", normalizedRange.checkOut.toISOString());
+    sessionStorage.setItem("checkIn", toIsoDateOnly(normalizedRange.checkIn));
+    sessionStorage.setItem("checkOut", toIsoDateOnly(normalizedRange.checkOut));
     sessionStorage.setItem("adultCount", adultCount.toString());
     sessionStorage.setItem("childCount", childCount.toString());
 

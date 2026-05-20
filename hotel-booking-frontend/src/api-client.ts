@@ -549,3 +549,13 @@ export const checkHotelAvailability = async (params: {
 
   return response.data;
 };
+
+export const closeBooking = async (bookingId: string) => {
+  const response = await axiosInstance.patch(`/api/bookings/${bookingId}/close`);
+  return response.data;
+};
+
+export const openBooking = async (bookingId: string) => {
+  const response = await axiosInstance.patch(`/api/bookings/${bookingId}/open`);
+  return response.data;
+};

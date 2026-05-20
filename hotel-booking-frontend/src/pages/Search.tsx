@@ -12,6 +12,7 @@ import PriceFilter from "../components/PriceFilter";
 import { siteConfig } from "../config/siteConfig";
 import { LayoutList, LayoutGrid, ChevronLeft, ChevronRight, CalendarDays } from "lucide-react";
 import { roomCatalog } from "../../../shared/roomCatalog";
+import { toIsoDateOnly } from "../lib/utils";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 
@@ -135,8 +136,8 @@ const Search = () => {
 
   const searchParams = {
     destination: search.destination?.trim() || "",
-    checkIn: hasCommittedDateRange ? search.checkIn.toISOString() : undefined,
-    checkOut: hasCommittedDateRange ? search.checkOut.toISOString() : undefined,
+    checkIn: hasCommittedDateRange ? toIsoDateOnly(search.checkIn) : undefined,
+    checkOut: hasCommittedDateRange ? toIsoDateOnly(search.checkOut) : undefined,
     adultCount: search.adultCount.toString(),
     childCount: search.childCount.toString(),
     page: page.toString(),

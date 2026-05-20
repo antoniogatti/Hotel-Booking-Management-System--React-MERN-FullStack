@@ -300,6 +300,7 @@ const BookingCheckIn = () => {
     }
   );
 
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -312,6 +313,14 @@ const BookingCheckIn = () => {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <p className="text-gray-600">Booking not found</p>
+      </div>
+    );
+  }
+
+  if (booking.closedAt) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-red-600 font-semibold">This booking is closed and cannot be checked in.</p>
       </div>
     );
   }

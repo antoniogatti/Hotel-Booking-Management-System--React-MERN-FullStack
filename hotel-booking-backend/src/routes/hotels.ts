@@ -16,6 +16,7 @@ import { recordAuditEvent } from "../lib/audit-log";
 
 const router = express.Router();
 const DUPLICATE_BOOKING_WINDOW_MS = 30 * 60 * 1000;
+const BOOKING_DATE_TIME_ZONE = process.env.BOOKING_DATE_TIME_ZONE || "Europe/Rome";
 
 const buildReservationNumber = () => {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -63,9 +64,43 @@ type AvailabilityAssessment = {
 const ACTIVE_BOOKING_STATUSES = ["pending", "confirmed", "arrived", "completed"] as const;
 
 const getDayStart = (date: Date) => {
-  const value = new Date(date);
-  value.setHours(0, 0, 0, 0);
-  return value;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+};
+
+const buildUtcDateOnly = (year: number, month: number, day: number) =>
+  new Date(Date.UTC(year, month - 1, day));
+
+const normalizeBookingDate = (value: string | Date) => {
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) {
+      return new Date(NaN);
+    }
+
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: BOOKING_DATE_TIME_ZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).formatToParts(value);
+
+    const year = Number(parts.find((part) => part.type === "year")?.value);
+    const month = Number(parts.find((part) => part.type === "month")?.value);
+    const day = Number(parts.find((part) => part.type === "day")?.value);
+
+    if (!year || !month || !day) {
+      return new Date(NaN);
+    }
+
+    return buildUtcDateOnly(year, month, day);
+  }
+
+  const raw = String(value || "").trim();
+  const ymdMatch = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymdMatch) {
+    return buildUtcDateOnly(Number(ymdMatch[1]), Number(ymdMatch[2]), Number(ymdMatch[3]));
+  }
+
+  return normalizeBookingDate(new Date(raw));
 };
 
 const getAvailableHotelsForStay = async <THotel extends { _id: unknown }>(params: {
@@ -80,8 +115,8 @@ const getAvailableHotelsForStay = async <THotel extends { _id: unknown }>(params
     return hotels;
   }
 
-  const checkInDate = new Date(checkIn);
-  const checkOutDate = new Date(checkOut);
+  const checkInDate = normalizeBookingDate(checkIn);
+  const checkOutDate = normalizeBookingDate(checkOut);
 
   if (
     Number.isNaN(checkInDate.getTime()) ||
@@ -344,8 +379,8 @@ router.get(
         });
       }
 
-      const checkIn = new Date(String(req.query.checkIn || ""));
-      const checkOut = new Date(String(req.query.checkOut || ""));
+      const checkIn = normalizeBookingDate(String(req.query.checkIn || ""));
+      const checkOut = normalizeBookingDate(String(req.query.checkOut || ""));
       const adultCount = Math.max(1, Number(req.query.adultCount) || 1);
       const childCount = Math.max(0, Number(req.query.childCount) || 0);
 
@@ -405,8 +440,8 @@ router.post(
         return res.status(404).json({ message: "Hotel not found" });
       }
 
-      const checkIn = new Date(req.body.checkIn);
-      const checkOut = new Date(req.body.checkOut);
+      const checkIn = normalizeBookingDate(String(req.body.checkIn || ""));
+      const checkOut = normalizeBookingDate(String(req.body.checkOut || ""));
       const normalizedEmail = String(req.body.email).trim().toLowerCase();
 
       if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
@@ -457,6 +492,8 @@ router.post(
 
       const totalCost = hotel.pricePerNight * nights;
       const reservationNumber = await generateUniqueReservationNumber();
+      const canonicalRoomName =
+        String(hotel.name || "").trim() || String(req.body.roomName || "").trim() || "Room";
 
       const bookingRequest = {
         reservationNumber,
@@ -506,7 +543,7 @@ router.post(
         await sendBookingRequestEmails({
           reservationNumber,
           hotelName: hotel.name,
-          roomName: req.body.roomName,
+          roomName: canonicalRoomName,
           firstName: req.body.firstName,
           lastName: req.body.lastName,
           email: normalizedEmail,
