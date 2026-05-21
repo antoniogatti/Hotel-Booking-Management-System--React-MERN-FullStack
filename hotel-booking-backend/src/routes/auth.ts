@@ -548,4 +548,102 @@ router.post("/logout", (req: Request, res: Response) => {
   res.send();
 });
 
+// ─── Service Account Auth (Sofia Hermes) ──────────────────────────────────────
+// POST /api/auth/service
+// Verifica client_id + client_secret dell'app Entra SofiaHermes-PalazzoPinto,
+// restituisce un JWT firmato con ruolo admin valido 12 ore.
+/**
+ * @swagger
+ * /api/auth/service:
+ *   post:
+ *     summary: Service account authentication (Sofia Hermes)
+ *     description: Authenticates a service account using client credentials. Returns a signed JWT valid 12h.
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [client_id, client_secret]
+ *             properties:
+ *               client_id:
+ *                 type: string
+ *               client_secret:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: JWT token issued
+ *       401:
+ *         description: Invalid credentials
+ *       503:
+ *         description: Service auth not configured
+ */
+router.post("/service", async (req: Request, res: Response) => {
+  const SOFIA_CLIENT_ID = process.env.SOFIA_CLIENT_ID;
+  const SOFIA_CLIENT_SECRET = process.env.SOFIA_CLIENT_SECRET;
+
+  if (!SOFIA_CLIENT_ID || !SOFIA_CLIENT_SECRET) {
+    return res.status(503).json({ message: "Service auth not configured" });
+  }
+
+  const { client_id, client_secret } = req.body;
+  if (!client_id || !client_secret) {
+    return res.status(401).json({ message: "Missing credentials" });
+  }
+
+  try {
+    // Timing-safe comparison per prevenire timing attacks
+    const idOk =
+      client_id.length === SOFIA_CLIENT_ID.length &&
+      crypto.timingSafeEqual(Buffer.from(client_id), Buffer.from(SOFIA_CLIENT_ID));
+    const secretOk =
+      client_secret.length === SOFIA_CLIENT_SECRET.length &&
+      crypto.timingSafeEqual(Buffer.from(client_secret), Buffer.from(SOFIA_CLIENT_SECRET));
+
+    if (!idOk || !secretOk) {
+      logError("Service auth failed: invalid credentials", undefined, { route: "auth.service" });
+      return res.status(401).json({ message: "Invalid credentials" });
+    }
+
+    // Cerca o crea utente sofia nel DB
+    const SOFIA_EMAIL = process.env.SOFIA_EMAIL || "sofia@palazzopintobnb.com";
+    let user = await User.findOne({ email: SOFIA_EMAIL });
+    if (!user) {
+      user = new User({
+        email: SOFIA_EMAIL,
+        firstName: "Sofia",
+        lastName: "Hermes",
+        password: crypto.randomBytes(32).toString("hex"),
+        emailVerified: true,
+        role: "admin",
+      });
+      await user.save();
+    }
+
+    // JWT 12 ore
+    const token = jwt.sign(
+      { userId: user.id, role: "admin" },
+      process.env.JWT_SECRET_KEY as string,
+      { expiresIn: "12h" }
+    );
+
+    await recordAuditEvent({
+      action: "service.auth.success",
+      entityType: "user",
+      entityId: String(user._id),
+      actorId: String(user._id),
+      actorRole: "admin",
+      actorEmail: SOFIA_EMAIL,
+      metadata: { service: "sofia-hermes" },
+    });
+
+    return res.status(200).json({ token, expiresIn: 43200, role: "admin" });
+  } catch (err) {
+    logError("Service auth handler failed", err, { route: "auth.service" });
+    return res.status(500).json({ message: "Something went wrong" });
+  }
+});
+// ─────────────────────────────────────────────────────────────────────────────
+
 export default router;
