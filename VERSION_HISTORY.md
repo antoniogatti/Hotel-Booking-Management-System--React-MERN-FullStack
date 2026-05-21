@@ -1,5 +1,13 @@
 # Version History
 
+## 1.11.4 - 2026-05-21
+
+### Email Templates and Notification Subjects
+- Refreshed customer booking email templates with stronger Palazzo Pinto branding (logo, palette, hero treatment, and refined layout) while keeping email-client-safe markup.
+- Updated customer confirmation/property section to use the branded property label with direct Google Maps link.
+- Standardized technical/admin email subjects to start with `[B&B System]` and include action, room name, and reservation identifier.
+- Added direct booking-details links in technical/admin booking emails for authenticated backoffice users.
+
 ## 1.11.3 - 2026-05-20
 
 ### Sync Scheduler Operability

@@ -6,6 +6,7 @@ type ContactFormPayload = {
 };
 
 type BookingRequestPayload = {
+  bookingId?: string;
   reservationNumber: string;
   hotelName: string;
   roomName: string;
@@ -28,6 +29,7 @@ type BookingRequestPayload = {
 };
 
 type BookingDecisionPayload = {
+  bookingId?: string;
   reservationNumber: string;
   hotelName: string;
   roomName: string;
@@ -41,6 +43,7 @@ type BookingDecisionPayload = {
 };
 
 type CheckInNotificationPayload = {
+  bookingId?: string;
   reservationNumber: string;
   hotelName: string;
   roomName: string;
@@ -65,6 +68,19 @@ type CheckInNotificationPayload = {
 };
 
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
+const TECH_SUBJECT_PREFIX = "[B&B System]";
+const BRAND_NAME = "Palazzo Pinto B&B";
+const BRAND_WEBSITE_URL = "https://www.palazzopintobnb.com";
+const BRAND_LOGO_URL = `${BRAND_WEBSITE_URL}/common/LOGOPAYOFF_PalazzoPinto.png`;
+const BRAND_HERO_IMAGE_URL = `${BRAND_WEBSITE_URL}/home/sildeshow/Z62_1095-scaled.jpg`;
+const BRAND_PRIMARY_COLOR = "#2b4463";
+const BRAND_ACCENT_COLOR = "#ea836c";
+const BRAND_SURFACE_COLOR = "#f7f3ed";
+const PROPERTY_DISPLAY_NAME = "Palazzo Pinto B&B Brindisi - Italy";
+const PROPERTY_GOOGLE_MAPS_URL =
+  "https://www.google.com/maps/search/?api=1&query=Palazzo%20Pinto%20B%26B%2C%20Via%20Masaniello%2C%2030%2072100%20Brindisi";
+const buildBookingDetailsUrl = (bookingId?: string) =>
+  bookingId ? `${BRAND_WEBSITE_URL}/booking/${encodeURIComponent(bookingId)}` : "";
 
 const escapeHtml = (value: string) =>
   value
@@ -249,6 +265,7 @@ const toUserHtml = (payload: ContactFormPayload) => {
 
 const toBookingAdminHtml = (payload: BookingRequestPayload) => {
   const submittedAt = formatFriendlyDate(new Date());
+  const bookingDetailsUrl = buildBookingDetailsUrl(payload.bookingId);
 
   return `
     <h2>New Booking Request (Technical Copy)</h2>
@@ -269,6 +286,11 @@ const toBookingAdminHtml = (payload: BookingRequestPayload) => {
     <p><strong>Arrival Time:</strong> ${escapeHtml(payload.arrivalTime)}</p>
     <p><strong>Total Cost (quoted):</strong> EUR ${payload.totalCost}</p>
     <p><strong>Coupon:</strong> ${payload.coupon ? escapeHtml(payload.coupon) : "Not provided"}</p>
+    ${
+      bookingDetailsUrl
+        ? `<p><strong>Booking Details:</strong> <a href="${bookingDetailsUrl}" target="_blank" rel="noopener noreferrer">Open in backoffice</a></p>`
+        : ""
+    }
     <p><strong>Special Requests:</strong></p>
     <p style="white-space: pre-wrap;">${payload.specialRequests ? escapeHtml(payload.specialRequests) : "None"}</p>
   `;
@@ -276,28 +298,39 @@ const toBookingAdminHtml = (payload: BookingRequestPayload) => {
 
 const toBookingUserHtml = (payload: BookingRequestPayload) => {
   return `
-    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
-      <h2 style="margin-bottom: 8px;">Thank You For Your Booking Request</h2>
-      <p>Hello ${escapeHtml(payload.firstName)},</p>
-      <p>
-        We have received your booking request for <strong>${escapeHtml(payload.hotelName)}</strong>
-        and our team will contact you shortly to confirm availability and final details.
-      </p>
-      <p><strong>Booking Reference:</strong> ${escapeHtml(payload.reservationNumber)}</p>
-      <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin: 16px 0;">
-        <p><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
-        <p><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
-        <p><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
-        <p><strong>Guests:</strong> ${payload.adultCount} adults, ${payload.childCount} children</p>
-        <p><strong>Nationality:</strong> ${escapeHtml(payload.nationality)}</p>
-        <p><strong>Arrival:</strong> ${escapeHtml(payload.arrivalTime)}</p>
-        <p><strong>Estimated Total:</strong> EUR ${payload.totalCost}</p>
+    <div style="margin:0;padding:24px;background:${BRAND_SURFACE_COLOR};font-family:Arial,Helvetica,sans-serif;color:#1f2937;line-height:1.5;">
+      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+        <div style="padding:16px 16px 0;">
+          <div style="background:linear-gradient(135deg,#f8efe6 0%,#eef3f8 100%);border:2px solid #e6d8c9;border-radius:16px;padding:10px;">
+            <img src="${BRAND_HERO_IMAGE_URL}" alt="Palazzo Pinto Brindisi" style="width:100%;height:auto;display:block;border:0;border-radius:10px;" />
+          </div>
+        </div>
+        <div style="padding:22px 24px;">
+          <div style="text-align:center;margin:0 0 10px;">
+            <a href="${BRAND_WEBSITE_URL}" target="_blank" rel="noopener noreferrer">
+              <img src="${BRAND_LOGO_URL}" alt="${BRAND_NAME}" style="max-width:220px;width:100%;height:auto;border:0;" />
+            </a>
+          </div>
+          <h2 style="margin:0 0 10px;color:${BRAND_PRIMARY_COLOR};font-size:31px;line-height:1.15;font-family:Georgia,'Times New Roman',serif;">Thank You For Your Booking Request</h2>
+          <p style="margin:0 0 10px;">Hello ${escapeHtml(payload.firstName)},</p>
+          <p style="margin:0 0 12px;">We have received your booking request for <strong>${escapeHtml(payload.hotelName)}</strong> and our team will contact you shortly to confirm availability and final details.</p>
+          <p style="margin:0 0 14px;"><strong>Booking Reference:</strong> ${escapeHtml(payload.reservationNumber)}</p>
+          <div style="background:#fcfcfd;border:1px solid #e7ebf0;border-radius:10px;padding:14px 16px;">
+            <p style="margin:0 0 7px;"><strong>Property:</strong> <a href="${PROPERTY_GOOGLE_MAPS_URL}" target="_blank" rel="noopener noreferrer" style="color:${BRAND_PRIMARY_COLOR};">${escapeHtml(PROPERTY_DISPLAY_NAME)}</a></p>
+            <p style="margin:0 0 7px;"><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
+            <p style="margin:0 0 7px;"><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
+            <p style="margin:0 0 7px;"><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
+            <p style="margin:0 0 7px;"><strong>Guests:</strong> ${payload.adultCount} adults, ${payload.childCount} children</p>
+            <p style="margin:0 0 7px;"><strong>Nationality:</strong> ${escapeHtml(payload.nationality)}</p>
+            <p style="margin:0 0 7px;"><strong>Arrival:</strong> ${escapeHtml(payload.arrivalTime)}</p>
+            <p style="margin:0;"><strong>Estimated Total:</strong> EUR ${payload.totalCost}</p>
+          </div>
+          <div style="margin-top:18px;text-align:center;">
+            <a href="${PROPERTY_GOOGLE_MAPS_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:${BRAND_ACCENT_COLOR};color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:999px;font-weight:700;">View Property On Google Maps</a>
+          </div>
+          <p style="margin:20px 0 0;">Kind regards,<br/>${BRAND_NAME}<br/>Reservations Team</p>
+        </div>
       </div>
-      <p>
-        Kind regards,<br/>
-        Palazzo Pinto B&B<br/>
-        Reservations Team
-      </p>
     </div>
   `;
 };
@@ -305,6 +338,7 @@ const toBookingUserHtml = (payload: BookingRequestPayload) => {
 const toBookingDecisionAdminHtml = (payload: BookingDecisionPayload) => {
   const submittedAt = formatFriendlyDate(new Date());
   const decisionLabel = payload.decision === "confirmed" ? "CONFIRMED" : "REJECTED";
+  const bookingDetailsUrl = buildBookingDetailsUrl(payload.bookingId);
 
   return `
     <h2>Booking Request ${decisionLabel}</h2>
@@ -318,6 +352,11 @@ const toBookingDecisionAdminHtml = (payload: BookingDecisionPayload) => {
     <p><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
     <p><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
     <p><strong>Decision:</strong> ${decisionLabel}</p>
+    ${
+      bookingDetailsUrl
+        ? `<p><strong>Booking Details:</strong> <a href="${bookingDetailsUrl}" target="_blank" rel="noopener noreferrer">Open in backoffice</a></p>`
+        : ""
+    }
     <p><strong>Reason:</strong> ${payload.reason ? escapeHtml(payload.reason) : "Not provided"}</p>
   `;
 };
@@ -330,34 +369,44 @@ const toBookingDecisionUserHtml = (payload: BookingDecisionPayload) => {
     : "Thank you for your request. At this time we are unable to confirm it.";
 
   return `
-    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.5;">
-      <h2 style="margin-bottom: 8px;">${title}</h2>
-      <p>Hello ${escapeHtml(payload.firstName)},</p>
-      <p>${intro}</p>
-      <p><strong>Booking Reference:</strong> ${escapeHtml(payload.reservationNumber)}</p>
-      <div style="border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin: 16px 0;">
-        <p><strong>Property:</strong> ${escapeHtml(payload.hotelName)}</p>
-        <p><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
-        <p><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
-        <p><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
-        <p><strong>Status:</strong> ${isConfirmed ? "Booked" : "Rejected"}</p>
+    <div style="margin:0;padding:24px;background:${BRAND_SURFACE_COLOR};font-family:Arial,Helvetica,sans-serif;color:#1f2937;line-height:1.5;">
+      <div style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">
+        <div style="padding:16px 16px 0;">
+          <div style="background:linear-gradient(135deg,#f8efe6 0%,#eef3f8 100%);border:2px solid #e6d8c9;border-radius:16px;padding:10px;">
+            <img src="${BRAND_HERO_IMAGE_URL}" alt="Palazzo Pinto Brindisi" style="width:100%;height:auto;display:block;border:0;border-radius:10px;" />
+          </div>
+        </div>
+        <div style="padding:22px 24px;">
+          <div style="text-align:center;margin:0 0 10px;">
+            <a href="${BRAND_WEBSITE_URL}" target="_blank" rel="noopener noreferrer">
+              <img src="${BRAND_LOGO_URL}" alt="${BRAND_NAME}" style="max-width:220px;width:100%;height:auto;border:0;" />
+            </a>
+          </div>
+          <h2 style="margin:0 0 10px;color:${BRAND_PRIMARY_COLOR};font-size:31px;line-height:1.15;font-family:Georgia,'Times New Roman',serif;">${title}</h2>
+          <p style="margin:0 0 10px;">Hello ${escapeHtml(payload.firstName)},</p>
+          <p style="margin:0 0 12px;">${intro}</p>
+          <p style="margin:0 0 14px;"><strong>Booking Reference:</strong> ${escapeHtml(payload.reservationNumber)}</p>
+          <div style="background:#fcfcfd;border:1px solid #e7ebf0;border-radius:10px;padding:14px 16px;">
+            <p style="margin:0 0 7px;"><strong>Property:</strong> <a href="${PROPERTY_GOOGLE_MAPS_URL}" target="_blank" rel="noopener noreferrer" style="color:${BRAND_PRIMARY_COLOR};">${escapeHtml(PROPERTY_DISPLAY_NAME)}</a></p>
+            <p style="margin:0 0 7px;"><strong>Room:</strong> ${escapeHtml(payload.roomName)}</p>
+            <p style="margin:0 0 7px;"><strong>Check-In:</strong> ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>
+            <p style="margin:0 0 7px;"><strong>Check-Out:</strong> ${escapeHtml(formatFriendlyDate(payload.checkOut))}</p>
+            <p style="margin:0;"><strong>Status:</strong> ${isConfirmed ? "Booked" : "Rejected"}</p>
+          </div>
+          ${payload.reason ? `<p style="margin:14px 0 0;"><strong>Note:</strong> ${escapeHtml(payload.reason)}</p>` : ""}
+          <div style="margin-top:18px;text-align:center;">
+            <a href="${PROPERTY_GOOGLE_MAPS_URL}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:${BRAND_ACCENT_COLOR};color:#ffffff;text-decoration:none;padding:10px 16px;border-radius:999px;font-weight:700;">Open Property Location</a>
+          </div>
+          <p style="margin:20px 0 0;">Kind regards,<br/>${BRAND_NAME}<br/>Reservations Team</p>
+        </div>
       </div>
-      ${
-        payload.reason
-          ? `<p><strong>Note:</strong> ${escapeHtml(payload.reason)}</p>`
-          : ""
-      }
-      <p>
-        Kind regards,<br/>
-        Palazzo Pinto B&B<br/>
-        Reservations Team
-      </p>
     </div>
   `;
 };
 
 const toCheckInAdminHtml = (payload: CheckInNotificationPayload) => {
   const submittedAt = formatFriendlyDate(new Date());
+  const bookingDetailsUrl = buildBookingDetailsUrl(payload.bookingId);
 
   return `
     <h2>Guest Check-in Completed</h2>
@@ -377,6 +426,11 @@ const toCheckInAdminHtml = (payload: CheckInNotificationPayload) => {
     <p><strong>Payment Details:</strong> ${escapeHtml(payload.paymentDetails)}</p>
     <p><strong>City Tax:</strong> EUR ${payload.cityTax.toFixed(2)}</p>
     <p><strong>Uploaded Documents:</strong> ${payload.documentCount}</p>
+    ${
+      bookingDetailsUrl
+        ? `<p><strong>Booking Details:</strong> <a href="${bookingDetailsUrl}" target="_blank" rel="noopener noreferrer">Open in backoffice</a></p>`
+        : ""
+    }
     <p><strong>Breakfast:</strong> ${payload.breakfast && ((payload.breakfast.savouryCount || 0) + (payload.breakfast.sweetCount || 0) > 0)
       ? `${escapeHtml(payload.breakfast.time || "Time not set")} | Savoury: ${payload.breakfast.savouryCount || 0}, Sweet: ${payload.breakfast.sweetCount || 0}`
       : "None"}</p>
@@ -405,7 +459,7 @@ export const sendContactEmails = async (payload: ContactFormPayload) => {
     token,
     senderAddress,
     to: inboxAddress,
-    subject: adminSubject,
+    subject: `${TECH_SUBJECT_PREFIX} Contact Request | ${payload.name} - ${payload.email}`,
     html: toAdminHtml(payload),
     text: payload.message,
     replyTo: payload.email,
@@ -437,7 +491,7 @@ export const sendBookingRequestEmails = async (payload: BookingRequestPayload) =
     token,
     senderAddress,
     to: inboxAddress,
-    subject: `${subjectPrefix} Booking Request - ${payload.hotelName} (${payload.reservationNumber})`,
+    subject: `${TECH_SUBJECT_PREFIX} Requested | ${payload.roomName} - ${payload.reservationNumber}`,
     html: toBookingAdminHtml(payload),
     text: `Booking request from ${payload.firstName} ${payload.lastName} for ${payload.hotelName}`,
     replyTo: payload.email,
@@ -472,7 +526,7 @@ export const sendBookingDecisionEmails = async (
     token,
     senderAddress,
     to: inboxAddress,
-    subject: `${subjectPrefix} Booking ${decisionLabel} - ${payload.hotelName} (${payload.reservationNumber})`,
+    subject: `${TECH_SUBJECT_PREFIX} ${decisionLabel} | ${payload.roomName} - ${payload.reservationNumber}`,
     html: toBookingDecisionAdminHtml(payload),
     text: `Booking ${decisionLabel.toLowerCase()} for ${payload.reservationNumber}`,
     replyTo: payload.email,
@@ -482,7 +536,7 @@ export const sendBookingDecisionEmails = async (
     token,
     senderAddress,
     to: payload.email,
-    subject: `Booking ${decisionLabel} - ${payload.hotelName} (${payload.reservationNumber})`,
+    subject: `Booking ${decisionLabel} - ${BRAND_NAME} - ${payload.hotelName} (${payload.reservationNumber})`,
     html: toBookingDecisionUserHtml(payload),
     text: `Booking ${decisionLabel.toLowerCase()} for reservation ${payload.reservationNumber}`,
   });
@@ -506,7 +560,7 @@ export const sendCheckInNotificationEmail = async (
     token,
     senderAddress,
     to: inboxAddress,
-    subject: `${subjectPrefix} Check-in Saved - ${payload.hotelName} (${payload.reservationNumber})`,
+    subject: `${TECH_SUBJECT_PREFIX} Check-in Saved | ${payload.roomName} - ${payload.reservationNumber}`,
     html: toCheckInAdminHtml(payload),
     text: `Check-in saved for reservation ${payload.reservationNumber}`,
     replyTo: payload.email,

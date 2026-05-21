@@ -541,6 +541,7 @@ router.post(
 
       try {
         await sendBookingRequestEmails({
+          bookingId: String(newBooking._id),
           reservationNumber,
           hotelName: hotel.name,
           roomName: canonicalRoomName,

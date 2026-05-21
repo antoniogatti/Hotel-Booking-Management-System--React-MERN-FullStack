@@ -734,6 +734,7 @@ router.post(
 
       try {
         await sendBookingDecisionEmails({
+          bookingId: String(booking._id),
           reservationNumber: booking.reservationNumber || "N/A",
           hotelName: accessCheck.hotel?.name || "Room",
           roomName: accessCheck.hotel?.name || "Room",
@@ -1581,6 +1582,7 @@ router.post(
 
       try {
         await sendCheckInNotificationEmail({
+          bookingId: String(booking._id),
           reservationNumber: booking.reservationNumber || "N/A",
           hotelName: accessCheck.hotel?.name || "Room",
           roomName: accessCheck.hotel?.name || "Room",
