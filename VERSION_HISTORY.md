@@ -1,5 +1,15 @@
 # Version History
 
+## 1.11.5 - 2026-05-21
+
+### Scheduler Monitor and Run Observability
+- Added a dedicated admin-only Scheduler Monitor page with day filter and run summary cards.
+- Added secured scheduler monitor APIs to list daily booking enrichment runs.
+- Added persistent scheduler run logging with status, counters, duration, and concise run metadata.
+- Added concise extracted run errors with inline accordion details in the Scheduler Monitor UI.
+- Updated run outcome mapping so runs with processing errors are marked as `failed` for clearer diagnostics.
+- Added scheduler log retention cleanup to keep only the latest 30 days before each run.
+
 ## 1.11.4 - 2026-05-21
 
 ### Email Templates and Notification Subjects

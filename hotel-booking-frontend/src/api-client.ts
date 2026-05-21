@@ -559,3 +559,49 @@ export const openBooking = async (bookingId: string) => {
   const response = await axiosInstance.patch(`/api/bookings/${bookingId}/open`);
   return response.data;
 };
+
+export type SchedulerRunRow = {
+  _id: string;
+  slotKey: string;
+  status: "success" | "failed" | "skipped";
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  processed: number;
+  syncedOneNote: number;
+  syncedExcel: number;
+  enrichedNames: number;
+  errors: number;
+  errorDetails?: Array<{
+    code: string;
+    message: string;
+    externalEventId?: string;
+    hotelId?: string;
+  }>;
+  reason?: string;
+  errorCode?: string;
+  errorMessage?: string;
+};
+
+export type SchedulerMonitorResponse = {
+  date: string;
+  timeZone: string;
+  message?: string;
+  runs: SchedulerRunRow[];
+};
+
+export const fetchBookingEnrichmentSchedulerRuns = async (
+  date?: string
+): Promise<SchedulerMonitorResponse> => {
+  const params = new URLSearchParams();
+  if (date) {
+    params.append("date", date);
+  }
+
+  const query = params.toString();
+  const response = await axiosInstance.get(
+    `/api/scheduler-monitor/enrichment/runs${query ? `?${query}` : ""}`
+  );
+
+  return response.data;
+};

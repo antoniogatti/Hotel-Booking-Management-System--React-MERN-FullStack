@@ -108,6 +108,14 @@ const AdminPortal = () => {
                   </Link>
                 </Button>
               )}
+              {userRole === "admin" && (
+                <Button asChild variant="outline">
+                  <Link to="/scheduler-monitor">
+                    <Clock3 className="mr-2 h-4 w-4" />
+                    Open Scheduler Monitor
+                  </Link>
+                </Button>
+              )}
             </div>
           </div>
         </section>
@@ -353,6 +361,19 @@ const AdminPortal = () => {
                   <div>
                     <p className="font-semibold text-slate-900">Sync Center</p>
                     <p className="text-sm text-slate-600">Review Booking.com sync health and last sync times.</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-slate-500" />
+                </Link>
+              )}
+
+              {userRole === "admin" && (
+                <Link
+                  to="/scheduler-monitor"
+                  className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-4 transition hover:border-teal-300 hover:bg-teal-50/60"
+                >
+                  <div>
+                    <p className="font-semibold text-slate-900">Scheduler Monitor</p>
+                    <p className="text-sm text-slate-600">Review enrichment scheduler runs with concise error codes.</p>
                   </div>
                   <ArrowRight className="h-4 w-4 text-slate-500" />
                 </Link>

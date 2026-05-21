@@ -1,5 +1,6 @@
 import ExternalCalendarEvent from "../models/external-calendar-event";
 import Hotel from "../models/hotel";
+import SchedulerRunLog from "../models/scheduler-run-log";
 import User from "../models/user";
 import { getValidMicrosoftGraphAccessToken } from "./microsoft-graph-auth";
 import { syncBookingFromExcel } from "./excel-booking-sync";
@@ -16,6 +17,10 @@ const AUTO_SYNC_MAX_BOOKINGS = Math.max(
   1,
   Number(process.env.BOOKING_ENRICHMENT_MAX_BOOKINGS || 50)
 );
+const AUTO_SYNC_LOG_RETENTION_DAYS = Math.max(
+  1,
+  Number(process.env.BOOKING_ENRICHMENT_LOG_RETENTION_DAYS || 30)
+);
 const AUTO_SYNC_INTERVAL_MS = 60 * 1000;
 
 let schedulerHandle: NodeJS.Timeout | null = null;
@@ -30,8 +35,16 @@ export type BookingEnrichmentRunSummary = {
   syncedExcel: number;
   enrichedNames: number;
   errors: number;
-  status: "completed" | "skipped";
+  status: "completed" | "skipped" | "failed";
   reason?: string;
+  errorCode?: string;
+  errorMessage?: string;
+  errorDetails?: Array<{
+    code: string;
+    message: string;
+    externalEventId?: string;
+    hotelId?: string;
+  }>;
 };
 
 type TimeParts = {
@@ -79,6 +92,29 @@ const addDaysToKey = (key: string, days: number) => {
 const getDateKeyInTimeZone = (date: Date, timeZone: string) => {
   const parts = toParts(date, timeZone);
   return toDateKey(parts);
+};
+
+const extractErrorDetails = (error: unknown) => {
+  if (error instanceof Error) {
+    const maybeCode = (error as { code?: unknown }).code;
+    const code = typeof maybeCode === "string" && maybeCode.trim() ? maybeCode.trim() : error.name;
+    return {
+      code,
+      message: error.message || "Unknown error",
+    };
+  }
+
+  if (typeof error === "string") {
+    return {
+      code: "Error",
+      message: error,
+    };
+  }
+
+  return {
+    code: "UnknownError",
+    message: "Unknown scheduler failure",
+  };
 };
 
 const shouldRunNow = (now: Date) => {
@@ -203,8 +239,82 @@ const applyExcelSyncToImportedEvent = (params: {
 };
 
 const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSummary> => {
+  const startedAt = new Date();
+
+  const cleanupOldRunLogs = async () => {
+    try {
+      const cutoff = new Date(startedAt);
+      cutoff.setUTCDate(cutoff.getUTCDate() - AUTO_SYNC_LOG_RETENTION_DAYS);
+
+      const cleanupResult = await SchedulerRunLog.deleteMany({
+        schedulerName: "booking_enrichment",
+        startedAt: { $lt: cutoff },
+      });
+
+      if ((cleanupResult.deletedCount || 0) > 0) {
+        logInfo("Booking enrichment scheduler log retention cleanup completed", {
+          retentionDays: AUTO_SYNC_LOG_RETENTION_DAYS,
+          deletedCount: cleanupResult.deletedCount,
+          cutoff: cutoff.toISOString(),
+        });
+      }
+    } catch (cleanupError) {
+      logWarn("Booking enrichment scheduler log retention cleanup failed", {
+        slotKey,
+        retentionDays: AUTO_SYNC_LOG_RETENTION_DAYS,
+        error: cleanupError instanceof Error ? cleanupError.message : "unknown cleanup error",
+      });
+    }
+  };
+
+  const persistRunLog = async (summary: BookingEnrichmentRunSummary) => {
+    try {
+      const finishedAt = new Date();
+      await SchedulerRunLog.create({
+        schedulerName: "booking_enrichment",
+        slotKey: summary.slotKey,
+        runDateKey: getDateKeyInTimeZone(startedAt, AUTO_SYNC_TIME_ZONE),
+        timeZone: summary.timeZone,
+        status:
+          summary.status === "completed"
+            ? "success"
+            : summary.status === "failed"
+              ? "failed"
+              : "skipped",
+        startedAt,
+        finishedAt,
+        durationMs: Math.max(0, finishedAt.getTime() - startedAt.getTime()),
+        processed: summary.processed,
+        syncedOneNote: summary.syncedOneNote,
+        syncedExcel: summary.syncedExcel,
+        enrichedNames: summary.enrichedNames,
+        errorCount: summary.errors,
+        errorDetails: (summary.errorDetails || []).slice(0, 10).map((detail) => ({
+          code: detail.code,
+          message: detail.message,
+          externalEventId: detail.externalEventId || "",
+          hotelId: detail.hotelId || "",
+        })),
+        reason: summary.reason || "",
+        errorCode: summary.errorCode || "",
+        errorMessage: summary.errorMessage || "",
+      });
+    } catch (persistError) {
+      logError("Unable to persist booking enrichment scheduler run log", persistError, {
+        slotKey: summary.slotKey,
+      });
+    }
+  };
+
+  const completeAndPersist = async (summary: BookingEnrichmentRunSummary) => {
+    await persistRunLog(summary);
+    return summary;
+  };
+
+  await cleanupOldRunLogs();
+
   if (syncInProgress) {
-    return {
+    return completeAndPersist({
       slotKey,
       timeZone: AUTO_SYNC_TIME_ZONE,
       processed: 0,
@@ -214,7 +324,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
       errors: 0,
       status: "skipped",
       reason: "sync already in progress",
-    };
+    });
   }
 
   syncInProgress = true;
@@ -227,7 +337,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
     const automationUser = await getAutomationUser();
     if (!automationUser) {
       logWarn("Booking enrichment scheduler skipped: no Microsoft-connected admin/hotel owner");
-      return {
+      return completeAndPersist({
         slotKey,
         timeZone: AUTO_SYNC_TIME_ZONE,
         processed: 0,
@@ -237,7 +347,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
         errors: 0,
         status: "skipped",
         reason: "no Microsoft-connected admin/hotel owner",
-      };
+      });
     }
 
     const graphAccessToken = await getValidMicrosoftGraphAccessToken(automationUser);
@@ -245,7 +355,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
       logWarn("Booking enrichment scheduler skipped: Microsoft Graph token unavailable", {
         userId: String(automationUser._id),
       });
-      return {
+      return completeAndPersist({
         slotKey,
         timeZone: AUTO_SYNC_TIME_ZONE,
         processed: 0,
@@ -255,7 +365,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
         errors: 0,
         status: "skipped",
         reason: "Microsoft Graph token unavailable",
-      };
+      });
     }
 
     const candidates = await ExternalCalendarEvent.find({
@@ -281,7 +391,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
         slotKey,
         timeZone: AUTO_SYNC_TIME_ZONE,
       });
-      return {
+      return completeAndPersist({
         slotKey,
         timeZone: AUTO_SYNC_TIME_ZONE,
         processed: 0,
@@ -290,7 +400,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
         enrichedNames: 0,
         errors: 0,
         status: "completed",
-      };
+      });
     }
 
     const hotelIds = Array.from(new Set(scopedCandidates.map((entry) => String(entry.hotelId))));
@@ -302,6 +412,12 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
     let syncedExcel = 0;
     let enrichedNames = 0;
     let errors = 0;
+    const errorDetails: Array<{
+      code: string;
+      message: string;
+      externalEventId?: string;
+      hotelId?: string;
+    }> = [];
 
     for (const entry of scopedCandidates) {
       processed += 1;
@@ -381,6 +497,13 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
         }
       } catch (error) {
         errors += 1;
+        const details = extractErrorDetails(error);
+        errorDetails.push({
+          code: details.code,
+          message: details.message,
+          externalEventId: String(entry._id),
+          hotelId: String(entry.hotelId),
+        });
         logError("Booking enrichment sync failed for imported event", error, {
           externalEventId: String(entry._id),
           hotelId: String(entry.hotelId),
@@ -399,7 +522,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
       errors,
     });
 
-    return {
+    return completeAndPersist({
       slotKey,
       timeZone: AUTO_SYNC_TIME_ZONE,
       processed,
@@ -407,15 +530,19 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
       syncedExcel,
       enrichedNames,
       errors,
-      status: "completed",
-    };
+      status: errors > 0 ? "failed" : "completed",
+      errorDetails,
+    });
   } catch (error) {
+    const details = extractErrorDetails(error);
+
     logError("Booking enrichment scheduler run failed", error, {
       slotKey,
       timeZone: AUTO_SYNC_TIME_ZONE,
+      errorCode: details.code,
     });
 
-    return {
+    return completeAndPersist({
       slotKey,
       timeZone: AUTO_SYNC_TIME_ZONE,
       processed: 0,
@@ -423,9 +550,17 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
       syncedExcel: 0,
       enrichedNames: 0,
       errors: 1,
-      status: "skipped",
-      reason: error instanceof Error ? error.message : "unknown run failure",
-    };
+      status: "failed",
+      reason: details.message,
+      errorCode: details.code,
+      errorMessage: details.message,
+      errorDetails: [
+        {
+          code: details.code,
+          message: details.message,
+        },
+      ],
+    });
   } finally {
     syncInProgress = false;
   }
