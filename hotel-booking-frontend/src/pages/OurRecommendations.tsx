@@ -48,13 +48,13 @@ const restaurants: RecommendationItem[] = [
     travelModes: ["walk"],
   },
   {
-    name: "Cascipo",
+    name: "Alkilo",
     area: "Historic centre",
     description:
-      "A reliable Italian option in the centre when you want a quick and easy dinner close to the B&B.",
-    highlight: "Best for a classic central trattoria feel.",
-    query: "Via San Benedetto 45 Brindisi",
-    mapUrl: "https://maps.app.goo.gl/28hEjvDTS9e4xmsH8",
+      "A well-regarded bar and café on Via Cavour, ideal for a pre-dinner aperitivo or a relaxed drink close to Palazzo Pinto.",
+    highlight: "Best for aperitivo and cocktails in the centre.",
+    query: "Via Cavour 2 Brindisi",
+    mapUrl: "https://maps.app.goo.gl/viQd2o1aWoTWguxE9",
     roughDistance: "0.2 km",
     estimatedTime: "About 3 minutes on foot",
     travelModes: ["walk"],
