@@ -51,8 +51,8 @@ const restaurants: RecommendationItem[] = [
     name: "Alkilo",
     area: "Historic centre",
     description:
-      "A well-regarded bar and café on Via Cavour, ideal for a pre-dinner aperitivo or a relaxed drink close to Palazzo Pinto.",
-    highlight: "Best for aperitivo and cocktails in the centre.",
+      "The best steak house in Brindisi, located on the bay front and just a short walk from Palazzo Pinto. Known for top-quality grilled meats with a stunning waterfront setting.",
+    highlight: "Best Steak House in Brindisi.",
     query: "Via Cavour 2 Brindisi",
     mapUrl: "https://maps.app.goo.gl/viQd2o1aWoTWguxE9",
     roughDistance: "0.2 km",
