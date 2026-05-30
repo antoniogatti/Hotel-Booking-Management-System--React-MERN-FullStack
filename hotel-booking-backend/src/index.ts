@@ -226,6 +226,15 @@ const configuredOrigins = [
     .filter(Boolean),
 ];
 
+const productionFallbackOrigins = isProduction
+  ? [
+      "https://www.palazzopintobnb.com",
+      "https://palazzopintobnb.com",
+      "https://hotel-mern-booking.vercel.app",
+      "https://palazzopinto-web-2603151048.azurewebsites.net",
+    ]
+  : [];
+
 const defaultOrigins = isProduction
   ? []
   : [
@@ -236,7 +245,7 @@ const defaultOrigins = isProduction
 ];
 
 const allowedOrigins = new Set(
-  [...configuredOrigins, ...defaultOrigins]
+  [...configuredOrigins, ...productionFallbackOrigins, ...defaultOrigins]
     .filter((origin): origin is string => Boolean(origin))
     .map(normalizeOrigin)
 );
