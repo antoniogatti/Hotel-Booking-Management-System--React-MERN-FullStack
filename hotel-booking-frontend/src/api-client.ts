@@ -524,7 +524,7 @@ export type HotelAvailabilityResponse = {
 };
 
 export const submitContactForm = async (payload: ContactFormPayload) => {
-  const response = await axiosInstance.post("/api/contact", payload, { withCredentials: false, skipAuth: true });
+  const response = await axiosInstance.post("/api/contact", payload, { withCredentials: false, skipAuth: true } as any);
   return response.data;
 };
 
@@ -534,7 +534,7 @@ export const submitBookingRequest = async (
   const response = await axiosInstance.post(
     `/api/rooms/${payload.hotelId}/booking-request`,
     payload,
-    { withCredentials: false, skipAuth: true }
+    { withCredentials: false, skipAuth: true } as any
   );
   return response.data;
 };
@@ -555,7 +555,7 @@ export const checkHotelAvailability = async (params: {
 
   const response = await axiosInstance.get(
     `/api/rooms/${params.hotelId}/availability?${queryParams.toString()}`,
-    { withCredentials: false, skipAuth: true }
+    { withCredentials: false, skipAuth: true } as any
   );
 
   return response.data;
