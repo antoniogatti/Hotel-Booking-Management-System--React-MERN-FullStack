@@ -50,6 +50,15 @@ const localDevDefaultRole: AppRole =
 const SOFIA_EMAIL = process.env.SOFIA_EMAIL || "sofia@palazzopintobnb.com";
 const SOFIA_CLIENT_ID = process.env.SOFIA_CLIENT_ID;
 
+const normalizeCredential = (value: unknown) => {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  // Tolerate accidental wrapping quotes and trailing whitespace/newlines from env files.
+  return value.trim().replace(/^['\"]|['\"]$/g, "");
+};
+
 const getSessionCookieOptions = (
   overrides: Partial<CookieOptions> = {}
 ): CookieOptions => ({
@@ -630,12 +639,17 @@ router.post("/logout", (req: Request, res: Response) => {
  */
 router.post("/service", async (req: Request, res: Response) => {
   const SOFIA_CLIENT_SECRET = process.env.SOFIA_CLIENT_SECRET;
+  const expectedClientId = normalizeCredential(SOFIA_CLIENT_ID);
+  const expectedClientSecret = normalizeCredential(SOFIA_CLIENT_SECRET);
 
-  if (!SOFIA_CLIENT_ID || !SOFIA_CLIENT_SECRET) {
+  if (!expectedClientId || !expectedClientSecret) {
     return res.status(503).json({ message: "Service auth not configured" });
   }
 
   const { client_id, client_secret } = req.body;
+  const incomingClientId = normalizeCredential(client_id);
+  const incomingClientSecret = normalizeCredential(client_secret);
+
   if (!client_id || !client_secret) {
     return res.status(401).json({ message: "Missing credentials" });
   }
@@ -643,11 +657,11 @@ router.post("/service", async (req: Request, res: Response) => {
   try {
     // Timing-safe comparison per prevenire timing attacks
     const idOk =
-      client_id.length === SOFIA_CLIENT_ID.length &&
-      crypto.timingSafeEqual(Buffer.from(client_id), Buffer.from(SOFIA_CLIENT_ID));
+      incomingClientId.length === expectedClientId.length &&
+      crypto.timingSafeEqual(Buffer.from(incomingClientId), Buffer.from(expectedClientId));
     const secretOk =
-      client_secret.length === SOFIA_CLIENT_SECRET.length &&
-      crypto.timingSafeEqual(Buffer.from(client_secret), Buffer.from(SOFIA_CLIENT_SECRET));
+      incomingClientSecret.length === expectedClientSecret.length &&
+      crypto.timingSafeEqual(Buffer.from(incomingClientSecret), Buffer.from(expectedClientSecret));
 
     if (!idOk || !secretOk) {
       logError("Service auth failed: invalid credentials", undefined, { route: "auth.service" });
