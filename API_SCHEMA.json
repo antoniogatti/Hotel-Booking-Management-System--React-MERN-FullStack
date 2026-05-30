@@ -1,0 +1,748 @@
+{
+  "_meta": {
+    "title": "Palazzo Pinto B&B – Backend API Schema",
+    "version": "1.11.6",
+    "baseUrl": "https://api.palazzopintobnb.com",
+    "generated": "2026-05-30",
+    "authSchemes": {
+      "none": "No authentication required",
+      "bearer": "Authorization: Bearer <jwt>  — obtained from POST /api/auth/login or POST /api/auth/service",
+      "cookie": "Alternatively, the JWT can be sent as an HttpOnly cookie named 'auth_token'",
+      "aad": "Azure AD access token (Bearer) also accepted on routes marked as 'bearer|aad'"
+    },
+    "roles": {
+      "guest": "Unauthenticated public user",
+      "user": "Authenticated registered user",
+      "hotel_owner": "Hotel owner – can manage own hotels and bookings",
+      "admin": "Full access to everything"
+    },
+    "agentNotes": {
+      "serviceAuth": "Sofia Hermes authenticates via POST /api/auth/service using SOFIA_CLIENT_ID / SOFIA_CLIENT_SECRET and receives a JWT. Use that JWT as Bearer on all protected routes.",
+      "pagination": "Most list endpoints support ?pageNumber=<n> (1-based). Response includes { data, pagination: { total, page, pages } }",
+      "dates": "All dates are ISO 8601 strings (YYYY-MM-DD or full ISO timestamp)"
+    }
+  },
+
+  "endpoints": [
+
+    {
+      "group": "Authentication",
+      "basePath": "/api/auth"
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "auth": "none",
+      "description": "Login with email + password. Returns JWT as cookie and in response body.",
+      "requestBody": {
+        "email": "string (required)",
+        "password": "string (required)"
+      },
+      "response": {
+        "userId": "string",
+        "email": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "roles": ["string"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/service",
+      "auth": "none",
+      "description": "Service account authentication for AI agents and integrations. Returns a JWT.",
+      "requestBody": {
+        "client_id": "string (required) – value of SOFIA_CLIENT_ID env var",
+        "client_secret": "string (required)"
+      },
+      "response": {
+        "token": "string (JWT)",
+        "user": {
+          "userId": "string",
+          "email": "string",
+          "roles": ["string"]
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/validate-token",
+      "auth": "bearer|aad",
+      "description": "Validates current session token (app JWT or Azure AD token). Returns user profile and roles.",
+      "response": {
+        "userId": "string",
+        "email": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "roles": ["string"],
+        "authProvider": "app | aad"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/logout",
+      "auth": "none",
+      "description": "Clears the auth cookie. Safe to call without being authenticated."
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/microsoft",
+      "auth": "none",
+      "description": "Initiates Microsoft OAuth2 (PKCE) login flow. Redirects browser to Microsoft."
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/callback/microsoft",
+      "auth": "none",
+      "description": "Microsoft OAuth2 callback. Exchanges code for token, creates/updates user, sets cookie, redirects to frontend."
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/google",
+      "auth": "none",
+      "description": "Google OAuth – DISABLED (returns 410). Use /api/auth/microsoft instead."
+    },
+
+    {
+      "group": "Users",
+      "basePath": "/api/users"
+    },
+    {
+      "method": "POST",
+      "path": "/api/users/register",
+      "auth": "none",
+      "description": "Register a new user account.",
+      "requestBody": {
+        "firstName": "string (required)",
+        "lastName": "string (required)",
+        "email": "string (required)",
+        "password": "string (required, min 6 chars)"
+      },
+      "response": {
+        "token": "string (JWT)"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/users/me",
+      "auth": "bearer",
+      "requiredRole": "user",
+      "description": "Returns the authenticated user's profile.",
+      "response": {
+        "_id": "string",
+        "email": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "roles": ["string"]
+      }
+    },
+
+    {
+      "group": "Public Room Search",
+      "basePath": "/api/rooms",
+      "note": "These routes are public (no auth). Use withCredentials:false when calling from browser."
+    },
+    {
+      "method": "GET",
+      "path": "/api/rooms/search",
+      "auth": "none",
+      "description": "Search rooms. When no filters are provided, returns ALL active rooms (full catalogue). When filters are provided, applies availability and pagination.",
+      "queryParams": {
+        "destination": "string (optional) – city/country filter",
+        "checkIn": "string (optional) – ISO date YYYY-MM-DD",
+        "checkOut": "string (optional) – ISO date YYYY-MM-DD",
+        "adultCount": "number (optional)",
+        "childCount": "number (optional)",
+        "facilities": "string[] (optional) – comma-separated amenities",
+        "types": "string[] (optional) – room types",
+        "stars": "number (optional)",
+        "maxPrice": "number (optional)",
+        "sortOption": "string (optional) – 'starRating'|'pricePerNightAsc'|'pricePerNightDesc'",
+        "pageNumber": "number (optional, default 1) – only used when filters are present"
+      },
+      "response": {
+        "data": ["HotelPublic"],
+        "pagination": {
+          "total": "number",
+          "page": "number",
+          "pages": "number"
+        }
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/rooms",
+      "auth": "none",
+      "description": "Returns all hotels/rooms sorted by last-updated. No filtering.",
+      "response": ["HotelPublic"]
+    },
+    {
+      "method": "GET",
+      "path": "/api/rooms/:id",
+      "auth": "none",
+      "description": "Returns full public details for a single hotel/room by MongoDB ID.",
+      "pathParams": {
+        "id": "string – MongoDB ObjectId"
+      },
+      "response": "HotelPublic"
+    },
+    {
+      "method": "GET",
+      "path": "/api/rooms/:hotelId/availability",
+      "auth": "none",
+      "description": "Returns availability for a hotel given a date range.",
+      "pathParams": {
+        "hotelId": "string – MongoDB ObjectId"
+      },
+      "queryParams": {
+        "checkIn": "string (required) – ISO date",
+        "checkOut": "string (required) – ISO date"
+      },
+      "response": {
+        "available": "boolean",
+        "bookedDates": ["string"],
+        "blockedDates": ["string"]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/rooms/:hotelId/booking-request",
+      "auth": "none",
+      "description": "Submits a guest booking request (pending, no payment). Email confirmation sent to guest.",
+      "pathParams": {
+        "hotelId": "string – MongoDB ObjectId"
+      },
+      "requestBody": {
+        "firstName": "string (required)",
+        "lastName": "string (required)",
+        "email": "string (required)",
+        "phone": "string (optional)",
+        "checkIn": "string (required) – ISO date",
+        "checkOut": "string (required) – ISO date",
+        "adultCount": "number (required)",
+        "childCount": "number (optional)",
+        "notes": "string (optional)"
+      },
+      "response": {
+        "bookingId": "string",
+        "status": "pending"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/rooms/:hotelId/bookings",
+      "auth": "bearer",
+      "requiredRole": "user",
+      "description": "Creates a confirmed booking for a logged-in user (Stripe payment flow).",
+      "pathParams": {
+        "hotelId": "string"
+      },
+      "requestBody": {
+        "checkIn": "string",
+        "checkOut": "string",
+        "adultCount": "number",
+        "childCount": "number",
+        "paymentIntentId": "string"
+      }
+    },
+
+    {
+      "group": "My Hotels (Owner/Admin)",
+      "basePath": "/api/my-hotels",
+      "requiredRole": "hotel_owner or admin"
+    },
+    {
+      "method": "POST",
+      "path": "/api/my-hotels",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Creates a new hotel listing. Supports multipart/form-data for image uploads.",
+      "requestBody": "multipart/form-data – hotel fields + imageFiles[]"
+    },
+    {
+      "method": "GET",
+      "path": "/api/my-hotels",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Returns all hotels owned by the authenticated user."
+    },
+    {
+      "method": "GET",
+      "path": "/api/my-hotels/:id",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Returns a single hotel owned by the authenticated user.",
+      "pathParams": {
+        "id": "string – MongoDB ObjectId"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/my-hotels/:hotelId",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Updates an existing hotel listing. Supports multipart/form-data for image replacement.",
+      "pathParams": {
+        "hotelId": "string – MongoDB ObjectId"
+      }
+    },
+
+    {
+      "group": "Bookings Management (Admin/Owner)",
+      "basePath": "/api/bookings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/bookings",
+      "auth": "bearer",
+      "requiredRole": "admin",
+      "description": "Returns ALL bookings in the system."
+    },
+    {
+      "method": "GET",
+      "path": "/api/bookings/rooms",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Returns bookings for rooms owned by the authenticated hotel owner."
+    },
+    {
+      "method": "GET",
+      "path": "/api/bookings/calendar/:hotelId",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Returns calendar view of bookings for a hotel.",
+      "pathParams": {
+        "hotelId": "string"
+      },
+      "queryParams": {
+        "month": "number (optional) – 1-12",
+        "year": "number (optional)"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/bookings/calendar/:hotelId/day-status",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Sets custom status (blocked/open) for a specific day on a hotel calendar.",
+      "pathParams": {
+        "hotelId": "string"
+      },
+      "requestBody": {
+        "date": "string – ISO date",
+        "status": "blocked | open"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/bookings/hotel/:hotelId",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Returns all bookings for a specific hotel.",
+      "pathParams": {
+        "hotelId": "string"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/bookings/:id",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Returns full details of a single booking.",
+      "pathParams": {
+        "id": "string – booking MongoDB ObjectId"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/bookings/:id/decision",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Approve or reject a pending booking request.",
+      "pathParams": {
+        "id": "string"
+      },
+      "requestBody": {
+        "decision": "approved | rejected",
+        "reason": "string (optional) – rejection reason"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/bookings/:id",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Full update of a booking record.",
+      "pathParams": {
+        "id": "string"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/bookings/:id/status",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Updates only the status field of a booking.",
+      "pathParams": {
+        "id": "string"
+      },
+      "requestBody": {
+        "status": "pending | approved | rejected | checked_in | checked_out | cancelled"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/bookings/:id/close",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Marks a booking as closed/completed.",
+      "pathParams": {
+        "id": "string"
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/bookings/:id/open",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Re-opens a previously closed booking.",
+      "pathParams": {
+        "id": "string"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/bookings/:id/check-in",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Records guest check-in for a booking.",
+      "pathParams": {
+        "id": "string"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/bookings/:id/sync-excel",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Syncs booking data to the connected OneDrive Excel file.",
+      "pathParams": {
+        "id": "string"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/bookings/:id/sync-onenote",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Syncs booking data to the connected OneNote notebook.",
+      "pathParams": {
+        "id": "string"
+      }
+    },
+    {
+      "method": "DELETE",
+      "path": "/api/bookings/:id",
+      "auth": "bearer",
+      "requiredRole": "admin",
+      "description": "Permanently deletes a booking. Admin only.",
+      "pathParams": {
+        "id": "string"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/bookings/dashboard/summary",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Returns booking counts, revenue summary and status breakdown for the dashboard.",
+      "queryParams": {
+        "hotelId": "string (optional) – filter by hotel"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/bookings/dashboard/upcoming-check-ins",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Returns list of upcoming check-ins in the near future.",
+      "queryParams": {
+        "days": "number (optional, default 7) – look-ahead window in days"
+      }
+    },
+
+    {
+      "group": "My Bookings (Logged-in guest)",
+      "basePath": "/api/my-bookings"
+    },
+    {
+      "method": "GET",
+      "path": "/api/my-bookings",
+      "auth": "bearer",
+      "requiredRole": "user",
+      "description": "Returns all bookings made by the authenticated guest user."
+    },
+
+    {
+      "group": "Booking.com Integration",
+      "basePath": "/api/integrations/booking-com"
+    },
+    {
+      "method": "GET",
+      "path": "/api/integrations/booking-com/export/:hotelId/:token.ics",
+      "auth": "none",
+      "description": "Public iCal export endpoint consumed by Booking.com. The token is a per-hotel secret stored in the hotel record.",
+      "pathParams": {
+        "hotelId": "string – MongoDB ObjectId",
+        "token": "string – hotel-specific export token"
+      }
+    },
+    {
+      "method": "PUT",
+      "path": "/api/integrations/booking-com/rooms/:hotelId/config",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Updates Booking.com iCal sync configuration for a hotel.",
+      "pathParams": {
+        "hotelId": "string"
+      },
+      "requestBody": {
+        "bookingComIcalUrl": "string (optional) – Booking.com iCal URL to import",
+        "syncEnabled": "boolean (optional)"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/integrations/booking-com/rooms/:hotelId/export-token/regenerate",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Regenerates the iCal export token for a hotel. Invalidates the previous token.",
+      "pathParams": {
+        "hotelId": "string"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/integrations/booking-com/sync",
+      "auth": "bearer",
+      "requiredRole": "hotel_owner|admin",
+      "description": "Triggers an immediate iCal sync from Booking.com for all configured hotels or a specific one.",
+      "requestBody": {
+        "hotelId": "string (optional) – if omitted, syncs all hotels"
+      }
+    },
+
+    {
+      "group": "Business Insights",
+      "basePath": "/api/business-insights",
+      "requiredRole": "admin"
+    },
+    {
+      "method": "GET",
+      "path": "/api/business-insights/dashboard",
+      "auth": "bearer",
+      "requiredRole": "admin",
+      "description": "Returns occupancy, revenue, and booking trend data for the admin dashboard."
+    },
+    {
+      "method": "GET",
+      "path": "/api/business-insights/forecast",
+      "auth": "bearer",
+      "requiredRole": "admin",
+      "description": "Returns revenue and occupancy forecast for upcoming periods."
+    },
+    {
+      "method": "GET",
+      "path": "/api/business-insights/system-stats",
+      "auth": "bearer",
+      "requiredRole": "admin",
+      "description": "Returns system-level statistics: users, hotels, total bookings, DB health."
+    },
+
+    {
+      "group": "OneNote Integration",
+      "basePath": "/api/onenote",
+      "note": "Requires a valid Microsoft Graph access token in the session (obtained via /api/auth/microsoft flow)."
+    },
+    {
+      "method": "GET",
+      "path": "/api/onenote/notebooks",
+      "auth": "session (Microsoft Graph)",
+      "description": "Lists all OneNote notebooks accessible to the authenticated Microsoft user."
+    },
+    {
+      "method": "GET",
+      "path": "/api/onenote/sections",
+      "auth": "session (Microsoft Graph)",
+      "description": "Lists sections in a notebook.",
+      "queryParams": {
+        "notebookId": "string (optional)"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/onenote/pages",
+      "auth": "session (Microsoft Graph)",
+      "description": "Lists pages in a section.",
+      "queryParams": {
+        "sectionId": "string (optional)"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/onenote/prenotazioni/bookings",
+      "auth": "session (Microsoft Graph)",
+      "description": "Reads and parses the Prenotazioni OneNote section, returning structured booking records."
+    },
+    {
+      "method": "GET",
+      "path": "/api/onenote/pages/:pageId",
+      "auth": "session (Microsoft Graph)",
+      "description": "Returns metadata for a single OneNote page.",
+      "pathParams": {
+        "pageId": "string"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/onenote/pages/:pageId/content",
+      "auth": "session (Microsoft Graph)",
+      "description": "Returns the full HTML content of a OneNote page.",
+      "pathParams": {
+        "pageId": "string"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/onenote/ai/extract-booking",
+      "auth": "session (Microsoft Graph)",
+      "description": "Uses Azure OpenAI to extract structured booking data from raw OneNote page text.",
+      "requestBody": {
+        "text": "string (optional) – raw text to extract from",
+        "pageId": "string (optional) – OneNote page ID to fetch and extract from"
+      },
+      "response": {
+        "booking": "Extracted booking object (guestName, checkIn, checkOut, adults, notes, etc.)"
+      }
+    },
+
+    {
+      "group": "Scheduler Monitor",
+      "basePath": "/api/scheduler-monitor"
+    },
+    {
+      "method": "GET",
+      "path": "/api/scheduler-monitor/enrichment/runs",
+      "auth": "bearer",
+      "requiredRole": "admin",
+      "description": "Returns the history of scheduled enrichment job runs (status, timestamps, records processed)."
+    },
+
+    {
+      "group": "Contact",
+      "basePath": "/api/contact"
+    },
+    {
+      "method": "POST",
+      "path": "/api/contact",
+      "auth": "none",
+      "description": "Sends a contact form message. Delivers email via Microsoft Graph (no SMTP).",
+      "requestBody": {
+        "name": "string (required)",
+        "email": "string (required)",
+        "subject": "string (required)",
+        "message": "string (required)"
+      },
+      "response": {
+        "message": "string – confirmation"
+      }
+    },
+
+    {
+      "group": "Health",
+      "basePath": "/api/health"
+    },
+    {
+      "method": "GET",
+      "path": "/api/health",
+      "auth": "none",
+      "description": "Basic liveness probe. Returns 200 OK with uptime and version.",
+      "response": {
+        "status": "ok",
+        "version": "string",
+        "uptime": "number (seconds)"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/health/detailed",
+      "auth": "none",
+      "description": "Extended health check: MongoDB connectivity, memory usage, scheduler status.",
+      "response": {
+        "status": "ok | degraded",
+        "db": "connected | disconnected",
+        "memory": "object",
+        "scheduler": "object"
+      }
+    }
+  ],
+
+  "models": {
+    "HotelPublic": {
+      "description": "Public-facing hotel/room object returned by /api/rooms/*",
+      "fields": {
+        "_id": "string",
+        "name": "string",
+        "city": "string",
+        "country": "string",
+        "description": "string",
+        "type": "string",
+        "pricePerNight": "number",
+        "facilities": ["string"],
+        "imageUrls": ["string"],
+        "location": "object",
+        "contact": "object",
+        "policies": "object",
+        "amenities": ["string"],
+        "isActive": "boolean",
+        "isFeatured": "boolean",
+        "adultCount": "number",
+        "childCount": "number",
+        "createdAt": "string (ISO date)",
+        "updatedAt": "string (ISO date)"
+      }
+    },
+    "Booking": {
+      "description": "Full booking record",
+      "fields": {
+        "_id": "string",
+        "hotelId": "string (ref Hotel)",
+        "userId": "string (ref User, optional for guest requests)",
+        "firstName": "string",
+        "lastName": "string",
+        "email": "string",
+        "phone": "string",
+        "checkIn": "string (ISO date)",
+        "checkOut": "string (ISO date)",
+        "adultCount": "number",
+        "childCount": "number",
+        "totalCost": "number",
+        "status": "pending | approved | rejected | checked_in | checked_out | cancelled",
+        "notes": "string",
+        "source": "direct | booking_com | manual",
+        "createdAt": "string (ISO date)",
+        "updatedAt": "string (ISO date)"
+      }
+    },
+    "User": {
+      "fields": {
+        "_id": "string",
+        "email": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "roles": ["guest", "user", "hotel_owner", "admin"],
+        "authProvider": "local | microsoft"
+      }
+    }
+  }
+}
