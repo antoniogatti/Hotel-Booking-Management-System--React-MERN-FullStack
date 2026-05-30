@@ -1,5 +1,13 @@
 # Version History
 
+## 1.11.6 - 2026-05-30
+
+### Public Search and Auth Compatibility
+- Updated public room search behavior so requests without stay dates return the full room set for guest browsing, while date-based requests still apply availability filtering.
+- Reduced public search payload fields by removing non-essential analytics/rating data from the response.
+- Added Azure AD token support to `validate-token` via Microsoft JWKS signature verification and claim-to-application-user mapping.
+- Updated frontend app version metadata so the portal/footer displays `1.11.6`.
+
 ## 1.11.5 - 2026-05-21
 
 ### Scheduler Monitor and Run Observability
