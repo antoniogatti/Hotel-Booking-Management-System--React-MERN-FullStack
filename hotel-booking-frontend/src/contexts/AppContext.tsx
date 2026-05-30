@@ -35,6 +35,8 @@ export const AppContextProvider = ({
     "Hotel room is getting ready..."
   );
   const { toast } = useToast();
+  const storedSessionToken =
+    typeof window !== "undefined" ? localStorage.getItem("session_id") : null;
 
   const { isError, isLoading, data } = useQuery(
     "validateToken",
@@ -43,7 +45,7 @@ export const AppContextProvider = ({
       retry: false,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000,
-      enabled: true,
+      enabled: !!storedSessionToken,
     }
   );
 
@@ -52,8 +54,6 @@ export const AppContextProvider = ({
     | null
     | undefined;
 
-  const storedSessionToken =
-    typeof window !== "undefined" ? localStorage.getItem("session_id") : null;
   const storedRoleValue =
     typeof window !== "undefined" ? localStorage.getItem("user_role") : null;
   const storedRole =

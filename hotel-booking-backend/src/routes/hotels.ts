@@ -17,6 +17,25 @@ import { recordAuditEvent } from "../lib/audit-log";
 const router = express.Router();
 const DUPLICATE_BOOKING_WINDOW_MS = 30 * 60 * 1000;
 const BOOKING_DATE_TIME_ZONE = process.env.BOOKING_DATE_TIME_ZONE || "Europe/Rome";
+const PUBLIC_SEARCH_ROOM_FIELDS = [
+  "_id",
+  "slug",
+  "minimumNights",
+  "name",
+  "city",
+  "country",
+  "description",
+  "type",
+  "adultCount",
+  "childCount",
+  "facilities",
+  "pricePerNight",
+  "starRating",
+  "imageUrls",
+  "lastUpdated",
+  "isActive",
+  "isFeatured",
+].join(" ");
 
 const buildReservationNumber = () => {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -296,6 +315,7 @@ router.get("/search", async (req: Request, res: Response) => {
     const skip = (pageNumber - 1) * pageSize;
 
     const matchedHotels = await Hotel.find(query)
+      .select(PUBLIC_SEARCH_ROOM_FIELDS)
       .sort(sortOptions)
       .lean();
 
