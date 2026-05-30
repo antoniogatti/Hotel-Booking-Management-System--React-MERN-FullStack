@@ -19,7 +19,9 @@ const DUPLICATE_BOOKING_WINDOW_MS = 30 * 60 * 1000;
 const BOOKING_DATE_TIME_ZONE = process.env.BOOKING_DATE_TIME_ZONE || "Europe/Rome";
 const PUBLIC_SEARCH_ROOM_FIELDS = [
   "_id",
+  "userId",
   "slug",
+  "originalUrl",
   "minimumNights",
   "name",
   "city",
@@ -30,12 +32,44 @@ const PUBLIC_SEARCH_ROOM_FIELDS = [
   "childCount",
   "facilities",
   "pricePerNight",
-  "starRating",
   "imageUrls",
   "lastUpdated",
+  "location",
+  "contact",
+  "policies",
+  "amenities",
   "isActive",
   "isFeatured",
+  "createdAt",
+  "updatedAt",
 ].join(" ");
+
+const hasSearchFilters = (queryParams: any) => {
+  const hasValue = (value: unknown) => {
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
+
+    if (value === undefined || value === null) {
+      return false;
+    }
+
+    const normalized = String(value).trim();
+    return normalized.length > 0;
+  };
+
+  return [
+    queryParams.destination,
+    queryParams.checkIn,
+    queryParams.checkOut,
+    queryParams.adultCount,
+    queryParams.childCount,
+    queryParams.facilities,
+    queryParams.types,
+    queryParams.stars,
+    queryParams.maxPrice,
+  ].some(hasValue);
+};
 
 const buildReservationNumber = () => {
   const date = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -291,6 +325,7 @@ const assessHotelAvailability = async (params: {
 router.get("/search", async (req: Request, res: Response) => {
   try {
     const query = constructSearchQuery(req.query);
+    const shouldReturnAllRooms = !hasSearchFilters(req.query);
 
     let sortOptions = {};
     switch (req.query.sortOption) {
@@ -309,9 +344,8 @@ router.get("/search", async (req: Request, res: Response) => {
     }
 
     const pageSize = 5;
-    const pageNumber = parseInt(
-      req.query.page ? req.query.page.toString() : "1"
-    );
+    const rawPageNumber = parseInt(req.query.page ? req.query.page.toString() : "1", 10);
+    const pageNumber = Number.isNaN(rawPageNumber) || rawPageNumber < 1 ? 1 : rawPageNumber;
     const skip = (pageNumber - 1) * pageSize;
 
     const matchedHotels = await Hotel.find(query)
@@ -326,14 +360,17 @@ router.get("/search", async (req: Request, res: Response) => {
     });
 
     const total = availableHotels.length;
-    const hotels = availableHotels.slice(skip, skip + pageSize);
+    const hotels = shouldReturnAllRooms
+      ? availableHotels
+      : availableHotels.slice(skip, skip + pageSize);
+    const pages = shouldReturnAllRooms ? 1 : Math.ceil(total / pageSize);
 
     const response: HotelSearchResponse = {
       data: hotels,
       pagination: {
         total,
-        page: pageNumber,
-        pages: Math.ceil(total / pageSize),
+        page: shouldReturnAllRooms ? 1 : pageNumber,
+        pages,
       },
     };
 
