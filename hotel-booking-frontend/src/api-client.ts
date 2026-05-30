@@ -235,17 +235,26 @@ export const searchHotels = async (
   searchParams.types?.forEach((type) => queryParams.append("types", type));
   searchParams.stars?.forEach((star) => queryParams.append("stars", star));
 
-  const response = await axiosInstance.get(`/api/rooms/search?${queryParams}`);
+  const response = await axiosInstance.get(`/api/rooms/search?${queryParams}`, {
+    withCredentials: false,
+    skipAuth: true,
+  } as any);
   return response.data;
 };
 
 export const fetchHotels = async (): Promise<HotelType[]> => {
-  const response = await axiosInstance.get("/api/rooms");
+  const response = await axiosInstance.get("/api/rooms", {
+    withCredentials: false,
+    skipAuth: true,
+  } as any);
   return response.data;
 };
 
 export const fetchHotelById = async (hotelId: string): Promise<HotelType> => {
-  const response = await axiosInstance.get(`/api/rooms/${hotelId}`);
+  const response = await axiosInstance.get(`/api/rooms/${hotelId}`, {
+    withCredentials: false,
+    skipAuth: true,
+  } as any);
   return response.data;
 };
 

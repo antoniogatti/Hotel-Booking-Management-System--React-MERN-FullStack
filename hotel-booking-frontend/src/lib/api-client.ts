@@ -22,6 +22,7 @@ export const getApiBaseUrl = getBaseURL;
 // Extend axios config to include metadata
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   metadata?: { retryCount: number };
+  skipAuth?: boolean;
 }
 
 const clearStoredProfile = () => {
@@ -47,7 +48,7 @@ axiosInstance.interceptors.request.use((config: CustomAxiosRequestConfig) => {
   config.metadata = { retryCount: 0 };
 
   const token = getStoredSessionToken();
-  if (token && !config.headers.Authorization) {
+  if (!config.skipAuth && token && !config.headers.Authorization) {
     config.headers.Authorization = `Bearer ${token}`;
   }
 
