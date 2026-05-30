@@ -4,7 +4,7 @@ import User from "../models/user";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
-import verifyToken from "../middleware/auth";
+import verifyToken, { verifyTokenOrAzureAd } from "../middleware/auth";
 import {
   normalizeEmail,
   resolvePersistedRole,
@@ -47,6 +47,8 @@ const forceLocalAdminRole =
   !isProduction && String(process.env.FORCE_LOCAL_ADMIN_ROLE || "true").toLowerCase() !== "false";
 const localDevDefaultRole: AppRole =
   useInMemoryMongo || forceLocalAdminRole ? "admin" : defaultAppRole;
+const SOFIA_EMAIL = process.env.SOFIA_EMAIL || "sofia@palazzopintobnb.com";
+const SOFIA_CLIENT_ID = process.env.SOFIA_CLIENT_ID;
 
 const getSessionCookieOptions = (
   overrides: Partial<CookieOptions> = {}
@@ -488,31 +490,78 @@ router.post(
  *       401:
  *         description: Token is invalid or expired
  */
-router.get("/validate-token", verifyToken, async (req: Request, res: Response) => {
-  const user = await User.findById(req.userId).select(
+router.get("/validate-token", verifyTokenOrAzureAd, async (req: Request, res: Response) => {
+  let user: any = null;
+
+  if (req.authProvider === "aad" && req.aadClaims) {
+    const emailFromClaims = normalizeEmail(
+      String(
+        req.aadClaims.preferred_username ||
+          req.aadClaims.upn ||
+          req.aadClaims.email ||
+          ""
+      )
+    );
+
+    if (emailFromClaims) {
+      user = await User.findOne({ email: emailFromClaims }).select(
+        "role email firstName lastName image"
+      );
+    }
+
+    if (!user) {
+      const appId = String(req.aadClaims.appid || req.aadClaims.azp || "");
+      if (SOFIA_CLIENT_ID && appId && appId === SOFIA_CLIENT_ID) {
+        user = await User.findOne({ email: SOFIA_EMAIL });
+        if (!user) {
+          user = new User({
+            email: SOFIA_EMAIL,
+            firstName: "Sofia",
+            lastName: "Hermes",
+            password: crypto.randomBytes(32).toString("hex"),
+            emailVerified: true,
+            role: "admin",
+          });
+          await user.save();
+        }
+      }
+    }
+  } else {
+    user = await User.findById(req.userId).select(
+      "role email firstName lastName image"
+    );
+  }
+
+  if (!user) {
+    return res.status(401).json({ message: "unauthorized" });
+  }
+
+  req.userId = String(user._id);
+
+  const hydratedUser = await User.findById(req.userId).select(
     "role email firstName lastName image"
   );
-  if (!user) {
+  if (!hydratedUser) {
     return res.status(401).json({ message: "unauthorized" });
   }
 
   const role = forceLocalAdminRole
     ? "admin"
-    : user.role
-    ? resolvePersistedRole(user.role)
+    : hydratedUser.role
+    ? resolvePersistedRole(hydratedUser.role)
     : localDevDefaultRole;
-  if (!user.role || user.role !== role) {
-    user.role = role;
-    await user.save();
+  if (!hydratedUser.role || hydratedUser.role !== role) {
+    hydratedUser.role = role;
+    await hydratedUser.save();
 
     await recordAuditEvent({
       action: "user.role.defaulted",
       entityType: "user",
-      entityId: String(user._id),
-      targetUserId: String(user._id),
-      actorId: String(user._id),
+      entityId: String(hydratedUser._id),
+      targetUserId: String(hydratedUser._id),
+      actorId: String(hydratedUser._id),
       actorRole: role,
-      actorEmail: user.email,
+      actorEmail: hydratedUser.email,
       metadata: {
         previousRole: null,
         nextRole: role,
@@ -524,11 +573,11 @@ router.get("/validate-token", verifyToken, async (req: Request, res: Response) =
   res.status(200).send({
     userId: req.userId,
     role,
-    email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
-    image: user.image,
-    microsoftGraphConnected: hasMicrosoftGraphAccess(user),
+    email: hydratedUser.email,
+    firstName: hydratedUser.firstName,
+    lastName: hydratedUser.lastName,
+    image: hydratedUser.image,
+    microsoftGraphConnected: hasMicrosoftGraphAccess(hydratedUser),
   });
 });
 
@@ -580,7 +629,6 @@ router.post("/logout", (req: Request, res: Response) => {
  *         description: Service auth not configured
  */
 router.post("/service", async (req: Request, res: Response) => {
-  const SOFIA_CLIENT_ID = process.env.SOFIA_CLIENT_ID;
   const SOFIA_CLIENT_SECRET = process.env.SOFIA_CLIENT_SECRET;
 
   if (!SOFIA_CLIENT_ID || !SOFIA_CLIENT_SECRET) {
@@ -607,7 +655,6 @@ router.post("/service", async (req: Request, res: Response) => {
     }
 
     // Cerca o crea utente sofia nel DB
-    const SOFIA_EMAIL = process.env.SOFIA_EMAIL || "sofia@palazzopintobnb.com";
     let user = await User.findOne({ email: SOFIA_EMAIL });
     if (!user) {
       user = new User({
