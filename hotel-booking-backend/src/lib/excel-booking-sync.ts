@@ -118,8 +118,11 @@ const graphGet = async (accessToken: string, path: string) => {
 };
 
 const getWorksheetValues = async (accessToken: string) => {
+  // If the workbook is not configured, treat Excel sync as disabled and
+  // return an empty set of rows so callers receive a graceful "no match" result
+  // instead of throwing and failing the whole scheduler run.
   if (!workbookDriveId || !workbookItemId) {
-    throw new Error("Excel workbook is not configured. Set MS_BOOKINGS_EXCEL_DRIVE_ID and MS_BOOKINGS_EXCEL_ITEM_ID.");
+    return [] as unknown as any[];
   }
 
   const worksheetPath = `/drives/${encodeURIComponent(
