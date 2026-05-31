@@ -1,9 +1,9 @@
 {
   "_meta": {
     "title": "Palazzo Pinto B&B – Backend API Schema",
-    "version": "1.11.6",
+    "version": "1.12.0",
     "baseUrl": "https://api.palazzopintobnb.com",
-    "generated": "2026-05-30",
+    "generated": "2026-05-31",
     "authSchemes": {
       "none": "No authentication required",
       "bearer": "Authorization: Bearer <jwt>  — obtained from POST /api/auth/login or POST /api/auth/service",

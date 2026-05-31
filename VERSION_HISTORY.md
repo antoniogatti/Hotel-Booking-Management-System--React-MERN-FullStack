@@ -1,4 +1,8 @@
 # Version History
+## 1.12.0 - 2026-05-31
+
+### API Auth: Service account compatibility
+- Fixed service-account authentication flow for AI agents: normalized credential handling and improved token issuance for `POST /api/auth/service` so agent clients receive valid JWTs consistently.
 
 ## 1.11.6 - 2026-05-30
 
