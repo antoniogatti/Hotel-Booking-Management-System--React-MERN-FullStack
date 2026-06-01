@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../models/user";
 import Hotel from "../models/hotel";
+import Booking from "../models/booking";
 
 const router = express.Router();
 
@@ -20,7 +21,12 @@ const getSessionCookieOptions = () => ({ httpOnly: true });
 
 // Simple discovery
 router.get("/", (req: Request, res: Response) => {
-  res.json({ service: "mcp", tools: ["health", "rooms.search"] });
+  const tools = ["health", "rooms.search", "bookings.verify", "availability.check"];
+  if (!isProduction) {
+    tools.push("bookings.createTest");
+  }
+
+  res.json({ service: "mcp", tools });
 });
 
 // Exchange client_id + client_secret + tenant -> Bearer JWT
@@ -204,10 +210,200 @@ router.post("/execute", verifyMcpToken, async (req: Request, res: Response) => {
         return res.json({ data, pagination: { total, page, pages } });
       }
 
+      case "availability.check": {
+        // availability search
+        const { checkIn, checkOut, adultCount, childCount, destination, hotelId } = params || {};
+        const activeStatuses = ["pending", "confirmed", "arrived", "completed"];
+        if (!checkIn || !checkOut) {
+          return res.status(400).json({ message: "checkIn and checkOut are required for availability queries" });
+        }
+
+        const checkInDate = new Date(checkIn);
+        const checkOutDate = new Date(checkOut);
+        if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime()) || checkInDate >= checkOutDate) {
+          return res.status(400).json({ message: "invalid checkIn/checkOut dates" });
+        }
+
+        const adults = Number(adultCount) || 1;
+        const children = Number(childCount) || 0;
+
+        // Build hotel query
+        const hotelQuery: any = { isActive: true };
+        if (hotelId) hotelQuery._id = hotelId;
+        if (destination) {
+          const dest = escapeRegexLiteral(String(destination).trim().slice(0, 100));
+          hotelQuery.$or = [{ city: { $regex: dest, $options: "i" } }, { country: { $regex: dest, $options: "i" } }];
+        }
+        hotelQuery.adultCount = { $gte: adults };
+        hotelQuery.childCount = { $gte: children };
+
+        const candidates = await Hotel.find(hotelQuery).select(PUBLIC_SEARCH_ROOM_FIELDS).lean();
+
+        const available: any[] = [];
+        const unavailable: any[] = [];
+
+        for (const h of candidates) {
+          const overlap = await Booking.findOne({
+            hotelId: h._id,
+            status: { $in: activeStatuses },
+            checkIn: { $lt: checkOutDate },
+            checkOut: { $gt: checkInDate },
+          }).select("_id reservationNumber status checkIn checkOut").lean();
+
+          if (overlap) {
+            unavailable.push({ hotel: h, conflict: overlap });
+          } else {
+            available.push(h);
+          }
+        }
+
+        return res.json({
+          available,
+          unavailable,
+          requested: { checkIn: checkInDate, checkOut: checkOutDate, adults, children },
+          totalAvailable: available.length,
+        });
+      }
+
+      case "bookings.createTest": {
+        // Development-only helper to insert a test booking into the DB
+        if (isProduction) {
+          return res.status(403).json({ message: "not allowed in production" });
+        }
+
+        const {
+          hotelId,
+          firstName = "Test",
+          lastName = "Guest",
+          email = "test@example.com",
+          phone = "",
+          adultCount = 1,
+          childCount = 0,
+          checkIn,
+          checkOut,
+          totalCost = 100,
+          reservationNumber,
+        } = params || {};
+
+        if (!checkIn || !checkOut) {
+          return res.status(400).json({ message: "checkIn and checkOut are required" });
+        }
+
+        const checkInDate = new Date(checkIn);
+        const checkOutDate = new Date(checkOut);
+        if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime()) || checkInDate >= checkOutDate) {
+          return res.status(400).json({ message: "invalid checkIn/checkOut dates" });
+        }
+
+        let targetHotel = null;
+        if (hotelId) {
+          targetHotel = await Hotel.findById(hotelId).select("_id").lean();
+        } else {
+          targetHotel = await Hotel.findOne({ isActive: true }).select("_id").lean();
+        }
+
+        if (!targetHotel) {
+          // Create a minimal test hotel when none exist (development only)
+          const newHotel = new Hotel({
+            userId: "mcp-test",
+            name: "Test Room",
+            city: "Testville",
+            country: "Testland",
+            slug: "testroom",
+            adultCount: Number(adultCount) || 1,
+            childCount: Number(childCount) || 0,
+            pricePerNight: Number(totalCost) || 100,
+            isActive: true,
+            description: "Test hotel generated for MCP local tests",
+            lastUpdated: new Date(),
+            starRating: 1,
+          });
+
+          await newHotel.save();
+          targetHotel = { _id: newHotel._id } as any;
+        }
+
+        const booking = new Booking({
+          reservationNumber: reservationNumber || `TEST-${Date.now()}`,
+          userId: "mcp-test",
+          hotelId: String(targetHotel._id),
+          firstName: String(firstName),
+          lastName: String(lastName),
+          email: String(email),
+          phone: String(phone),
+          adultCount: Number(adultCount),
+          childCount: Number(childCount),
+          checkIn: checkInDate,
+          checkOut: checkOutDate,
+          totalCost: Number(totalCost),
+          status: "pending",
+        });
+
+        await booking.save();
+
+        return res.json({ bookingId: booking._id, reservationNumber: booking.reservationNumber });
+      }
+
+      case "bookings.verify": {
+        // Booking lookup / verification only
+        const { bookingRef, bookingId, checkAvailability, includePayments } = params || {};
+
+        if (!bookingRef && !bookingId) {
+          return res.status(400).json({ message: "bookingRef or bookingId is required" });
+        }
+
+        const query: any = {};
+        if (bookingId) query._id = bookingId;
+        if (bookingRef) query.reservationNumber = bookingRef;
+
+        const booking = await Booking.findOne(query).lean();
+        if (!booking) {
+          return res.status(404).json({ verified: false, message: "booking not found" });
+        }
+
+        const verified = booking.status && booking.status !== "cancelled" && booking.status !== "refunded";
+
+        const response: any = {
+          verified,
+          booking,
+          paymentStatus: includePayments ? booking.checkInInfo?.paymentDetails || null : undefined,
+          conflicts: [],
+          notes: [],
+        };
+
+        if (checkAvailability) {
+          const activeStatuses = ["pending", "confirmed", "arrived", "completed"];
+          const overlapping = await Booking.findOne({
+            hotelId: booking.hotelId,
+            status: { $in: activeStatuses },
+            checkIn: { $lt: booking.checkOut },
+            checkOut: { $gt: booking.checkIn },
+            _id: { $ne: booking._id },
+          }).select("_id reservationNumber status checkIn checkOut").lean();
+
+          if (overlapping) {
+            response.conflicts.push({
+              bookingId: overlapping._id,
+              reservationNumber: overlapping.reservationNumber,
+              status: overlapping.status,
+              checkIn: overlapping.checkIn,
+              checkOut: overlapping.checkOut,
+            });
+            response.verified = false;
+          }
+        }
+
+        return res.json(response);
+      }
+
       default:
         return res.status(404).json({ message: "unknown tool" });
     }
-  } catch (err) {
+  } catch (err: any) {
+    if (!isProduction) {
+      return res.status(500).json({ message: "tool execution failed", error: err?.message || String(err), stack: err?.stack });
+    }
+
     return res.status(500).json({ message: "tool execution failed" });
   }
 });

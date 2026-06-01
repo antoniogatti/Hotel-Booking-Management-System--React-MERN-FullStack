@@ -1,0 +1,11 @@
+{
+    "params":  {
+                   "checkOut":  "2026-07-16",
+                   "adultCount":  2,
+                   "lastName":  "Tester",
+                   "checkIn":  "2026-07-13",
+                   "email":  "unit@test.local",
+                   "firstName":  "Unit"
+               },
+    "tool":  "bookings.createTest"
+}
