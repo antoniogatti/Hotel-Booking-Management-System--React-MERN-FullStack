@@ -212,7 +212,7 @@ router.post("/execute", verifyMcpToken, async (req: Request, res: Response) => {
 
       case "availability.check": {
         // availability search
-        const { checkIn, checkOut, adultCount, childCount, destination, hotelId } = params || {};
+        const { checkIn, checkOut, adultCount, childCount } = params || {};
         const activeStatuses = ["pending", "confirmed", "arrived", "completed"];
         if (!checkIn || !checkOut) {
           return res.status(400).json({ message: "checkIn and checkOut are required for availability queries" });
@@ -227,13 +227,8 @@ router.post("/execute", verifyMcpToken, async (req: Request, res: Response) => {
         const adults = Number(adultCount) || 1;
         const children = Number(childCount) || 0;
 
-        // Build hotel query
+        // Build hotel query (single-hotel assumption)
         const hotelQuery: any = { isActive: true };
-        if (hotelId) hotelQuery._id = hotelId;
-        if (destination) {
-          const dest = escapeRegexLiteral(String(destination).trim().slice(0, 100));
-          hotelQuery.$or = [{ city: { $regex: dest, $options: "i" } }, { country: { $regex: dest, $options: "i" } }];
-        }
         hotelQuery.adultCount = { $gte: adults };
         hotelQuery.childCount = { $gte: children };
 
