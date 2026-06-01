@@ -17,6 +17,7 @@ import contactRoutes from "./routes/contact";
 import bookingComSyncRoutes from "./routes/booking-com-sync";
 import oneNoteRoutes from "./routes/onenote";
 import schedulerMonitorRoutes from "./routes/scheduler-monitor";
+import mcpRoutes from "./routes/mcp";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./swagger";
 import helmet from "helmet";
@@ -341,6 +342,14 @@ if (swaggerEnabled) {
       customSiteTitle: "Palazzo Pinto B&B API Documentation",
     })
   );
+}
+
+// MCP (Model Context Protocol) endpoint
+const mcpEnabled = process.env.MCP_ENABLED === "true" || !isProduction;
+if (mcpEnabled) {
+  app.use("/mcp", mcpRoutes);
+} else {
+  logWarn("MCP endpoint disabled by configuration", { MCP_ENABLED: process.env.MCP_ENABLED });
 }
 
 // Dynamic Port Configuration (for Coolify/VPS and local development)

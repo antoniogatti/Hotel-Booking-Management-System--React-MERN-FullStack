@@ -113,6 +113,11 @@
           "name": "CONTACT_MAIL_CONFIRMATION_SUBJECT",
           "value": "Message Sent - Confirmation"
         }
+        ,
+        {
+          "name": "MCP_ENABLED",
+          "value": "true"
+        }
       ]
     },
     "tags": {
