@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import crypto from "crypto";
 import User from "../models/user";
 import Hotel from "../models/hotel";
+import ExternalCalendarEvent from "../models/external-calendar-event";
 import Booking from "../models/booking";
 
 const router = express.Router();
@@ -21,10 +22,7 @@ const getSessionCookieOptions = () => ({ httpOnly: true });
 
 // Simple discovery
 router.get("/", (req: Request, res: Response) => {
-  const tools = ["health", "rooms.search", "bookings.verify", "availability.check"];
-  if (!isProduction) {
-    tools.push("bookings.createTest");
-  }
+  const tools = ["health", "rooms.search", "bookings.verify", "availability.check", "bookings.upcomingCheckIns"];
 
   res.json({ service: "mcp", tools });
 });
@@ -260,83 +258,116 @@ router.post("/execute", verifyMcpToken, async (req: Request, res: Response) => {
         });
       }
 
-      case "bookings.createTest": {
-        // Development-only helper to insert a test booking into the DB
-        if (isProduction) {
-          return res.status(403).json({ message: "not allowed in production" });
-        }
+      case "bookings.upcomingCheckIns": {
+        // Return upcoming (or past) check-ins merged between local bookings and imported events
+        const days = Math.max(1, Number(params?.days) || 1);
+        const horizon = params?.horizon === "past" ? "past" : "upcoming";
+        const hotelId = params?.hotelId ? String(params.hotelId) : null;
 
-        const {
-          hotelId,
-          firstName = "Test",
-          lastName = "Guest",
-          email = "test@example.com",
-          phone = "",
-          adultCount = 1,
-          childCount = 0,
-          checkIn,
-          checkOut,
-          totalCost = 100,
-          reservationNumber,
-        } = params || {};
+        const toUtcStartOfDay = (value: string | Date) => {
+          const date = new Date(value);
+          return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+        };
 
-        if (!checkIn || !checkOut) {
-          return res.status(400).json({ message: "checkIn and checkOut are required" });
-        }
+        const today = toUtcStartOfDay(new Date());
+        const windowEnd = new Date(today.getTime() + days * 86400000);
 
-        const checkInDate = new Date(checkIn);
-        const checkOutDate = new Date(checkOut);
-        if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime()) || checkInDate >= checkOutDate) {
-          return res.status(400).json({ message: "invalid checkIn/checkOut dates" });
-        }
+        // Collect hotels to consider
+        const hotelQuery: any = {};
+        if (hotelId) hotelQuery._id = hotelId;
+        const hotels = await Hotel.find(hotelQuery).select("_id name city country");
+        const hotelIds = hotels.map((h) => String(h._id));
+        const hotelMap = new Map(hotels.map((h) => [String(h._id), h]));
 
-        let targetHotel = null;
-        if (hotelId) {
-          targetHotel = await Hotel.findById(hotelId).select("_id").lean();
+        // Local bookings
+        const localFilter: any = { hotelId: { $in: hotelIds } };
+        if (horizon === "past") {
+          localFilter.status = { $nin: ["cancelled", "refunded"] };
+          localFilter.checkIn = { $lt: today };
         } else {
-          targetHotel = await Hotel.findOne({ isActive: true }).select("_id").lean();
+          localFilter.status = { $in: ["pending", "confirmed", "arrived"] };
+          localFilter.checkIn = { $gte: today, $lt: windowEnd };
         }
 
-        if (!targetHotel) {
-          // Create a minimal test hotel when none exist (development only)
-          const newHotel = new Hotel({
-            userId: "mcp-test",
-            name: "Test Room",
-            city: "Testville",
-            country: "Testland",
-            slug: "testroom",
-            adultCount: Number(adultCount) || 1,
-            childCount: Number(childCount) || 0,
-            pricePerNight: Number(totalCost) || 100,
-            isActive: true,
-            description: "Test hotel generated for MCP local tests",
-            lastUpdated: new Date(),
-            starRating: 1,
-          });
+        const localUpcoming = await Booking.find(localFilter)
+          .sort(horizon === "past" ? { checkIn: -1, createdAt: -1 } : { checkIn: 1, createdAt: 1 })
+          .select("_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo");
 
-          await newHotel.save();
-          targetHotel = { _id: newHotel._id } as any;
+        // Imported events (Booking.com) - active only
+        const importedFilter: any = { hotelId: { $in: hotelIds }, status: "active" };
+        if (horizon === "past") {
+          importedFilter.startDate = { $lt: today };
+        } else {
+          importedFilter.startDate = { $gte: today, $lt: windowEnd };
         }
 
-        const booking = new Booking({
-          reservationNumber: reservationNumber || `TEST-${Date.now()}`,
-          userId: "mcp-test",
-          hotelId: String(targetHotel._id),
-          firstName: String(firstName),
-          lastName: String(lastName),
-          email: String(email),
-          phone: String(phone),
-          adultCount: Number(adultCount),
-          childCount: Number(childCount),
-          checkIn: checkInDate,
-          checkOut: checkOutDate,
-          totalCost: Number(totalCost),
-          status: "pending",
-        });
+        const importedUpcoming = await ExternalCalendarEvent.find(importedFilter)
+          .sort(horizon === "past" ? { startDate: -1, createdAt: -1 } : { startDate: 1, createdAt: 1 })
+          .select("_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo totalCost adultCount childCount");
 
-        await booking.save();
+        const toLocalRow = (booking: any) => {
+          const hotel = hotelMap.get(String(booking.hotelId));
+          const arrivalTime = booking.checkInInfo?.arrivalTime || booking.arrivalTime || "";
+          const checkedInAt = booking.checkInInfo?.checkedInAt;
+          return {
+            _id: String(booking._id),
+            hotelId: String(booking.hotelId),
+            hotelName: hotel?.name || "Room",
+            hotelCity: hotel?.city || "",
+            hotelCountry: hotel?.country || "",
+            reservationNumber: booking.reservationNumber || "N/A",
+            firstName: booking.firstName,
+            lastName: booking.lastName,
+            email: booking.email || "",
+            phone: booking.phone || "",
+            nationality: booking.nationality || "",
+            status: booking.status || "pending",
+            source: "local",
+            sourceLabel: "Direct",
+            checkIn: booking.checkIn,
+            checkOut: booking.checkOut,
+            arrivalTime,
+            checkedInAt,
+            isCheckedIn: Boolean(checkedInAt) || booking.status === "arrived" || (new Date(booking.checkIn)).getTime() < today.getTime(),
+            isImported: false,
+          };
+        };
 
-        return res.json({ bookingId: booking._id, reservationNumber: booking.reservationNumber });
+        const toImportedRow = (event: any) => {
+          const hotel = hotelMap.get(String(event.hotelId));
+          const arrivalTime = event.checkInInfo?.arrivalTime || "";
+          const checkedInAt = event.checkInInfo?.checkedInAt;
+          return {
+            _id: String(event._id),
+            hotelId: String(event.hotelId),
+            hotelName: hotel?.name || "Room",
+            hotelCity: hotel?.city || "",
+            hotelCountry: hotel?.country || "",
+            reservationNumber: event.externalUid || "Booking.com",
+            firstName: event.firstName || "",
+            lastName: event.lastName || "",
+            email: event.email || "",
+            phone: event.phone || "",
+            nationality: event.nationality || "",
+            status: "imported",
+            source: event.source || "booking_com",
+            sourceLabel: "Booking.com",
+            checkIn: event.startDate,
+            checkOut: event.endDate,
+            arrivalTime,
+            checkedInAt,
+            isCheckedIn: Boolean(checkedInAt) || (new Date(event.startDate)).getTime() < today.getTime(),
+            isImported: true,
+            totalCost: Number(event.totalCost || 0),
+            adultCount: Number(event.adultCount || 0),
+            childCount: Number(event.childCount || 0),
+          };
+        };
+
+        const rows = [...localUpcoming.map(toLocalRow), ...importedUpcoming.map(toImportedRow)];
+        rows.sort((a, b) => new Date(a.checkIn).getTime() - new Date(b.checkIn).getTime());
+
+        return res.json({ rows, days, horizon });
       }
 
       case "bookings.verify": {
