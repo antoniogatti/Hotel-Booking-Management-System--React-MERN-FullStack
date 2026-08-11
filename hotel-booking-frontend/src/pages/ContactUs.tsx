@@ -166,6 +166,11 @@ const ContactUs = () => {
 
   const mapsQuery = encodeURIComponent(siteConfig.contact.address);
   const mapsLink = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+  const privacyAccepted = watch("privacyAccepted");
+  const canSubmit =
+    Boolean(privacyAccepted) &&
+    (!shouldLoadTurnstile || Boolean(turnstileToken)) &&
+    !mutation.isLoading;
 
   return (
     <section className="bg-[#f7f7f7] min-h-[70vh]">
@@ -409,7 +414,7 @@ const ContactUs = () => {
 
               <button
                 type="submit"
-                disabled={mutation.isLoading}
+                disabled={!canSubmit}
                 className="inline-flex items-center justify-center rounded-lg bg-[#ea836c] text-white px-6 py-3 font-semibold hover:bg-[#db755f] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
               >
                 {mutation.isLoading ? "Sending..." : "Send Message"}

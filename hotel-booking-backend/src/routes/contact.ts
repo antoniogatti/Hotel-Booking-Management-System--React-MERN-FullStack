@@ -97,8 +97,8 @@ router.post(
     const turnstileToken = String(req.body.turnstileToken || "").trim();
     const isNonProduction = process.env.NODE_ENV !== "production";
     const devCaptchaBypassEnabled =
-      process.env.ENABLE_DEV_CAPTCHA === "true" ||
-      (isNonProduction && turnstileToken === "DEV_BYPASS");
+      isNonProduction &&
+      (process.env.ENABLE_DEV_CAPTCHA === "true" || turnstileToken === "DEV_BYPASS");
 
     // Require Turnstile verification only when secret is configured and bypass is disabled.
     const turnstileRequired = Boolean(process.env.TURNSTILE_SECRET) && !devCaptchaBypassEnabled;
