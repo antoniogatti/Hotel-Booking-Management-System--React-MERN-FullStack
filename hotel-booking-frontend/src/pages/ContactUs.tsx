@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation } from "react-query";
 import { useForm } from "react-hook-form";
 import { Mail, MapPin, Phone } from "lucide-react";
@@ -15,11 +15,21 @@ type ContactFormValues = {
   phone?: string;
   message: string;
   privacyAccepted: boolean;
+  hp?: string; // honeypot field for bot detection (should remain empty)
+  // devCaptcha removed: using Turnstile for bot protection
+  turnstileToken?: string;
+
 };
 
 const ContactUs = () => {
   const { toast } = useToast();
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
+  const turnstileWidgetIdRef = useRef<string | null>(null);
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+  const devCaptchaBypass = import.meta.env.VITE_ENABLE_DEV_CAPTCHA === "true";
+  const shouldLoadTurnstile = Boolean(turnstileSiteKey) && !devCaptchaBypass;
   const savedDraft = (() => {
     const raw = sessionStorage.getItem("contactFormDraft");
     if (!raw) {
@@ -45,6 +55,7 @@ const ContactUs = () => {
       phone: savedDraft?.phone || "",
       message: savedDraft?.message || "",
       privacyAccepted: savedDraft?.privacyAccepted || false,
+      // devCaptcha removed
     },
   });
 
@@ -53,6 +64,63 @@ const ContactUs = () => {
   useEffect(() => {
     sessionStorage.setItem("contactFormDraft", JSON.stringify(draftValues));
   }, [draftValues]);
+
+  // Load Turnstile script once and render widget explicitly.
+  // This avoids duplicate auto-render behavior in React StrictMode.
+  useEffect(() => {
+    if (!shouldLoadTurnstile || !turnstileSiteKey) {
+      setTurnstileToken(null);
+      return;
+    }
+
+    const renderWidget = () => {
+      const turnstile = (window as any).turnstile;
+      if (!turnstile || !turnstileContainerRef.current) return;
+      if (turnstileWidgetIdRef.current) return;
+
+      const widgetId = turnstile.render(turnstileContainerRef.current, {
+        sitekey: turnstileSiteKey,
+        callback: (token: string) => setTurnstileToken(token),
+        "error-callback": () => setTurnstileToken(null),
+        "expired-callback": () => setTurnstileToken(null),
+      });
+
+      turnstileWidgetIdRef.current = String(widgetId);
+    };
+
+    const existingScript = document.getElementById("cf-turnstile-script") as HTMLScriptElement | null;
+    if (existingScript) {
+      if ((window as any).turnstile) {
+        renderWidget();
+      } else {
+        existingScript.addEventListener("load", renderWidget, { once: true });
+      }
+    } else {
+      const script = document.createElement("script");
+      script.id = "cf-turnstile-script";
+      script.src = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
+      script.async = true;
+      script.defer = true;
+      script.addEventListener("load", renderWidget, { once: true });
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      try {
+        const turnstile = (window as any).turnstile;
+        if (turnstile && turnstileWidgetIdRef.current) {
+          turnstile.remove(turnstileWidgetIdRef.current);
+        }
+      } catch {
+        // no-op cleanup guard
+      }
+
+      turnstileWidgetIdRef.current = null;
+      if (turnstileContainerRef.current) {
+        turnstileContainerRef.current.innerHTML = "";
+      }
+    };
+  }, [shouldLoadTurnstile, turnstileSiteKey]);
 
   const mutation = useMutation(submitContactForm, {
     onSuccess: () => {
@@ -84,6 +152,15 @@ const ContactUs = () => {
   });
 
   const onSubmit = (values: ContactFormValues) => {
+    // Attach Turnstile token (if available) before sending
+    if (turnstileToken) {
+      (values as any).turnstileToken = turnstileToken;
+    } else if (import.meta.env.VITE_ENABLE_DEV_CAPTCHA === "true") {
+      // Development override: allow a fake token so local testing can proceed without a
+      // matching Turnstile site key configured in Cloudflare for localhost.
+      (values as any).turnstileToken = "DEV_BYPASS";
+    }
+
     mutation.mutate(values);
   };
 
@@ -204,11 +281,22 @@ const ContactUs = () => {
             </p>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+              {/* Honeypot field - hidden from users, helps block automated submissions */}
+              <input
+                type="text"
+                id="contact-hp"
+                style={{ display: "none" }}
+                tabIndex={-1}
+                autoComplete="off"
+                {...register("hp")}
+              />
               {submissionError && (
                 <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {submissionError}
                 </div>
               )}
+
+              {/* dev checkbox removed; honeypot + Turnstile used instead */}
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
@@ -311,6 +399,13 @@ const ContactUs = () => {
                   </p>
                 )}
               </div>
+
+              {/* Turnstile widget: appears right before submit button */}
+              {shouldLoadTurnstile && (
+                <div className="mb-3">
+                  <div ref={turnstileContainerRef} />
+                </div>
+              )}
 
               <button
                 type="submit"
