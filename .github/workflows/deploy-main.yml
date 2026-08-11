@@ -96,6 +96,8 @@ jobs:
           VITE_API_BASE_URL: ${{ env.PRODUCTION_API_BASE_URL }}
           VITE_APP_ENV: production
           VITE_APP_VERSION: "1.11.3"
+          VITE_TURNSTILE_SITE_KEY: "0x4AAAAAAELRojYEByXtdZLr"
+          VITE_ENABLE_DEV_CAPTCHA: "false"
         run: npm run build:prod
 
       - name: Azure Login
