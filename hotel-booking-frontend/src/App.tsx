@@ -39,6 +39,7 @@ import RoomLanding from "./pages/RoomLanding";
 import AdminPortal from "./pages/AdminPortal";
 import AdminPortalCheckIns from "./pages/AdminPortalCheckIns";
 import SchedulerMonitor from "./pages/SchedulerMonitor";
+import TrafficInsightsDashboard from "./pages/TrafficInsightsDashboard";
 import { siteConfig } from "./config/siteConfig";
 import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
 import { trackPublicPageView } from "./api-client";
@@ -85,6 +86,7 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/vacancy-management") return `${BRAND_NAME} | Vacancy Management`;
   if (pathname === "/booking-com-sync") return `${BRAND_NAME} | Booking.com Sync`;
   if (pathname === "/scheduler-monitor") return `${BRAND_NAME} | Scheduler Monitor`;
+  if (pathname === "/traffic-insights") return `${BRAND_NAME} | Traffic Insights`;
   if (pathname === "/manage-bookings") return `${BRAND_NAME} | Manage Bookings`;
   if (pathname.startsWith("/hotel/") && pathname.endsWith("/booking")) {
     return `${BRAND_NAME} | Booking Details`;
@@ -390,6 +392,18 @@ const App = () => {
             userRole === "admin" ? (
               <Layout>
                 <SchedulerMonitor />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/traffic-insights"
+          element={
+            userRole === "admin" ? (
+              <Layout>
+                <TrafficInsightsDashboard />
               </Layout>
             ) : (
               <Navigate to="/" />

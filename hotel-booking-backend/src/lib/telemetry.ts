@@ -1,4 +1,9 @@
-import appInsights from "applicationinsights";
+import appInsightsModule from "applicationinsights";
+
+const appInsights =
+  (appInsightsModule as any)?.setup
+    ? (appInsightsModule as any)
+    : (appInsightsModule as any)?.default;
 
 let initialized = false;
 
@@ -82,6 +87,10 @@ export const initializeTelemetry = () => {
     return;
   }
 
+  if (!appInsights?.setup) {
+    return;
+  }
+
   appInsights
     .setup(connectionString)
     .setAutoCollectRequests(true)
@@ -111,6 +120,10 @@ export const trackTelemetryEvent = (
   properties?: Record<string, string>,
   measurements?: Record<string, number>
 ) => {
+  if (!appInsights?.defaultClient) {
+    return;
+  }
+
   if (!appInsights.defaultClient) {
     return;
   }

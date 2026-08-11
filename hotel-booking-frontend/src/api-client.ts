@@ -490,6 +490,46 @@ export type PublicPageViewPayload = {
   isPublicPage?: boolean;
 };
 
+export type TrafficInsightsDashboardResponse = {
+  range: {
+    days: number;
+  };
+  metrics: {
+    pageViews24h: number;
+    uniqueVisitors24h: number;
+    requestCount24h: number;
+    failedRequests24h: number;
+    avgApiDurationMs24h: number;
+  };
+  trafficByDate: Array<{
+    date: string;
+    pageViews: number;
+  }>;
+  sessionsByDevice: Array<{
+    device: string;
+    sessions: number;
+  }>;
+  topPages: Array<{
+    path: string;
+    views: number;
+  }>;
+  recentApi: Array<{
+    endpoint: string;
+    successCount: number;
+    failedCount: number;
+    avgDurationMs: number;
+  }>;
+  geoTraffic: Array<{
+    country: string;
+    city: string;
+    hits: number;
+    lastSeen: string | null;
+    latitude: number;
+    longitude: number;
+  }>;
+  lastUpdated: string;
+};
+
 export type BookingRequestPayload = {
   hotelId: string;
   firstName: string;
@@ -542,6 +582,15 @@ export const trackPublicPageView = async (payload: PublicPageViewPayload) => {
     withCredentials: false,
     skipAuth: true,
   } as any);
+};
+
+export const fetchTrafficInsightsDashboard = async (
+  days = 7
+): Promise<TrafficInsightsDashboardResponse> => {
+  const response = await axiosInstance.get(
+    `/api/traffic-insights/dashboard?days=${days}`
+  );
+  return response.data;
 };
 
 export const submitBookingRequest = async (

@@ -19,6 +19,7 @@ import oneNoteRoutes from "./routes/onenote";
 import schedulerMonitorRoutes from "./routes/scheduler-monitor";
 import mcpRoutes from "./routes/mcp";
 import telemetryRoutes from "./routes/telemetry";
+import trafficInsightsRoutes from "./routes/traffic-insights";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./swagger";
 import helmet from "helmet";
@@ -337,6 +338,7 @@ app.use("/api/business-insights", businessInsightsRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/onenote", oneNoteRoutes);
 app.use("/api/telemetry", telemetryRoutes);
+app.use("/api/traffic-insights", trafficInsightsRoutes);
 
 // Swagger API Documentation
 const swaggerEnabled = !isProduction || process.env.ENABLE_SWAGGER === "true";
