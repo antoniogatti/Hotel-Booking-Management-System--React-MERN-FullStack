@@ -18,6 +18,7 @@ import bookingComSyncRoutes from "./routes/booking-com-sync";
 import oneNoteRoutes from "./routes/onenote";
 import schedulerMonitorRoutes from "./routes/scheduler-monitor";
 import mcpRoutes from "./routes/mcp";
+import telemetryRoutes from "./routes/telemetry";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./swagger";
 import helmet from "helmet";
@@ -27,6 +28,7 @@ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { startBookingComSyncScheduler } from "./lib/booking-com-ical";
 import { startBookingEnrichmentScheduler } from "./lib/booking-enrichment-scheduler";
 import { logError, logInfo, logWarn } from "./lib/logger";
+import { initializeTelemetry } from "./lib/telemetry";
 
 const isProduction = process.env.NODE_ENV === "production";
 const useInMemoryMongo =
@@ -75,6 +77,8 @@ logInfo("Environment configuration validated", {
   backendUrl: process.env.BACKEND_URL || `http://localhost:${process.env.PORT || 5000}`,
   useInMemoryMongo,
 });
+
+initializeTelemetry();
 
 // MongoDB Connection with Error Handling
 const connectDB = async () => {
@@ -332,6 +336,7 @@ app.use("/api/health", healthRoutes);
 app.use("/api/business-insights", businessInsightsRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/onenote", oneNoteRoutes);
+app.use("/api/telemetry", telemetryRoutes);
 
 // Swagger API Documentation
 const swaggerEnabled = !isProduction || process.env.ENABLE_SWAGGER === "true";

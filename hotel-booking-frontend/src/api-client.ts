@@ -481,6 +481,15 @@ export type ContactFormPayload = {
   privacyAccepted: boolean;
 };
 
+export type PublicPageViewPayload = {
+  path: string;
+  title?: string;
+  referrer?: string;
+  language?: string;
+  timeZone?: string;
+  isPublicPage?: boolean;
+};
+
 export type BookingRequestPayload = {
   hotelId: string;
   firstName: string;
@@ -526,6 +535,13 @@ export type HotelAvailabilityResponse = {
 export const submitContactForm = async (payload: ContactFormPayload) => {
   const response = await axiosInstance.post("/api/contact", payload, { withCredentials: false, skipAuth: true } as any);
   return response.data;
+};
+
+export const trackPublicPageView = async (payload: PublicPageViewPayload) => {
+  await axiosInstance.post("/api/telemetry/page-view", payload, {
+    withCredentials: false,
+    skipAuth: true,
+  } as any);
 };
 
 export const submitBookingRequest = async (

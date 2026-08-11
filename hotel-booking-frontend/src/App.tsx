@@ -41,6 +41,7 @@ import AdminPortalCheckIns from "./pages/AdminPortalCheckIns";
 import SchedulerMonitor from "./pages/SchedulerMonitor";
 import { siteConfig } from "./config/siteConfig";
 import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
+import { trackPublicPageView } from "./api-client";
 
 const BRAND_NAME = "Palazzo Pinto B&B";
 
@@ -110,11 +111,54 @@ const PageTitleManager = () => {
   return null;
 };
 
+const isPublicPagePath = (pathname: string): boolean => {
+  if (pathname === "/") return true;
+
+  const publicPrefixes = [
+    "/rooms",
+    "/search",
+    "/detail/",
+    "/contact-us",
+    "/reach-us",
+    "/our-recommendations",
+    "/privacy-cookie-policy",
+    "/terms-conditions",
+    "/sign-in",
+    "/auth/callback",
+  ];
+
+  return publicPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
+};
+
+const PublicPageTrafficTracker = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!isPublicPagePath(location.pathname)) {
+      return;
+    }
+
+    void trackPublicPageView({
+      path: location.pathname,
+      title: document.title,
+      referrer: document.referrer || undefined,
+      language: navigator.language || undefined,
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      isPublicPage: true,
+    }).catch(() => {
+      // Keep navigation resilient if telemetry endpoint is unavailable.
+    });
+  }, [location.pathname]);
+
+  return null;
+};
+
 const App = () => {
   const { isLoggedIn, isOwnerOrAdmin, userRole } = useAppContext();
   return (
     <Router>
       <PageTitleManager />
+      <PublicPageTrafficTracker />
       <ScrollToTop />
       <Routes>
         <Route
