@@ -1,0 +1,18 @@
+﻿{
+    "tables":  [
+                   {
+                       "name":  "PrimaryResult",
+                       "columns":  [
+                                       {
+                                           "name":  "count_",
+                                           "type":  "long"
+                                       }
+                                   ],
+                       "rows":  [
+                                    [
+                                        0
+                                    ]
+                                ]
+                   }
+               ]
+}

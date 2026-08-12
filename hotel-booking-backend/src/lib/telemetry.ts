@@ -134,3 +134,24 @@ export const trackTelemetryEvent = (
     measurements,
   });
 };
+
+export const isTelemetryInitialized = (): boolean => {
+  return !!appInsights?.defaultClient;
+};
+
+export const sendTestEvent = (
+  name: string,
+  properties?: Record<string, string>,
+  measurements?: Record<string, number>
+): boolean => {
+  if (!appInsights?.defaultClient) {
+    return false;
+  }
+
+  try {
+    appInsights.defaultClient.trackEvent({ name, properties, measurements });
+    return true;
+  } catch (e) {
+    return false;
+  }
+};

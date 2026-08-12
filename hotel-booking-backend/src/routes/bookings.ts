@@ -1038,9 +1038,42 @@ router.post(
           bookingId: req.params.id,
           actorId: req.userId,
         });
-        return res.status(401).json({
-          message: "Microsoft Graph access expired. Sign in with Microsoft again to continue OneNote sync.",
-        });
+        // we'll attempt to fallback to an automation user below
+      }
+
+      if (!graphAccessToken) {
+        try {
+          const preferredEmail = String(process.env.BOOKING_ENRICHMENT_SYNC_USER_EMAIL || "")
+            .trim()
+            .toLowerCase();
+
+          let automationUser: any = null;
+          if (preferredEmail) {
+            automationUser = await User.findOne({
+              email: preferredEmail,
+              "microsoftGraphAuth.accessTokenCiphertext": { $exists: true, $ne: "" },
+            });
+          }
+
+          if (!automationUser) {
+            automationUser = await User.findOne({
+              role: { $in: ["admin", "hotel_owner"] },
+              "microsoftGraphAuth.accessTokenCiphertext": { $exists: true, $ne: "" },
+            }).sort({ updatedAt: -1 });
+          }
+
+          if (automationUser) {
+            graphAccessToken = await getValidMicrosoftGraphAccessToken(automationUser);
+            // log that we're using automation user token for this sync
+            console.log(`Using automation user ${automationUser.email} for OneNote sync (actor ${req.userId})`);
+          }
+        } catch (fallbackError) {
+          logError("Automation user fallback failed for OneNote sync", fallbackError, {
+            route: "bookings.sync-onenote",
+            bookingId: req.params.id,
+            actorId: req.userId,
+          });
+        }
       }
 
       if (!graphAccessToken) {

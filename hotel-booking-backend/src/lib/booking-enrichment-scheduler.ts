@@ -1,4 +1,5 @@
 import ExternalCalendarEvent from "../models/external-calendar-event";
+import Booking from "../models/booking";
 import Hotel from "../models/hotel";
 import SchedulerRunLog from "../models/scheduler-run-log";
 import User from "../models/user";
@@ -17,6 +18,7 @@ const AUTO_SYNC_MAX_BOOKINGS = Math.max(
   1,
   Number(process.env.BOOKING_ENRICHMENT_MAX_BOOKINGS || 50)
 );
+const AUTO_SYNC_DAYS_AHEAD = Math.max(0, Number(process.env.BOOKING_ENRICHMENT_DAYS_AHEAD || 7));
 const AUTO_SYNC_LOG_RETENTION_DAYS = Math.max(
   1,
   Number(process.env.BOOKING_ENRICHMENT_LOG_RETENTION_DAYS || 30)
@@ -332,7 +334,10 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
   try {
     const now = new Date();
     const todayKey = getDateKeyInTimeZone(now, AUTO_SYNC_TIME_ZONE);
-    const allowedDateKeys = new Set([todayKey, addDaysToKey(todayKey, 1), addDaysToKey(todayKey, 2)]);
+    const allowedDateKeys = new Set<string>();
+    for (let i = 0; i <= AUTO_SYNC_DAYS_AHEAD; i++) {
+      allowedDateKeys.add(addDaysToKey(todayKey, i));
+    }
 
     const automationUser = await getAutomationUser();
     if (!automationUser) {
@@ -368,7 +373,8 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
       });
     }
 
-    const candidates = await ExternalCalendarEvent.find({
+    // Fetch booking.com imported events (ExternalCalendarEvent) and local Bookings
+    const externalCandidates = await ExternalCalendarEvent.find({
       source: "booking_com",
       status: "active",
       $or: [
@@ -381,8 +387,24 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
       .sort({ startDate: 1 })
       .limit(AUTO_SYNC_MAX_BOOKINGS);
 
+    const bookingCandidates = await Booking.find({
+      status: { $in: ["pending", "confirmed", "arrived", "imported", "completed"] },
+      $or: [
+        { firstName: { $exists: false } },
+        { firstName: "" },
+        { lastName: { $exists: false } },
+        { lastName: "" },
+      ],
+    })
+      .sort({ checkIn: 1 })
+      .limit(AUTO_SYNC_MAX_BOOKINGS);
+
+    // Combine and cap total candidates to AUTO_SYNC_MAX_BOOKINGS
+    const candidates = [...externalCandidates, ...bookingCandidates].slice(0, AUTO_SYNC_MAX_BOOKINGS);
+
     const scopedCandidates = candidates.filter((entry) => {
-      const dateKey = getDateKeyInTimeZone(new Date(entry.startDate), AUTO_SYNC_TIME_ZONE);
+      const startDate = (entry as any).startDate || (entry as any).checkIn;
+      const dateKey = getDateKeyInTimeZone(new Date(startDate), AUTO_SYNC_TIME_ZONE);
       return allowedDateKeys.has(dateKey);
     });
 
@@ -431,6 +453,9 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
         let changed = false;
         const missingBefore = hasMissingGuestNames(entry);
 
+        const entryStart = (entry as any).startDate || (entry as any).checkIn;
+        const entryEnd = (entry as any).endDate || (entry as any).checkOut;
+
         const oneNoteResult = await syncBookingFromOneNote({
           accessToken: graphAccessToken,
           booking: {
@@ -439,8 +464,8 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
             phone: entry.phone || "",
             adultCount: entry.adultCount,
             childCount: entry.childCount,
-            checkIn: entry.startDate,
-            checkOut: entry.endDate,
+            checkIn: entryStart,
+            checkOut: entryEnd,
           },
           hotel: {
             name: hotel.name,
@@ -468,7 +493,7 @@ const runScheduledSync = async (slotKey: string): Promise<BookingEnrichmentRunSu
           booking: {
             firstName: entry.firstName || "",
             lastName: entry.lastName || "",
-            checkIn: new Date(entry.startDate),
+            checkIn: new Date(entryStart),
           },
           hotel: {
             name: hotel.name,
@@ -593,7 +618,7 @@ export const startBookingEnrichmentScheduler = () => {
   logInfo("Booking enrichment scheduler started", {
     timeZone: AUTO_SYNC_TIME_ZONE,
     schedule: ["12:00", "18:00"],
-    targetWindow: "today to +2 days",
+    targetWindow: `today to +${AUTO_SYNC_DAYS_AHEAD} days`,
     targetFilter: "booking.com imports missing firstName/lastName",
     maxBookingsPerRun: AUTO_SYNC_MAX_BOOKINGS,
   });

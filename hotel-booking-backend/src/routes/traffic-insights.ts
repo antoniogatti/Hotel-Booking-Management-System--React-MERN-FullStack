@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
 import { logError } from "../lib/logger";
+import { isTelemetryInitialized, sendTestEvent } from "../lib/telemetry";
 
 const router = express.Router();
 
@@ -112,6 +113,50 @@ const runAppInsightsQuery = async (appId: string, apiKey: string, query: string)
   const data = (await response.json()) as AppInsightsQueryResponse;
   return data.tables?.[0]?.rows || [];
 };
+
+// Admin-only debug endpoints to inspect telemetry SDK state and send a test event.
+router.get(
+  "/debug",
+  verifyToken,
+  requireRole("admin"),
+  async (req: Request, res: Response) => {
+    try {
+      const appId = getAppInsightsAppId();
+      const apiKey = getAppInsightsApiKey();
+
+      return res.status(200).json({
+        initialized: isTelemetryInitialized(),
+        appId: appId || null,
+        hasApiKey: !!apiKey,
+      });
+    } catch (error) {
+      logError("Failed to fetch telemetry debug status", error);
+      return res.status(500).json({ message: "Failed to fetch telemetry status" });
+    }
+  }
+);
+
+router.post(
+  "/debug/send-event",
+  verifyToken,
+  requireRole("admin"),
+  async (req: Request, res: Response) => {
+    try {
+      const eventName = String(req.body?.name || "debug_test_event");
+      const properties = req.body?.properties || { triggeredBy: "admin" };
+
+      const sent = sendTestEvent(eventName, properties);
+      if (!sent) {
+        return res.status(500).json({ sent: false, message: "Telemetry client not initialized" });
+      }
+
+      return res.status(200).json({ sent: true });
+    } catch (error) {
+      logError("Failed to send telemetry test event", error);
+      return res.status(500).json({ sent: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  }
+);
 
 router.get(
   "/dashboard",

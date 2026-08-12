@@ -10,7 +10,7 @@ import {
 import { BookingType, HotelSearchResponse } from "../../../shared/types";
 import { body, param, validationResult } from "express-validator";
 import { randomBytes } from "crypto";
-import verifyToken from "../middleware/auth";
+import verifyToken, { verifyTokenOrAzureAd } from "../middleware/auth";
 import { sendBookingRequestEmails } from "../lib/contact-mail";
 import { recordAuditEvent } from "../lib/audit-log";
 
@@ -475,7 +475,8 @@ router.post(
     body("childCount").isInt({ min: 0 }).withMessage("Child count must be 0 or greater"),
     body("checkIn").isISO8601().withMessage("Check-in date is invalid"),
     body("checkOut").isISO8601().withMessage("Check-out date is invalid"),
-    body("totalCost").isNumeric().withMessage("Total cost is required"),
+    body("totalCost").optional().isNumeric().withMessage("Total cost must be numeric when provided"),
+    body("pricePerNight").optional().isNumeric().withMessage("pricePerNight must be numeric when provided"),
     body("nights").isInt({ min: 1 }).withMessage("Nights is required"),
     body("hotelName").trim().notEmpty().withMessage("Hotel name is required"),
     body("roomName").trim().notEmpty().withMessage("Room name is required"),
@@ -529,6 +530,30 @@ router.post(
 
       const nights = calculateNights(checkIn, checkOut);
 
+      // If caller provided price fields, require authentication and role check
+      const priceOverrideRequested =
+        typeof req.body.pricePerNight !== "undefined" || typeof req.body.totalCost !== "undefined";
+
+      if (priceOverrideRequested) {
+        try {
+          await new Promise<void>((resolve, reject) => {
+            verifyTokenOrAzureAd(req as any, res as any, (err?: any) => {
+              if (err) return reject(err);
+              resolve();
+            });
+          });
+        } catch (authErr) {
+          // `verifyTokenOrAzureAd` already sent a 401 response when unauthorized
+          return;
+        }
+
+        // Only allow admin or hotel_owner to override prices
+        const role = String(req.userRole || "");
+        if (!["admin", "hotel_owner"].includes(role)) {
+          return res.status(403).json({ message: "Insufficient privileges to override price" });
+        }
+      }
+
       const duplicateThreshold = new Date(Date.now() - DUPLICATE_BOOKING_WINDOW_MS);
       const existingRecentBooking = await Booking.findOne({
         hotelId,
@@ -547,7 +572,25 @@ router.post(
         });
       }
 
-      const totalCost = hotel.pricePerNight * nights;
+      // Determine pricePerNight and totalCost, allowing authenticated overrides
+      let usedPricePerNight = Number(hotel.pricePerNight || 0);
+      let totalCost = usedPricePerNight * nights;
+
+      if (priceOverrideRequested) {
+        if (typeof req.body.pricePerNight !== "undefined") {
+          usedPricePerNight = Number(req.body.pricePerNight);
+        }
+
+        if (typeof req.body.totalCost !== "undefined") {
+          totalCost = Number(req.body.totalCost);
+        } else {
+          totalCost = usedPricePerNight * nights;
+        }
+      }
+
+      if (!Number.isFinite(totalCost) || totalCost < 0) {
+        return res.status(400).json({ message: "Invalid total cost" });
+      }
       const reservationNumber = await generateUniqueReservationNumber();
       const canonicalRoomName =
         String(hotel.name || "").trim() || String(req.body.roomName || "").trim() || "Room";
@@ -589,6 +632,13 @@ router.post(
           checkIn: checkIn.toISOString(),
           checkOut: checkOut.toISOString(),
           totalCost,
+          priceOverride: priceOverrideRequested || false,
+          overrideBy: priceOverrideRequested ? (req.userId || undefined) : undefined,
+          overrideRole: priceOverrideRequested ? (req.userRole || undefined) : undefined,
+          overridePricePerNight: priceOverrideRequested
+            ? Number(req.body.pricePerNight ?? usedPricePerNight)
+            : undefined,
+          overrideTotalCost: priceOverrideRequested ? Number(req.body.totalCost ?? totalCost) : undefined,
           status: newBooking.status,
         },
       });
