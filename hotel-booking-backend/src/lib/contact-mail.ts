@@ -79,8 +79,41 @@ const BRAND_SURFACE_COLOR = "#f7f3ed";
 const PROPERTY_DISPLAY_NAME = "Palazzo Pinto B&B Brindisi - Italy";
 const PROPERTY_GOOGLE_MAPS_URL =
   "https://www.google.com/maps/search/?api=1&query=Palazzo%20Pinto%20B%26B%2C%20Via%20Masaniello%2C%2030%2072100%20Brindisi";
-const buildBookingDetailsUrl = (bookingId?: string) =>
-  bookingId ? `${BRAND_WEBSITE_URL}/booking/${encodeURIComponent(bookingId)}` : "";
+
+const normalizeBaseUrl = (value?: string): string => {
+  const base = String(value || "").trim();
+  if (!base) {
+    return "";
+  }
+
+  return base.replace(/\/+$/, "");
+};
+
+const resolvePublicBaseUrls = () => {
+  const frontendBase =
+    normalizeBaseUrl(process.env.PUBLIC_WEB_URL) ||
+    normalizeBaseUrl(process.env.FRONTEND_URL) ||
+    BRAND_WEBSITE_URL;
+
+  const backendBase =
+    normalizeBaseUrl(process.env.PUBLIC_API_URL) ||
+    normalizeBaseUrl(process.env.BACKEND_URL) ||
+    frontendBase;
+
+  return {
+    frontendBase,
+    backendBase,
+  };
+};
+
+const buildBookingDetailsUrl = (bookingId?: string) => {
+  if (!bookingId) {
+    return "";
+  }
+
+  const { frontendBase } = resolvePublicBaseUrls();
+  return `${frontendBase}/booking/${encodeURIComponent(bookingId)}`;
+};
 
 const escapeHtml = (value: string) =>
   value
@@ -437,6 +470,92 @@ const toCheckInAdminHtml = (payload: CheckInNotificationPayload) => {
     <p><strong>Special Notes:</strong></p>
     <p style="white-space: pre-wrap;">${payload.specialNotes ? escapeHtml(payload.specialNotes) : "None"}</p>
   `;
+};
+
+const toSelfCheckInAdminHtml = (payload: {
+  id: string;
+  fullName: string;
+  breakfastTime?: string;
+  numberOfNights: number;
+  sourceCode?: string;
+  code?: string;
+  guests?: Array<{
+    givenName: string;
+    familyName: string;
+    documentType: string;
+    documentNumber: string;
+    breakfastChoice?: string;
+    documents?: Array<{
+      gridFsId?: unknown;
+      filename?: string;
+      mimeType?: string;
+      size?: number;
+      uploadedAt?: Date;
+    }>;
+  }>;
+}) => {
+  const submittedAt = formatFriendlyDate(new Date());
+  const { frontendBase } = resolvePublicBaseUrls();
+  const selfCheckinUrl = `${frontendBase}/admin-portal/self-checkins/${encodeURIComponent(payload.id)}`;
+
+  const guestsHtml = (payload.guests || [])
+    .map((g, i) => `
+      <div style="margin-bottom:10px;border-bottom:1px dashed #eaeaea;padding-bottom:8px;">
+        <p><strong>Guest ${i + 1}:</strong> ${escapeHtml(`${g.givenName || ""} ${g.familyName || ""}`.trim() || "(no name)")}</p>
+        <p><strong>ID Type:</strong> ${g.documentType ? escapeHtml(g.documentType) : "-"} &nbsp; <strong>ID Number:</strong> ${g.documentNumber ? escapeHtml(String(g.documentNumber)) : "-"}</p>
+        <p><strong>Breakfast:</strong> ${g.breakfastChoice ? escapeHtml(g.breakfastChoice) : "-"}</p>
+        ${g.documents && g.documents.length ? `<p><strong>Files:</strong> ${g.documents.map((_d, fileIndex) => `<a href="${selfCheckinUrl}" target="_blank" rel="noopener noreferrer">open file ${fileIndex + 1} from admin submission</a>`).join(" | ")}</p>` : ""}
+      </div>
+    `)
+    .join("");
+
+  return `
+    <h2>New Self Check-In Submission</h2>
+    <p><strong>Submitted On:</strong> ${submittedAt}</p>
+    <p><strong>Guest (primary):</strong> ${escapeHtml(payload.fullName)}</p>
+    <p><strong>Breakfast Time:</strong> ${payload.breakfastTime ? escapeHtml(payload.breakfastTime) : "Not requested"}</p>
+    <p><strong>Nights:</strong> ${payload.numberOfNights}</p>
+    <p><strong>Source Code:</strong> ${payload.sourceCode ? escapeHtml(payload.sourceCode) : "Not provided"}</p>
+    <p><strong>Confirmation Code:</strong> <strong>${payload.code ? escapeHtml(payload.code) : "—"}</strong></p>
+    <p><strong>Self Check-In Reference:</strong> <a href="${selfCheckinUrl}" target="_blank" rel="noopener noreferrer">Open submission</a></p>
+    <hr/>
+    ${guestsHtml}
+  `;
+};
+
+export const sendSelfCheckinNotificationEmail = async (payload: {
+  id: string;
+  fullName: string;
+  breakfastTime?: string;
+  numberOfNights: number;
+  sourceCode?: string;
+  code?: string;
+  guests?: Array<{
+    givenName: string;
+    familyName: string;
+    documentType: string;
+    documentNumber: string;
+    breakfastChoice?: string;
+    documents?: Array<{
+      gridFsId?: unknown;
+      filename?: string;
+      mimeType?: string;
+      size?: number;
+      uploadedAt?: Date;
+    }>;
+  }>;
+}) => {
+  const { tenantId, clientId, clientSecret, senderAddress, inboxAddress } = resolveMailConfig();
+  const token = await getGraphAccessToken(tenantId, clientId, clientSecret);
+
+  await sendMail({
+    token,
+    senderAddress,
+    to: inboxAddress,
+    subject: `${TECH_SUBJECT_PREFIX} Self Check-In Submitted | ${payload.fullName}`,
+    html: toSelfCheckInAdminHtml(payload),
+    text: `Self check-in submitted for ${payload.fullName}`,
+  });
 };
 
 export const sendContactEmails = async (payload: ContactFormPayload) => {

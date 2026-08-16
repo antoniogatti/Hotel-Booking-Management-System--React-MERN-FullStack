@@ -340,6 +340,17 @@ const AdminPortal = () => {
                 <ArrowRight className="h-4 w-4 text-slate-500" />
               </Link>
 
+              <Link
+                to="/admin-portal/self-checkins"
+                className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-4 transition hover:border-teal-300 hover:bg-teal-50/60"
+              >
+                <div>
+                  <p className="font-semibold text-slate-900">Self Check-In Submissions</p>
+                  <p className="text-sm text-slate-600">Review guest self-check-in forms and uploaded ID files.</p>
+                </div>
+                <ArrowRight className="h-4 w-4 text-slate-500" />
+              </Link>
+
               {userRole === "admin" && (
                 <Link
                   to="/manage-bookings"

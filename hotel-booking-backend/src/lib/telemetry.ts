@@ -135,6 +135,23 @@ export const trackTelemetryEvent = (
   });
 };
 
+export const trackTelemetryException = (
+  error: unknown,
+  properties?: Record<string, string>
+) => {
+  if (!appInsights?.defaultClient) {
+    return;
+  }
+
+  const normalizedError =
+    error instanceof Error ? error : new Error(typeof error === "string" ? error : "Unknown error");
+
+  appInsights.defaultClient.trackException({
+    exception: normalizedError,
+    properties,
+  });
+};
+
 export const isTelemetryInitialized = (): boolean => {
   return !!appInsights?.defaultClient;
 };

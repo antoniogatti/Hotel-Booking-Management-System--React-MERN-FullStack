@@ -1,0 +1,22 @@
+[
+  {
+    "name": "Microsoft.ApplicationInsights.Event",
+    "time": "2026-08-13T00:00:00.000Z",
+    "iKey": "770defd0-fe16-4fca-af55-465364661c2a",
+    "data": {
+      "baseType": "EventData",
+      "baseData": {
+        "ver": 2,
+        "name": "public_page_view",
+        "properties": {
+          "path": "/synthetic-test",
+          "title": "Synthetic Test",
+          "referrer": "",
+          "language": "en-US",
+          "triggeredBy": "synthetic_event_payload.json"
+        },
+        "measurements": {}
+      }
+    }
+  }
+]

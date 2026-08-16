@@ -38,8 +38,11 @@ import VacancyDashboard from "./pages/VacancyDashboard";
 import RoomLanding from "./pages/RoomLanding";
 import AdminPortal from "./pages/AdminPortal";
 import AdminPortalCheckIns from "./pages/AdminPortalCheckIns";
+import AdminSelfCheckins from "./pages/AdminSelfCheckins";
+import AdminSelfCheckinDetail from "./pages/AdminSelfCheckinDetail";
 import SchedulerMonitor from "./pages/SchedulerMonitor";
 import TrafficInsightsDashboard from "./pages/TrafficInsightsDashboard";
+import SelfCheckin from "./pages/SelfCheckin";
 import { siteConfig } from "./config/siteConfig";
 import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
 import { trackPublicPageView } from "./api-client";
@@ -62,6 +65,7 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/api-docs") return `${BRAND_NAME} | API Documentation`;
   if (pathname === "/api-status") return `${BRAND_NAME} | API Status`;
   if (pathname === "/contact-us") return `${BRAND_NAME} | Contact Us`;
+  if (pathname === "/self-checkin") return `${BRAND_NAME} | Self Check-In`;
   if (pathname === "/reach-us") return `${BRAND_NAME} | Reach Us`;
   if (pathname === "/our-recommendations") {
     return `${BRAND_NAME} | Our Recommendations`;
@@ -82,6 +86,8 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/booking-dashboard") return `${BRAND_NAME} | Dashboard`;
   if (pathname === "/admin-portal") return `${BRAND_NAME} | Admin Portal`;
   if (pathname === "/admin-portal/check-in") return `${BRAND_NAME} | Check-In Desk`;
+  if (pathname === "/admin-portal/self-checkins") return `${BRAND_NAME} | Self Check-In Submissions`;
+  if (pathname.startsWith("/admin-portal/self-checkins/")) return `${BRAND_NAME} | Self Check-In Details`;
   if (pathname.startsWith("/booking/")) return `${BRAND_NAME} | Booking Details`;
   if (pathname === "/vacancy-management") return `${BRAND_NAME} | Vacancy Management`;
   if (pathname === "/booking-com-sync") return `${BRAND_NAME} | Booking.com Sync`;
@@ -121,6 +127,7 @@ const isPublicPagePath = (pathname: string): boolean => {
     "/search",
     "/detail/",
     "/contact-us",
+    "/self-checkin",
     "/reach-us",
     "/our-recommendations",
     "/privacy-cookie-policy",
@@ -270,6 +277,14 @@ const App = () => {
           }
         />
         <Route
+          path="/self-checkin"
+          element={
+            <Layout>
+              <SelfCheckin />
+            </Layout>
+          }
+        />
+        <Route
           path="/business-insights"
           element={
             userRole === "admin" ? (
@@ -332,6 +347,30 @@ const App = () => {
             userRole === "admin" || userRole === "hotel_owner" ? (
               <Layout>
                 <AdminPortalCheckIns />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/admin-portal/self-checkins"
+          element={
+            userRole === "admin" || userRole === "hotel_owner" ? (
+              <Layout>
+                <AdminSelfCheckins />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/admin-portal/self-checkins/:id"
+          element={
+            userRole === "admin" || userRole === "hotel_owner" ? (
+              <Layout>
+                <AdminSelfCheckinDetail />
               </Layout>
             ) : (
               <Navigate to="/" />

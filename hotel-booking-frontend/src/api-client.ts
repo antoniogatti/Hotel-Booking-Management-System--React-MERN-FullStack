@@ -481,6 +481,68 @@ export type ContactFormPayload = {
   privacyAccepted: boolean;
 };
 
+export type SelfCheckinGuestPayload = {
+  givenName: string;
+  familyName: string;
+  documentType: "id_card" | "passport";
+  documentNumber: string;
+  breakfastChoice?: "Savoury" | "Sweet";
+};
+
+export type SubmitSelfCheckinPayload = {
+  queryCode?: string;
+  breakfastIncluded?: boolean;
+  fullName: string;
+  numberOfNights: number;
+  breakfastTime?: string;
+  guests: SelfCheckinGuestPayload[];
+  guestFilesByIndex: Record<number, File | null>;
+  turnstileToken?: string;
+};
+
+export type SubmitSelfCheckinResponse = {
+  id: string;
+  code?: string;
+  instructionVideoUrl?: string;
+  notificationsSent?: boolean;
+  warning?: string;
+};
+
+export type SelfCheckinAdminGuestDoc = {
+  gridFsId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  uploadedAt: string;
+};
+
+export type SelfCheckinAdminGuest = {
+  givenName: string;
+  familyName: string;
+  documentType: "id_card" | "passport";
+  documentNumber: string;
+  breakfastChoice?: "Savoury" | "Sweet";
+  documents: SelfCheckinAdminGuestDoc[];
+};
+
+export type SelfCheckinAdminRecord = {
+  _id: string;
+  fullName: string;
+  numberOfNights: number;
+  breakfastTime?: string;
+  sourceCode?: string;
+  code?: string;
+  guests: SelfCheckinAdminGuest[];
+  createdAt: string;
+};
+
+export type SelfCheckinAdminListResponse = {
+  items: SelfCheckinAdminRecord[];
+  total: number;
+  limit: number;
+  skip: number;
+};
+
 export type PublicPageViewPayload = {
   path: string;
   title?: string;
@@ -575,6 +637,95 @@ export type HotelAvailabilityResponse = {
 export const submitContactForm = async (payload: ContactFormPayload) => {
   const response = await axiosInstance.post("/api/contact", payload, { withCredentials: false, skipAuth: true } as any);
   return response.data;
+};
+
+export const submitSelfCheckin = async (
+  payload: SubmitSelfCheckinPayload
+): Promise<SubmitSelfCheckinResponse> => {
+  const formData = new FormData();
+  formData.append("fullName", payload.fullName);
+  formData.append("numberOfNights", String(payload.numberOfNights));
+  if (payload.breakfastTime) {
+    formData.append("breakfastTime", payload.breakfastTime);
+  }
+  formData.append("guests", JSON.stringify(payload.guests));
+
+  if (payload.turnstileToken) {
+    formData.append("turnstileToken", payload.turnstileToken);
+  }
+
+  const guestFileIndexes: number[] = [];
+  Object.entries(payload.guestFilesByIndex).forEach(([indexRaw, file]) => {
+    if (!file) return;
+    const index = Number(indexRaw);
+    guestFileIndexes.push(index);
+    formData.append(`guestFiles[${index}]`, file);
+  });
+
+  formData.append("guestFileGuestIndexes", JSON.stringify(guestFileIndexes));
+
+  const queryParams = new URLSearchParams();
+  if (payload.queryCode) {
+    queryParams.set("q", payload.queryCode);
+  }
+  if (payload.breakfastIncluded === false) {
+    queryParams.set("b", "false");
+  }
+  const query = queryParams.toString() ? `?${queryParams.toString()}` : "";
+
+  const response = await axiosInstance.post(`/api/self-checkin${query}`, formData, {
+    headers: {
+      "Content-Type": "multipart/form-data",
+    },
+    withCredentials: false,
+    skipAuth: true,
+  } as any);
+
+  return response.data;
+};
+
+export const fetchSelfCheckinAdminList = async (params?: {
+  limit?: number;
+  skip?: number;
+}): Promise<SelfCheckinAdminListResponse> => {
+  const query = new URLSearchParams();
+  if (params?.limit) query.set("limit", String(params.limit));
+  if (params?.skip) query.set("skip", String(params.skip));
+
+  const response = await axiosInstance.get(
+    `/api/self-checkin/admin${query.toString() ? `?${query.toString()}` : ""}`
+  );
+  return response.data;
+};
+
+export const fetchSelfCheckinAdminById = async (
+  id: string
+): Promise<SelfCheckinAdminRecord> => {
+  const response = await axiosInstance.get(`/api/self-checkin/admin/${id}`);
+  return response.data;
+};
+
+export const downloadSelfCheckinAdminFile = async (params: {
+  checkinId: string;
+  fileId: string;
+}) => {
+  const response = await axiosInstance.get(
+    `/api/self-checkin/admin/${params.checkinId}/files/${params.fileId}`,
+    {
+      responseType: "blob",
+    }
+  );
+
+  return response.data as Blob;
+};
+
+export const deleteSelfCheckinAdminById = async (id: string) => {
+  const response = await axiosInstance.delete(`/api/self-checkin/admin/${id}`);
+  return response.data as {
+    message: string;
+    id: string;
+    deletedFiles: number;
+  };
 };
 
 export const trackPublicPageView = async (payload: PublicPageViewPayload) => {
