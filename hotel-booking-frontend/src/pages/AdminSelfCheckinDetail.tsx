@@ -160,35 +160,39 @@ const AdminSelfCheckinDetail = () => {
                         {guest.documents.map((doc) => (
                           <div
                             key={doc.gridFsId}
-                            className="flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-sm"
+                            className="w-full rounded-2xl border border-slate-300 px-2.5 py-2 sm:w-auto"
                           >
-                            <span className="max-w-[260px] truncate">{doc.filename}</span>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs"
-                              onClick={() => viewFile(doc.gridFsId)}
-                              disabled={
-                                fileAction?.fileId === doc.gridFsId && fileAction.action === "view"
-                              }
-                            >
-                              <Eye className="h-3.5 w-3.5" />
-                              {fileAction?.fileId === doc.gridFsId && fileAction.action === "view"
-                                ? "Opening..."
-                                : "View"}
-                            </button>
-                            <button
-                              type="button"
-                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs"
-                              onClick={() => downloadFile(doc.gridFsId, doc.filename)}
-                              disabled={
-                                fileAction?.fileId === doc.gridFsId && fileAction.action === "download"
-                              }
-                            >
-                              <Download className="h-3.5 w-3.5" />
-                              {fileAction?.fileId === doc.gridFsId && fileAction.action === "download"
-                                ? "Downloading..."
-                                : "Download"}
-                            </button>
+                            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
+                              <span className="block min-w-0 flex-1 truncate text-sm">{doc.filename}</span>
+                              <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs"
+                                  onClick={() => viewFile(doc.gridFsId)}
+                                  disabled={
+                                    fileAction?.fileId === doc.gridFsId && fileAction.action === "view"
+                                  }
+                                >
+                                  <Eye className="h-3.5 w-3.5" />
+                                  {fileAction?.fileId === doc.gridFsId && fileAction.action === "view"
+                                    ? "Opening..."
+                                    : "View"}
+                                </button>
+                                <button
+                                  type="button"
+                                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs"
+                                  onClick={() => downloadFile(doc.gridFsId, doc.filename)}
+                                  disabled={
+                                    fileAction?.fileId === doc.gridFsId && fileAction.action === "download"
+                                  }
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  {fileAction?.fileId === doc.gridFsId && fileAction.action === "download"
+                                    ? "Downloading..."
+                                    : "Download"}
+                                </button>
+                              </div>
+                            </div>
                           </div>
                         ))}
                       </div>
