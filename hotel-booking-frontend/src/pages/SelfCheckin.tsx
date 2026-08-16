@@ -61,6 +61,7 @@ const SelfCheckin = () => {
 
       const widgetId = turnstile.render(turnstileContainerRef.current, {
         sitekey: turnstileSiteKey,
+        size: "flexible",
         callback: (token: string) => setTurnstileToken(token),
         "error-callback": () => setTurnstileToken(null),
         "expired-callback": () => setTurnstileToken(null),
@@ -472,7 +473,7 @@ const SelfCheckin = () => {
 
           {shouldLoadTurnstile && (
             <div className="rounded-xl border border-slate-200 p-3">
-              <div ref={turnstileContainerRef} />
+              <div ref={turnstileContainerRef} className="w-full" />
             </div>
           )}
 

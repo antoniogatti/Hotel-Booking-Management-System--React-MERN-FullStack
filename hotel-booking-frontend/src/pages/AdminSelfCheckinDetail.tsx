@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "react-query";
-import { ArrowLeft, Download, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Eye, Trash2 } from "lucide-react";
 import * as apiClient from "../api-client";
 import { useToast } from "../hooks/use-toast";
 
@@ -18,7 +18,10 @@ const AdminSelfCheckinDetail = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { id = "" } = useParams();
-  const [downloading, setDownloading] = useState<string | null>(null);
+  const [fileAction, setFileAction] = useState<{
+    fileId: string;
+    action: "download" | "view";
+  } | null>(null);
 
   const { data, isLoading } = useQuery(["selfCheckinAdminById", id], () =>
     apiClient.fetchSelfCheckinAdminById(id),
@@ -55,13 +58,16 @@ const AdminSelfCheckinDetail = () => {
     deleteMutation.mutate(id);
   };
 
+  const fetchFileBlob = async (fileId: string) =>
+    apiClient.downloadSelfCheckinAdminFile({
+      checkinId: id,
+      fileId,
+    });
+
   const downloadFile = async (fileId: string, filename: string) => {
     try {
-      setDownloading(fileId);
-      const blob = await apiClient.downloadSelfCheckinAdminFile({
-        checkinId: id,
-        fileId,
-      });
+      setFileAction({ fileId, action: "download" });
+      const blob = await fetchFileBlob(fileId);
       const url = window.URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -75,7 +81,25 @@ const AdminSelfCheckinDetail = () => {
         variant: "destructive",
       });
     } finally {
-      setDownloading(null);
+      setFileAction(null);
+    }
+  };
+
+  const viewFile = async (fileId: string) => {
+    try {
+      setFileAction({ fileId, action: "view" });
+      const blob = await fetchFileBlob(fileId);
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, "_blank", "noopener,noreferrer");
+      setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+    } catch {
+      toast({
+        title: "Open failed",
+        description: "Unable to open file preview.",
+        variant: "destructive",
+      });
+    } finally {
+      setFileAction(null);
     }
   };
 
@@ -134,16 +158,38 @@ const AdminSelfCheckinDetail = () => {
                     ) : (
                       <div className="mt-2 flex flex-wrap gap-2">
                         {guest.documents.map((doc) => (
-                          <button
+                          <div
                             key={doc.gridFsId}
-                            type="button"
-                            className="inline-flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-sm"
-                            onClick={() => downloadFile(doc.gridFsId, doc.filename)}
-                            disabled={downloading === doc.gridFsId}
+                            className="flex items-center gap-2 rounded-full border border-slate-300 px-3 py-1.5 text-sm"
                           >
-                            <Download className="h-4 w-4" />
-                            {downloading === doc.gridFsId ? "Downloading..." : doc.filename}
-                          </button>
+                            <span className="max-w-[260px] truncate">{doc.filename}</span>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs"
+                              onClick={() => viewFile(doc.gridFsId)}
+                              disabled={
+                                fileAction?.fileId === doc.gridFsId && fileAction.action === "view"
+                              }
+                            >
+                              <Eye className="h-3.5 w-3.5" />
+                              {fileAction?.fileId === doc.gridFsId && fileAction.action === "view"
+                                ? "Opening..."
+                                : "View"}
+                            </button>
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs"
+                              onClick={() => downloadFile(doc.gridFsId, doc.filename)}
+                              disabled={
+                                fileAction?.fileId === doc.gridFsId && fileAction.action === "download"
+                              }
+                            >
+                              <Download className="h-3.5 w-3.5" />
+                              {fileAction?.fileId === doc.gridFsId && fileAction.action === "download"
+                                ? "Downloading..."
+                                : "Download"}
+                            </button>
+                          </div>
                         ))}
                       </div>
                     )}
