@@ -13,8 +13,8 @@ const getBaseURL = () => {
     return "http://localhost:5000";
   }
 
-  // Safe production fallback. Set VITE_API_BASE_URL in production builds.
-  return `${window.location.protocol}//${window.location.hostname}`;
+  // Production fallback to the canonical public API host.
+  return "https://api.palazzopintobnb.com";
 };
 
 export const getApiBaseUrl = getBaseURL;

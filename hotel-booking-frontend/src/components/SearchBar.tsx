@@ -8,6 +8,7 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Card, CardContent } from "./ui/card";
 import { siteConfig } from "../config/siteConfig";
+import { getApiBaseUrl } from "../api-client";
 
 const SearchBar = () => {
   const isSinglePropertyMode = siteConfig.singlePropertyMode;
@@ -83,8 +84,7 @@ const SearchBar = () => {
           }
         }
 
-        const apiBaseUrl =
-          import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+        const apiBaseUrl = getApiBaseUrl();
         const response = await fetch(`${apiBaseUrl}/api/rooms`);
 
         if (!response.ok) {

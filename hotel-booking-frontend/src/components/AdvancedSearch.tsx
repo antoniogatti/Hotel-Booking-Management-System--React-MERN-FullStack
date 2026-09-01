@@ -10,6 +10,7 @@ import {
 import useSearchContext from "../hooks/useSearchContext";
 import { siteConfig } from "../config/siteConfig";
 import { toIsoDateOnly } from "../lib/utils";
+import { getApiBaseUrl } from "../api-client";
 
 interface AdvancedSearchProps {
   onSearch: (searchData: any) => void;
@@ -80,8 +81,7 @@ const AdvancedSearch: React.FC<AdvancedSearchProps> = ({
           }
         }
 
-        const apiBaseUrl =
-          import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
+        const apiBaseUrl = getApiBaseUrl();
         const response = await fetch(`${apiBaseUrl}/api/rooms`);
 
         if (!response.ok) {
