@@ -1,0 +1,581 @@
+<!doctype html>
+<html lang='en'>
+<head>
+<meta charset='utf-8'/><meta name='viewport' content='width=device-width,initial-scale=1'/>
+<title>Security Assessment</title>
+<style>
+:root{--bg:#090f1f;--bg2:#111a34;--card:#111c38;--text:#e9f0ff;--muted:#9eb2da;--line:#2d416f;--acc:#7ca8ff;--high:#f07a7a;--med:#f0b14a;--low:#67adff;--crit:#32d39a}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(1200px 500px at 15% -10%,#1d2c55 0,transparent 60%),linear-gradient(180deg,var(--bg),var(--bg2));color:var(--text);font-family:Inter,Segoe UI,Roboto,Arial,sans-serif}
+.wrap{max-width:1220px;margin:18px auto;padding:0 14px 24px} .hero{border:1px solid var(--line);border-radius:16px;padding:20px;background:linear-gradient(180deg,rgba(24,37,71,.95),rgba(15,25,50,.95));box-shadow:0 8px 30px rgba(0,0,0,.35)}
+h1{margin:0 0 6px;font-size:29px} .meta{color:var(--muted);font-size:14px}
+.badges{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px} .badge{padding:6px 10px;border-radius:999px;border:1px solid var(--line);font-size:12px;font-weight:700;background:#18284f}
+.layout{display:grid;grid-template-columns:300px 1fr;gap:14px;margin-top:14px} .panel{border:1px solid var(--line);border-radius:14px;padding:14px;background:rgba(17,28,56,.93)}
+.title{margin:0 0 10px;text-transform:uppercase;letter-spacing:.6px;font-size:12px;color:var(--muted)}
+.controls{display:flex;flex-wrap:wrap;gap:8px} .btn{border:1px solid #3b5d9c;background:#193161;color:#eef4ff;border-radius:999px;padding:7px 12px;font-size:12px;cursor:pointer} .btn.active{background:#2d56a9}
+.search{width:100%;margin-top:8px;background:#0f1833;color:#ebf2ff;border:1px solid #35508b;border-radius:10px;padding:10px}
+.toc ul{list-style:none;padding:0;margin:0;max-height:56vh;overflow:auto} .toc li{margin:0 0 8px} .toc a{color:#d8e6ff;text-decoration:none;font-size:13px} .toc a:hover{text-decoration:underline}
+.findings{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px} .finding-card{border:1px solid var(--line);border-radius:12px;background:#0f1a36;padding:12px}
+.finding-head{display:flex;align-items:center;gap:8px;margin-bottom:6px} .pill{padding:4px 8px;border-radius:999px;font-size:11px;font-weight:800;border:1px solid} .pill.high{color:#ffd7d7;border-color:#8c4545;background:rgba(140,69,69,.2)} .pill.medium{color:#ffe8bf;border-color:#8b6a35;background:rgba(139,106,53,.2)} .pill.low{color:#d7e8ff;border-color:#396f9b;background:rgba(57,111,155,.2)}
+.code{font-family:Consolas,monospace;color:#9eb6e7;font-size:12px} .finding-card h3{margin:0 0 8px;font-size:16px;line-height:1.35}
+.finding-body p,.content p{margin:7px 0;color:#dbe7ff;line-height:1.56} .list{margin:8px 0 8px 18px} .list li{margin:6px 0;color:#dbe7ff}
+.content h2{margin-top:24px;padding-top:8px;border-top:1px dashed #3a558f} .content h4{margin:12px 0 6px;color:#c5d8ff} .sep{border:0;border-top:1px solid #365188;margin:16px 0} code{background:#1b2a54;border:1px solid #365188;border-radius:6px;padding:1px 6px}
+.helper{font-size:12px;color:var(--muted);margin-top:8px} .hidden{display:none!important}
+@media (max-width:980px){.layout{grid-template-columns:1fr} .toc ul{max-height:none}}
+</style>
+</head>
+<body>
+<div class='wrap'>
+<section class='hero'>
+  <h1>Security Assessment — Hotel Booking Management System</h1>
+  <div class='meta'>Refined interactive report · filters fixed</div>
+  <div class='badges'>
+    <span class='badge'>Critical: 0</span>
+    <span class='badge'>High: 5</span>
+    <span class='badge'>Medium: 6</span>
+    <span class='badge'>Low: 3</span>
+  </div>
+</section>
+<section class='layout'>
+  <aside class='panel'>
+    <div class='title'>Filters</div>
+    <div class='controls'>
+      <button class='btn active' data-sev='all'>All</button>
+      <button class='btn' data-sev='high'>High</button>
+      <button class='btn' data-sev='medium'>Medium</button>
+      <button class='btn' data-sev='low'>Low</button>
+    </div>
+    <input id='q' class='search' placeholder='Search findings…' />
+    <div id='count' class='helper'></div>
+    <hr class='sep'/>
+    <nav class='toc'><div class='title'>Contents</div><ul><li><a href='#1-scope-method'>1) Scope &amp; Method</a></li><li><a href='#2-executive-summary'>2) Executive Summary</a></li><li><a href='#3-what-is-already-good-keep-this'>3) What is already good (keep this)</a></li><li><a href='#4-high-priority-findings'>4) High-priority findings</a></li><li><a href='#h1-session-token-in-url-localstorage-token-model-high'>H1 — Session token in URL + localStorage token model (high)</a></li><li><a href='#h2-service-auth-endpoints-mint-admin-jwts-with-static-shared-secret-and-no-throttling-high'>H2 — Service auth endpoints mint admin JWTs with static shared secret and no throttling (high)</a></li><li><a href='#h3-dependency-vulnerability-backlog-is-significant-high'>H3 — Dependency vulnerability backlog is significant (high)</a></li><li><a href='#h4-key-vault-network-acl-currently-open-in-iac-high'>H4 — Key Vault network ACL currently open in IaC (high)</a></li><li><a href='#h5-backend-public-network-exposure-remains-enabled-in-iac-high'>H5 — Backend public network exposure remains enabled in IaC (high)</a></li><li><a href='#5-medium-findings'>5) Medium findings</a></li><li><a href='#m1-production-cors-fallback-includes-legacy-non-canonical-origins'>M1 — Production CORS fallback includes legacy/non-canonical origins</a></li><li><a href='#m2-swagger-exposure-controlled-by-env-switch-may-be-re-enabled-accidentally'>M2 — Swagger exposure controlled by env switch may be re-enabled accidentally</a></li><li><a href='#m3-dev-admin-convenience-flags-are-powerful-if-env-is-mis-set'>M3 — Dev/admin convenience flags are powerful if env is mis-set</a></li><li><a href='#m4-contact-self-checkin-logging-may-include-pii-in-operational-logs'>M4 — Contact/self-checkin logging may include PII in operational logs</a></li><li><a href='#m5-security-docs-contain-detailed-subscription-tenant-resource-identifiers'>M5 — Security docs contain detailed subscription/tenant/resource identifiers</a></li><li><a href='#m6-route-protection-consistency-should-be-continuously-verified'>M6 — Route protection consistency should be continuously verified</a></li><li><a href='#6-low-findings-hygiene'>6) Low findings / hygiene</a></li><li><a href='#7-prioritized-remediation-plan'>7) Prioritized remediation plan</a></li><li><a href='#phase-a-this-week'>Phase A (this week)</a></li><li><a href='#phase-b-next-1-2-weeks'>Phase B (next 1–2 weeks)</a></li><li><a href='#phase-c-next-2-4-weeks'>Phase C (next 2–4 weeks)</a></li><li><a href='#8-final-verdict'>8) Final verdict</a></li><li><a href='#9-suggested-next-deliverable'>9) Suggested next deliverable</a></li></ul></nav>
+  </aside>
+  <main class='panel content'>
+    <h2 id='findings-overview'>Findings overview</h2>
+    <div id='findings' class='findings'>
+<article class='finding-card' data-severity='high' data-text='h1 session token in url + localstorage token model (high) **evidence**
+- backend appends token to redirect query params (`/auth/callback`): `hotel-booking-backend/src/routes/auth.ts` (`token` in redirect payload).
+- frontend reads `token` from url and stores it in localstorage: `hotel-booking-frontend/src/pages/authcallback.tsx`, `src/api-client.ts`, `src/lib/api-client.ts`.
+
+**why it matters**
+- url token can leak through browser history, logs, referrers, analytics tools, and copied links.
+- localstorage token is reachable by injected js if xss happens.
+
+**recommendation**
+- move fully to server-set session cookie (`httponly`, `secure`, `samesite`) and remove token from url entirely.
+- remove `localstorage.session_id` auth path and bearer injection from fe interceptor.
+- keep fe auth state via `/api/auth/validate-token` + cookie-based session only.
+
+---'>
+  <div class='finding-head'><span class='pill high'>HIGH</span><span class='code'>H1</span></div>
+  <h3>Session token in URL + localStorage token model (high)</h3>
+  <div class='finding-body'><p><strong>Evidence</strong></p>
+<ul class='list'>
+<li>Backend appends token to redirect query params (<code>/auth/callback</code>): <code>hotel-booking-backend/src/routes/auth.ts</code> (<code>token</code> in redirect payload).</li>
+<li>Frontend reads <code>token</code> from URL and stores it in localStorage: <code>hotel-booking-frontend/src/pages/AuthCallback.tsx</code>, <code>src/api-client.ts</code>, <code>src/lib/api-client.ts</code>.</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>URL token can leak through browser history, logs, referrers, analytics tools, and copied links.</li>
+<li>localStorage token is reachable by injected JS if XSS happens.</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>Move fully to server-set session cookie (<code>HttpOnly</code>, <code>Secure</code>, <code>SameSite</code>) and remove token from URL entirely.</li>
+<li>Remove <code>localStorage.session_id</code> auth path and Bearer injection from FE interceptor.</li>
+<li>Keep FE auth state via <code>/api/auth/validate-token</code> + cookie-based session only.</li>
+</ul>
+<hr class='sep'/></div>
+</article>
+
+<article class='finding-card' data-severity='high' data-text='h2 service auth endpoints mint admin jwts with static shared secret and no throttling (high) **evidence**
+- `/api/auth/service` returns admin jwt valid 12h when `client_id/client_secret` match (`auth.ts`).
+- `/api/mcp/auth` similar static credential exchange, returns 12h token (`mcp.ts`).
+
+**why it matters**
+- brute-force/credential-stuffing surface on high-privilege token mint endpoints.
+- static long-lived shared secret model increases blast radius if secret leaks.
+
+**recommendation**
+- add strict rate limits + temporary lockout on failed attempts for both endpoints.
+- reduce token ttl for service tokens (e.g., 15–60 min) and support rotation/jti revocation.
+- prefer signed client assertions or managed identity-based trust where possible.
+- restrict these routes by trusted network/source when feasible.
+
+---'>
+  <div class='finding-head'><span class='pill high'>HIGH</span><span class='code'>H2</span></div>
+  <h3>Service auth endpoints mint admin JWTs with static shared secret and no throttling (high)</h3>
+  <div class='finding-body'><p><strong>Evidence</strong></p>
+<ul class='list'>
+<li><code>/api/auth/service</code> returns admin JWT valid 12h when <code>client_id/client_secret</code> match (<code>auth.ts</code>).</li>
+<li><code>/api/mcp/auth</code> similar static credential exchange, returns 12h token (<code>mcp.ts</code>).</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>Brute-force/credential-stuffing surface on high-privilege token mint endpoints.</li>
+<li>Static long-lived shared secret model increases blast radius if secret leaks.</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>Add strict rate limits + temporary lockout on failed attempts for both endpoints.</li>
+<li>Reduce token TTL for service tokens (e.g., 15–60 min) and support rotation/jti revocation.</li>
+<li>Prefer signed client assertions or managed identity-based trust where possible.</li>
+<li>Restrict these routes by trusted network/source when feasible.</li>
+</ul>
+<hr class='sep'/></div>
+</article>
+
+<article class='finding-card' data-severity='high' data-text='h3 dependency vulnerability backlog is significant (high) **evidence (local audit)**
+- **backend**: 29 total vulnerabilities (13 high, 15 moderate, 1 low).
+- **frontend**: 9 total vulnerabilities (8 high, 1 moderate).
+- high-impact packages include `axios`, `react-router-dom/react-router`, `express`, `express-rate-limit`, `mongoose`, `js-cookie`.
+
+**why it matters**
+- known cves include ssrf/open redirect/prototype pollution/dos vectors depending on runtime paths.
+
+**recommendation**
+- run controlled upgrade wave (branch + ci + regression tests) for:
+  - fe: `axios`, `react-router-dom`, `js-cookie`
+  - be: `express`, `express-rate-limit`, `mongoose`, plus transitive chain
+- re-run `npm audit` until high severity is eliminated or explicitly risk-accepted.
+
+---'>
+  <div class='finding-head'><span class='pill high'>HIGH</span><span class='code'>H3</span></div>
+  <h3>Dependency vulnerability backlog is significant (high)</h3>
+  <div class='finding-body'><p><strong>Evidence (local audit)</strong></p>
+<ul class='list'>
+<li><strong>Backend</strong>: 29 total vulnerabilities (13 high, 15 moderate, 1 low).</li>
+<li><strong>Frontend</strong>: 9 total vulnerabilities (8 high, 1 moderate).</li>
+<li>High-impact packages include <code>axios</code>, <code>react-router-dom/react-router</code>, <code>express</code>, <code>express-rate-limit</code>, <code>mongoose</code>, <code>js-cookie</code>.</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>Known CVEs include SSRF/open redirect/prototype pollution/DoS vectors depending on runtime paths.</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>Run controlled upgrade wave (branch + CI + regression tests) for:</li>
+</ul>
+<p>  - FE: <code>axios</code>, <code>react-router-dom</code>, <code>js-cookie</code></p>
+<p>  - BE: <code>express</code>, <code>express-rate-limit</code>, <code>mongoose</code>, plus transitive chain</p>
+<ul class='list'>
+<li>Re-run <code>npm audit</code> until high severity is eliminated or explicitly risk-accepted.</li>
+</ul>
+<hr class='sep'/></div>
+</article>
+
+<article class='finding-card' data-severity='high' data-text='h4 key vault network acl currently open in iac (high) **evidence**
+- in `infra/main.bicep`: key vault `publicnetworkaccess: &#x27;enabled&#x27;` + `networkacls.defaultaction: &#x27;allow&#x27;`.
+
+**why it matters**
+- secrets store remains internet-reachable at network layer.
+
+**recommendation**
+- tighten kv network access (private endpoint or selected networks, `defaultaction: deny`) while validating deployment/runtime dependencies.
+
+---'>
+  <div class='finding-head'><span class='pill high'>HIGH</span><span class='code'>H4</span></div>
+  <h3>Key Vault network ACL currently open in IaC (high)</h3>
+  <div class='finding-body'><p><strong>Evidence</strong></p>
+<ul class='list'>
+<li>In <code>infra/main.bicep</code>: Key Vault <code>publicNetworkAccess: &#x27;Enabled&#x27;</code> + <code>networkAcls.defaultAction: &#x27;Allow&#x27;</code>.</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>Secrets store remains internet-reachable at network layer.</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>Tighten KV network access (private endpoint or selected networks, <code>defaultAction: Deny</code>) while validating deployment/runtime dependencies.</li>
+</ul>
+<hr class='sep'/></div>
+</article>
+
+<article class='finding-card' data-severity='high' data-text='h5 backend public network exposure remains enabled in iac (high) **evidence**
+- in `infra/main.bicep`: backend site `publicnetworkaccess: &#x27;enabled&#x27;`.
+
+**why it matters**
+- increases direct attack surface (expected for public api, but should be intentionally constrained).
+
+**recommendation**
+- if api must stay public, enforce additional hardening: strict endpoint minimization, threat protection, robust monitoring/alerts, and explicit deny-by-default controls elsewhere.
+
+---
+
+## 5) medium findings'>
+  <div class='finding-head'><span class='pill high'>HIGH</span><span class='code'>H5</span></div>
+  <h3>Backend public network exposure remains enabled in IaC (high)</h3>
+  <div class='finding-body'><p><strong>Evidence</strong></p>
+<ul class='list'>
+<li>In <code>infra/main.bicep</code>: backend site <code>publicNetworkAccess: &#x27;Enabled&#x27;</code>.</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>Increases direct attack surface (expected for public API, but should be intentionally constrained).</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>If API must stay public, enforce additional hardening: strict endpoint minimization, threat protection, robust monitoring/alerts, and explicit deny-by-default controls elsewhere.</li>
+</ul>
+<hr class='sep'/>
+<h2 id='5-medium-findings'>5) Medium findings</h2></div>
+</article>
+
+<article class='finding-card' data-severity='medium' data-text='m1 production cors fallback includes legacy/non-canonical origins - `index.ts` includes fallback origins including legacy `azurewebsites.net` and vercel hostname.
+- recommendation: keep only canonical production origins after migration window ends.'>
+  <div class='finding-head'><span class='pill medium'>MEDIUM</span><span class='code'>M1</span></div>
+  <h3>Production CORS fallback includes legacy/non-canonical origins</h3>
+  <div class='finding-body'><ul class='list'>
+<li><code>index.ts</code> includes fallback origins including legacy <code>azurewebsites.net</code> and Vercel hostname.</li>
+<li>Recommendation: keep only canonical production origins after migration window ends.</li>
+</ul></div>
+</article>
+
+<article class='finding-card' data-severity='medium' data-text='m2 swagger exposure controlled by env switch may be re-enabled accidentally - `swaggerenabled = !isproduction || enable_swagger === &#x27;true&#x27;`.
+- recommendation: hard-disable in prod by default, expose only behind admin auth in non-public contexts.'>
+  <div class='finding-head'><span class='pill medium'>MEDIUM</span><span class='code'>M2</span></div>
+  <h3>Swagger exposure controlled by env switch may be re-enabled accidentally</h3>
+  <div class='finding-body'><ul class='list'>
+<li><code>swaggerEnabled = !isProduction || ENABLE_SWAGGER === &#x27;true&#x27;</code>.</li>
+<li>Recommendation: hard-disable in prod by default, expose only behind admin auth in non-public contexts.</li>
+</ul></div>
+</article>
+
+<article class='finding-card' data-severity='medium' data-text='m3 dev/admin convenience flags are powerful if env is mis-set - role forcing in non-production path (`force_local_admin_role`, local defaults).
+- recommendation: assert fail-fast if such flags are ever enabled in production.'>
+  <div class='finding-head'><span class='pill medium'>MEDIUM</span><span class='code'>M3</span></div>
+  <h3>Dev/admin convenience flags are powerful if env is mis-set</h3>
+  <div class='finding-body'><ul class='list'>
+<li>Role forcing in non-production path (<code>FORCE_LOCAL_ADMIN_ROLE</code>, local defaults).</li>
+<li>Recommendation: assert fail-fast if such flags are ever enabled in production.</li>
+</ul></div>
+</article>
+
+<article class='finding-card' data-severity='medium' data-text='m4 contact/self-checkin logging may include pii in operational logs - route logging includes ip/user-agent and warning payloads.
+- recommendation: enforce structured redaction and retention policy for privacy compliance.'>
+  <div class='finding-head'><span class='pill medium'>MEDIUM</span><span class='code'>M4</span></div>
+  <h3>Contact/self-checkin logging may include PII in operational logs</h3>
+  <div class='finding-body'><ul class='list'>
+<li>Route logging includes IP/user-agent and warning payloads.</li>
+<li>Recommendation: enforce structured redaction and retention policy for privacy compliance.</li>
+</ul></div>
+</article>
+
+<article class='finding-card' data-severity='medium' data-text='m5 security docs contain detailed subscription/tenant/resource identifiers - `infra/azure-infra.md` includes subscription id, tenant id, resource ids.
+- recommendation: keep infra inventory in private/internal docs only, or redact ids in repo.'>
+  <div class='finding-head'><span class='pill medium'>MEDIUM</span><span class='code'>M5</span></div>
+  <h3>Security docs contain detailed subscription/tenant/resource identifiers</h3>
+  <div class='finding-body'><ul class='list'>
+<li><code>infra/AZURE-INFRA.md</code> includes subscription ID, tenant ID, resource IDs.</li>
+<li>Recommendation: keep infra inventory in private/internal docs only, or redact IDs in repo.</li>
+</ul></div>
+</article>
+
+<article class='finding-card' data-severity='medium' data-text='m6 route protection consistency should be continuously verified - some routes are intentionally public; others are protected at router-level middleware.
+- recommendation: add automated route-security tests to prevent accidental exposure during refactors.
+
+---
+
+## 6) low findings / hygiene
+
+1. add explicit dependency update cadence (monthly patch window + quarterly minor update window).
+2. add `npm audit` gating threshold in ci (e.g., fail on high/critical in prod deps).
+3. add a security regression checklist to pr template (auth/session, cors, uploads, logging).
+
+---
+
+## 7) prioritized remediation plan
+
+## phase a (this week)
+1. remove token-in-url callback behavior.
+2. remove fe localstorage bearer-token auth path; rely on secure cookies.
+3. add strict rate limits to `/api/auth/service` and `/api/mcp/auth`.
+4. start dependency patch wave for fe high-risk libs (`axios`, router stack, `js-cookie`).
+
+## phase b (next 1–2 weeks)
+1. patch be high-risk libs (`express`, `express-rate-limit`, `mongoose`, relevant transitives).
+2. lock down key vault network acl from `allow` to restricted model.
+3. remove legacy cors origins post-cutover.
+4. hard-disable swagger in production public surface.
+
+## phase c (next 2–4 weeks)
+1. add route-security automated tests (public vs protected route matrix).
+2. add siem/alerts for auth-service endpoint abuse patterns.
+3. finalize privacy/log redaction policy and retention controls.
+
+---
+
+## 8) final verdict
+
+**not “all ko” yet — but very close to a strong posture with focused work.**
+
+your platform already has solid security building blocks and a credible azure hardening direction. the biggest gap is **session/token handling** plus **dependency backlog**. if we execute phase a + b, security posture improves materially without large architecture disruption.
+
+---
+
+## 9) suggested next deliverable
+
+i can produce a follow-up **implementation patch plan** (file-by-file, command-by-command) to execute the top 4 high findings with minimal production risk and rollback notes.'>
+  <div class='finding-head'><span class='pill medium'>MEDIUM</span><span class='code'>M6</span></div>
+  <h3>Route protection consistency should be continuously verified</h3>
+  <div class='finding-body'><ul class='list'>
+<li>Some routes are intentionally public; others are protected at router-level middleware.</li>
+<li>Recommendation: add automated route-security tests to prevent accidental exposure during refactors.</li>
+</ul>
+<hr class='sep'/>
+<h2 id='6-low-findings-hygiene'>6) Low findings / hygiene</h2>
+<p><strong>1. Add explicit dependency update cadence (monthly patch window + quarterly minor update window).</strong></p>
+<p><strong>2. Add <code>npm audit</code> gating threshold in CI (e.g., fail on high/critical in prod deps).</strong></p>
+<p><strong>3. Add a security regression checklist to PR template (auth/session, CORS, uploads, logging).</strong></p>
+<hr class='sep'/>
+<h2 id='7-prioritized-remediation-plan'>7) Prioritized remediation plan</h2>
+<h2 id='phase-a-this-week'>Phase A (this week)</h2>
+<p><strong>1. Remove token-in-URL callback behavior.</strong></p>
+<p><strong>2. Remove FE localStorage bearer-token auth path; rely on secure cookies.</strong></p>
+<p><strong>3. Add strict rate limits to <code>/api/auth/service</code> and <code>/api/mcp/auth</code>.</strong></p>
+<p><strong>4. Start dependency patch wave for FE high-risk libs (<code>axios</code>, router stack, <code>js-cookie</code>).</strong></p>
+<h2 id='phase-b-next-1-2-weeks'>Phase B (next 1–2 weeks)</h2>
+<p><strong>1. Patch BE high-risk libs (<code>express</code>, <code>express-rate-limit</code>, <code>mongoose</code>, relevant transitives).</strong></p>
+<p><strong>2. Lock down Key Vault network ACL from <code>Allow</code> to restricted model.</strong></p>
+<p><strong>3. Remove legacy CORS origins post-cutover.</strong></p>
+<p><strong>4. Hard-disable Swagger in production public surface.</strong></p>
+<h2 id='phase-c-next-2-4-weeks'>Phase C (next 2–4 weeks)</h2>
+<p><strong>1. Add route-security automated tests (public vs protected route matrix).</strong></p>
+<p><strong>2. Add SIEM/alerts for auth-service endpoint abuse patterns.</strong></p>
+<p><strong>3. Finalize privacy/log redaction policy and retention controls.</strong></p>
+<hr class='sep'/>
+<h2 id='8-final-verdict'>8) Final verdict</h2>
+<p><strong>Not “all KO” yet — but very close to a strong posture with focused work.</strong></p>
+<p>Your platform already has solid security building blocks and a credible Azure hardening direction. The biggest gap is <strong>session/token handling</strong> plus <strong>dependency backlog</strong>. If we execute Phase A + B, security posture improves materially without large architecture disruption.</p>
+<hr class='sep'/>
+<h2 id='9-suggested-next-deliverable'>9) Suggested next deliverable</h2>
+<p>I can produce a follow-up <strong>implementation patch plan</strong> (file-by-file, command-by-command) to execute the top 4 high findings with minimal production risk and rollback notes.</p></div>
+</article>
+</div>
+    <h2 id='full-report'>Full report</h2>
+    <h1>Security Assessment — Hotel-Booking-Management-System (React + MERN)</h1>
+<p>Date: 2026-08-23</p>
+<p>Assessor: Jim Hernes (static review + dependency audit)</p>
+<h2 id='1-scope-method'>1) Scope &amp; Method</h2>
+<p>This assessment covers:</p>
+<ul class='list'>
+<li>Backend code (<code>hotel-booking-backend/src/**</code>)</li>
+<li>Frontend code (<code>hotel-booking-frontend/src/**</code>)</li>
+<li>Dependency vulnerability posture (<code>npm audit --omit=dev</code> on FE/BE)</li>
+<li>Azure infrastructure docs/IaC (<code>infra/AZURE-INFRA.md</code>, <code>infra/main.bicep</code>, <code>infra/azure-rollout.production.ps1</code>, <code>infra/README.md</code>)</li>
+</ul>
+<p>Method used:</p>
+<ul class='list'>
+<li>Static code inspection of auth/session, route protection, input validation, upload handling, and infra settings.</li>
+<li>Dependency audit from local <code>npm audit</code> output.</li>
+<li>Infra posture inferred from checked-in IaC/docs (not a live Azure security-center scan).</li>
+</ul>
+<hr class='sep'/>
+<h2 id='2-executive-summary'>2) Executive Summary</h2>
+<p><strong>Overall status: functional and partially hardened, but with important security improvements still recommended before calling it fully robust.</strong></p>
+<h4>Current posture in one line</h4>
+<p>You already have good foundations (helmet, CORS allowlist, role middleware, Key Vault references, managed identity, private endpoint path), but there are <strong>high-priority auth/session and dependency risks</strong> to close.</p>
+<h4>Risk snapshot</h4>
+<ul class='list'>
+<li><strong>Critical:</strong> 0 found in current static pass</li>
+<li><strong>High:</strong> 5</li>
+<li><strong>Medium:</strong> 6</li>
+<li><strong>Low:</strong> 3</li>
+</ul>
+<hr class='sep'/>
+<h2 id='3-what-is-already-good-keep-this'>3) What is already good (keep this)</h2>
+<p><strong>1. <strong>Backend transport/security baseline is present</strong></strong></p>
+<p>   - <code>httpsOnly: true</code>, <code>minTlsVersion: &#x27;1.2&#x27;</code>, <code>ftpsState: &#x27;Disabled&#x27;</code> in <code>infra/main.bicep</code>.</p>
+<p><strong>2. <strong>Secrets are Key Vault-referenced in app settings</strong></strong></p>
+<p>   - <code>@Microsoft.KeyVault(SecretUri=...)</code> pattern used for JWT, DB, Cloudinary, Entra secrets.</p>
+<p><strong>3. <strong>Managed identity + KV role assignment implemented</strong></strong></p>
+<p>   - Backend MSI + <code>Key Vault Secrets User</code> role assignment in Bicep.</p>
+<p><strong>4. <strong>CORS allowlist strategy implemented</strong></strong></p>
+<p>   - Dynamic allowlist with explicit origin matching in backend <code>index.ts</code>.</p>
+<p><strong>5. <strong>OAuth state validation implemented</strong></strong></p>
+<p>   - Microsoft callback validates <code>oauth_state</code> cookie before token exchange.</p>
+<p><strong>6. <strong>Upload validation is stronger than average</strong></strong></p>
+<p>   - MIME allowlist + magic-byte signature checks in <code>my-hotels.ts</code> and <code>self-checkin.ts</code>.</p>
+<p><strong>7. <strong>Rate limiting present on sensitive public forms</strong></strong></p>
+<p>   - Contact and self-checkin routes use dedicated limiters.</p>
+<hr class='sep'/>
+<h2 id='4-high-priority-findings'>4) High-priority findings</h2>
+<h2 id='h1-session-token-in-url-localstorage-token-model-high'>H1 — Session token in URL + localStorage token model (high)</h2>
+<p><strong>Evidence</strong></p>
+<ul class='list'>
+<li>Backend appends token to redirect query params (<code>/auth/callback</code>): <code>hotel-booking-backend/src/routes/auth.ts</code> (<code>token</code> in redirect payload).</li>
+<li>Frontend reads <code>token</code> from URL and stores it in localStorage: <code>hotel-booking-frontend/src/pages/AuthCallback.tsx</code>, <code>src/api-client.ts</code>, <code>src/lib/api-client.ts</code>.</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>URL token can leak through browser history, logs, referrers, analytics tools, and copied links.</li>
+<li>localStorage token is reachable by injected JS if XSS happens.</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>Move fully to server-set session cookie (<code>HttpOnly</code>, <code>Secure</code>, <code>SameSite</code>) and remove token from URL entirely.</li>
+<li>Remove <code>localStorage.session_id</code> auth path and Bearer injection from FE interceptor.</li>
+<li>Keep FE auth state via <code>/api/auth/validate-token</code> + cookie-based session only.</li>
+</ul>
+<hr class='sep'/>
+<h2 id='h2-service-auth-endpoints-mint-admin-jwts-with-static-shared-secret-and-no-throttling-high'>H2 — Service auth endpoints mint admin JWTs with static shared secret and no throttling (high)</h2>
+<p><strong>Evidence</strong></p>
+<ul class='list'>
+<li><code>/api/auth/service</code> returns admin JWT valid 12h when <code>client_id/client_secret</code> match (<code>auth.ts</code>).</li>
+<li><code>/api/mcp/auth</code> similar static credential exchange, returns 12h token (<code>mcp.ts</code>).</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>Brute-force/credential-stuffing surface on high-privilege token mint endpoints.</li>
+<li>Static long-lived shared secret model increases blast radius if secret leaks.</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>Add strict rate limits + temporary lockout on failed attempts for both endpoints.</li>
+<li>Reduce token TTL for service tokens (e.g., 15–60 min) and support rotation/jti revocation.</li>
+<li>Prefer signed client assertions or managed identity-based trust where possible.</li>
+<li>Restrict these routes by trusted network/source when feasible.</li>
+</ul>
+<hr class='sep'/>
+<h2 id='h3-dependency-vulnerability-backlog-is-significant-high'>H3 — Dependency vulnerability backlog is significant (high)</h2>
+<p><strong>Evidence (local audit)</strong></p>
+<ul class='list'>
+<li><strong>Backend</strong>: 29 total vulnerabilities (13 high, 15 moderate, 1 low).</li>
+<li><strong>Frontend</strong>: 9 total vulnerabilities (8 high, 1 moderate).</li>
+<li>High-impact packages include <code>axios</code>, <code>react-router-dom/react-router</code>, <code>express</code>, <code>express-rate-limit</code>, <code>mongoose</code>, <code>js-cookie</code>.</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>Known CVEs include SSRF/open redirect/prototype pollution/DoS vectors depending on runtime paths.</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>Run controlled upgrade wave (branch + CI + regression tests) for:</li>
+</ul>
+<p>  - FE: <code>axios</code>, <code>react-router-dom</code>, <code>js-cookie</code></p>
+<p>  - BE: <code>express</code>, <code>express-rate-limit</code>, <code>mongoose</code>, plus transitive chain</p>
+<ul class='list'>
+<li>Re-run <code>npm audit</code> until high severity is eliminated or explicitly risk-accepted.</li>
+</ul>
+<hr class='sep'/>
+<h2 id='h4-key-vault-network-acl-currently-open-in-iac-high'>H4 — Key Vault network ACL currently open in IaC (high)</h2>
+<p><strong>Evidence</strong></p>
+<ul class='list'>
+<li>In <code>infra/main.bicep</code>: Key Vault <code>publicNetworkAccess: &#x27;Enabled&#x27;</code> + <code>networkAcls.defaultAction: &#x27;Allow&#x27;</code>.</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>Secrets store remains internet-reachable at network layer.</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>Tighten KV network access (private endpoint or selected networks, <code>defaultAction: Deny</code>) while validating deployment/runtime dependencies.</li>
+</ul>
+<hr class='sep'/>
+<h2 id='h5-backend-public-network-exposure-remains-enabled-in-iac-high'>H5 — Backend public network exposure remains enabled in IaC (high)</h2>
+<p><strong>Evidence</strong></p>
+<ul class='list'>
+<li>In <code>infra/main.bicep</code>: backend site <code>publicNetworkAccess: &#x27;Enabled&#x27;</code>.</li>
+</ul>
+<p><strong>Why it matters</strong></p>
+<ul class='list'>
+<li>Increases direct attack surface (expected for public API, but should be intentionally constrained).</li>
+</ul>
+<p><strong>Recommendation</strong></p>
+<ul class='list'>
+<li>If API must stay public, enforce additional hardening: strict endpoint minimization, threat protection, robust monitoring/alerts, and explicit deny-by-default controls elsewhere.</li>
+</ul>
+<hr class='sep'/>
+<h2 id='5-medium-findings'>5) Medium findings</h2>
+<h2 id='m1-production-cors-fallback-includes-legacy-non-canonical-origins'>M1 — Production CORS fallback includes legacy/non-canonical origins</h2>
+<ul class='list'>
+<li><code>index.ts</code> includes fallback origins including legacy <code>azurewebsites.net</code> and Vercel hostname.</li>
+<li>Recommendation: keep only canonical production origins after migration window ends.</li>
+</ul>
+<h2 id='m2-swagger-exposure-controlled-by-env-switch-may-be-re-enabled-accidentally'>M2 — Swagger exposure controlled by env switch may be re-enabled accidentally</h2>
+<ul class='list'>
+<li><code>swaggerEnabled = !isProduction || ENABLE_SWAGGER === &#x27;true&#x27;</code>.</li>
+<li>Recommendation: hard-disable in prod by default, expose only behind admin auth in non-public contexts.</li>
+</ul>
+<h2 id='m3-dev-admin-convenience-flags-are-powerful-if-env-is-mis-set'>M3 — Dev/admin convenience flags are powerful if env is mis-set</h2>
+<ul class='list'>
+<li>Role forcing in non-production path (<code>FORCE_LOCAL_ADMIN_ROLE</code>, local defaults).</li>
+<li>Recommendation: assert fail-fast if such flags are ever enabled in production.</li>
+</ul>
+<h2 id='m4-contact-self-checkin-logging-may-include-pii-in-operational-logs'>M4 — Contact/self-checkin logging may include PII in operational logs</h2>
+<ul class='list'>
+<li>Route logging includes IP/user-agent and warning payloads.</li>
+<li>Recommendation: enforce structured redaction and retention policy for privacy compliance.</li>
+</ul>
+<h2 id='m5-security-docs-contain-detailed-subscription-tenant-resource-identifiers'>M5 — Security docs contain detailed subscription/tenant/resource identifiers</h2>
+<ul class='list'>
+<li><code>infra/AZURE-INFRA.md</code> includes subscription ID, tenant ID, resource IDs.</li>
+<li>Recommendation: keep infra inventory in private/internal docs only, or redact IDs in repo.</li>
+</ul>
+<h2 id='m6-route-protection-consistency-should-be-continuously-verified'>M6 — Route protection consistency should be continuously verified</h2>
+<ul class='list'>
+<li>Some routes are intentionally public; others are protected at router-level middleware.</li>
+<li>Recommendation: add automated route-security tests to prevent accidental exposure during refactors.</li>
+</ul>
+<hr class='sep'/>
+<h2 id='6-low-findings-hygiene'>6) Low findings / hygiene</h2>
+<p><strong>1. Add explicit dependency update cadence (monthly patch window + quarterly minor update window).</strong></p>
+<p><strong>2. Add <code>npm audit</code> gating threshold in CI (e.g., fail on high/critical in prod deps).</strong></p>
+<p><strong>3. Add a security regression checklist to PR template (auth/session, CORS, uploads, logging).</strong></p>
+<hr class='sep'/>
+<h2 id='7-prioritized-remediation-plan'>7) Prioritized remediation plan</h2>
+<h2 id='phase-a-this-week'>Phase A (this week)</h2>
+<p><strong>1. Remove token-in-URL callback behavior.</strong></p>
+<p><strong>2. Remove FE localStorage bearer-token auth path; rely on secure cookies.</strong></p>
+<p><strong>3. Add strict rate limits to <code>/api/auth/service</code> and <code>/api/mcp/auth</code>.</strong></p>
+<p><strong>4. Start dependency patch wave for FE high-risk libs (<code>axios</code>, router stack, <code>js-cookie</code>).</strong></p>
+<h2 id='phase-b-next-1-2-weeks'>Phase B (next 1–2 weeks)</h2>
+<p><strong>1. Patch BE high-risk libs (<code>express</code>, <code>express-rate-limit</code>, <code>mongoose</code>, relevant transitives).</strong></p>
+<p><strong>2. Lock down Key Vault network ACL from <code>Allow</code> to restricted model.</strong></p>
+<p><strong>3. Remove legacy CORS origins post-cutover.</strong></p>
+<p><strong>4. Hard-disable Swagger in production public surface.</strong></p>
+<h2 id='phase-c-next-2-4-weeks'>Phase C (next 2–4 weeks)</h2>
+<p><strong>1. Add route-security automated tests (public vs protected route matrix).</strong></p>
+<p><strong>2. Add SIEM/alerts for auth-service endpoint abuse patterns.</strong></p>
+<p><strong>3. Finalize privacy/log redaction policy and retention controls.</strong></p>
+<hr class='sep'/>
+<h2 id='8-final-verdict'>8) Final verdict</h2>
+<p><strong>Not “all KO” yet — but very close to a strong posture with focused work.</strong></p>
+<p>Your platform already has solid security building blocks and a credible Azure hardening direction. The biggest gap is <strong>session/token handling</strong> plus <strong>dependency backlog</strong>. If we execute Phase A + B, security posture improves materially without large architecture disruption.</p>
+<hr class='sep'/>
+<h2 id='9-suggested-next-deliverable'>9) Suggested next deliverable</h2>
+<p>I can produce a follow-up <strong>implementation patch plan</strong> (file-by-file, command-by-command) to execute the top 4 high findings with minimal production risk and rollback notes.</p>
+  </main>
+</section>
+</div>
+<script>
+(()=>{
+  const cards=[...document.querySelectorAll('.finding-card')];
+  const btns=[...document.querySelectorAll('.btn[data-sev]')];
+  const q=document.getElementById('q');
+  const count=document.getElementById('count');
+  let sev='all';
+  function apply(){
+    const query=(q.value||'').toLowerCase().trim();
+    let shown=0;
+    for(const c of cards){
+      const okSev=(sev==='all'||c.dataset.severity===sev);
+      const okQ=(!query||(c.dataset.text||'').includes(query));
+      const show=okSev&&okQ;
+      c.classList.toggle('hidden',!show);
+      if(show) shown++;
+    }
+    count.textContent=`${shown} finding${shown===1?'':'s'} shown`;
+  }
+  for(const b of btns){
+    b.addEventListener('click',()=>{
+      btns.forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      sev=b.dataset.sev;
+      apply();
+    });
+  }
+  q.addEventListener('input',apply);
+  apply();
+})();
+</script>
+</body></html>

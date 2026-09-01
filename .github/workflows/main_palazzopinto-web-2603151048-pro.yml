@@ -52,6 +52,7 @@ jobs:
       - name: Create frontend deployment package
         run: |
           rm -f frontend-release.zip
+          cp hotel-booking-frontend/server.js hotel-booking-frontend/dist/server.js
           cd hotel-booking-frontend/dist
           zip -r ../../frontend-release.zip .
 

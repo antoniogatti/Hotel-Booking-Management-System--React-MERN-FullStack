@@ -1,0 +1,22 @@
+{
+  "parameters": {
+    "accounts_prd_open_ai_pp_01_name": { "value": "prd-open-ai-pp-01-pro" },
+    "actionGroups_Application_Insights_Smart_Detection_name": { "value": "Application Insights Smart Detection" },
+    "certificates_api_palazzopintobnb_com_palazzopinto_api_secure_name": { "value": "api.palazzopintobnb.com-palazzopinto-api-secure-pro" },
+    "certificates_www_palazzopintobnb_com_palazzopinto_web_2603151048_name": { "value": "www.palazzopintobnb.com-palazzopinto-web-2603151048-pro" },
+    "components_palazzopinto_appi_name": { "value": "palazzopinto-appi-pro" },
+    "components_palazzopinto_appinsights_name": { "value": "palazzopinto-appinsights-pro" },
+    "mongoClusters_palazzopintodb_name": { "value": "palazzopintodb-pro" },
+    "privateDnsZones_privatelink_mongocluster_cosmos_azure_com_name": { "value": "privatelink.mongocluster.cosmos.azure.com" },
+    "privateEndpoints_palazzopinto_mongodb_pe_name": { "value": "palazzopinto-mongodb-pe-pro" },
+    "serverfarms_palazzopinto_api_b1_plan_name": { "value": "palazzopinto-api-b1-plan" },
+    "serverfarms_palazzopinto_free_plan_name": { "value": "palazzopinto-free-plan" },
+    "sites_palazzopinto_api_secure_name": { "value": "palazzopinto-api-secure-pro" },
+    "sites_palazzopinto_web_2603151048_name": { "value": "palazzopinto-web-2603151048-pro" },
+    "smartdetectoralertrules_failure_anomalies___palazzopinto_appi_name": { "value": "Failure Anomalies - palazzopinto-appi-pro" },
+    "smartdetectoralertrules_failure_anomalies___palazzopinto_appinsights_name": { "value": "Failure Anomalies - palazzopinto-appinsights-pro" },
+    "vaults_palazzopintokv_name": { "value": "palazzopintokv-pro" },
+    "virtualNetworks_palazzopinto_backend_vnet_name": { "value": "palazzopinto-backend-vnet" },
+    "workspaces_palazzopinto_logs_name": { "value": "palazzopinto-logs" }
+  }
+}

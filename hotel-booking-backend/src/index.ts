@@ -239,12 +239,12 @@ const productionFallbackOrigins = isProduction
       "https://palazzopintobnb.com",
       "https://hotel-mern-booking.vercel.app",
       "https://palazzopinto-web-2603151048.azurewebsites.net",
+      "https://palazzopinto-web-2603151048-pro.azurewebsites.net",
     ]
   : [];
 
-const defaultOrigins = isProduction
-  ? []
-  : [
+// Localhost is always allowed so the app owner can reach the API from a local machine, in prod or dev.
+const localDevOrigins = [
   "http://localhost:5174",
   "http://localhost:5173",
   "http://localhost:5175",
@@ -255,7 +255,7 @@ const defaultOrigins = isProduction
 ];
 
 const allowedOrigins = new Set(
-  [...configuredOrigins, ...productionFallbackOrigins, ...defaultOrigins]
+  [...configuredOrigins, ...productionFallbackOrigins, ...localDevOrigins]
     .filter((origin): origin is string => Boolean(origin))
     .map(normalizeOrigin)
 );

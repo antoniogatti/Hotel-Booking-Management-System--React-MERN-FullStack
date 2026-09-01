@@ -13,6 +13,16 @@ dist
 dist-ssr
 *.local
 
+# Deployment packages / prebuilt artifacts (too large for git)
+*-release.zip
+*-release-local.zip
+*-prebuilt.zip
+
+# Azure config exports may contain live secrets (connection strings, keys)
+infra/Sub-Copy/exports/api-appsettings-*.json
+infra/Sub-Copy/exports/api-mongo-setting.json
+
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
