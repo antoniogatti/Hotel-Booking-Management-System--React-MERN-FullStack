@@ -20,7 +20,7 @@ concurrency:
 env:
   APP_NAME: palazzopinto-web-2603151048-pro
   APP_SLOT: Production
-  VITE_API_BASE_URL: https://api.palazzopintobnb.com
+  VITE_API_BASE_URL: https://palazzopinto-api-secure-pro.azurewebsites.net
   VITE_APP_ENV: production
   VITE_APP_VERSION: "1.11.3"
   VITE_TURNSTILE_SITE_KEY: "0x4AAAAAAELRojYEByXtdZLr"
