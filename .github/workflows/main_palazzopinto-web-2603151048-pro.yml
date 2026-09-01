@@ -49,6 +49,12 @@ jobs:
         working-directory: hotel-booking-frontend
         run: npm run build:prod
 
+      - name: Create frontend deployment package
+        run: |
+          rm -f frontend-release.zip
+          cd hotel-booking-frontend/dist
+          zip -r ../../frontend-release.zip .
+
       - name: Login to Azure
         uses: azure/login@v2
         with:
@@ -61,4 +67,4 @@ jobs:
         with:
           app-name: ${{ env.APP_NAME }}
           slot-name: ${{ env.APP_SLOT }}
-          package: hotel-booking-frontend/dist
+          package: frontend-release.zip
