@@ -391,10 +391,15 @@ router.get(
         checkIn: { $lt: end },
         checkOut: { $gt: start },
       })
-        .sort({ checkIn: 1, createdAt: -1 })
         .select(
           "_id reservationNumber firstName lastName email phone checkIn checkOut status totalCost adultCount childCount createdAt"
         );
+
+      bookings.sort(
+        (left, right) =>
+          new Date(left.checkIn).getTime() - new Date(right.checkIn).getTime() ||
+          new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      );
 
       const closedDates = await BookingDayStatus.find({
         hotelId,

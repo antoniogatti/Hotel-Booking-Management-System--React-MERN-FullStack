@@ -172,13 +172,19 @@ export const getImportedCalendarEvents = async (params: {
   start: Date;
   end: Date;
 }) => {
-  return ExternalCalendarEvent.find({
+  const events = await ExternalCalendarEvent.find({
     hotelId: params.hotelId,
     source: BOOKING_COM_SOURCE,
     status: "active",
     startDate: { $lt: params.end },
     endDate: { $gt: params.start },
-  }).sort({ startDate: 1, updatedAt: -1 });
+  });
+
+  return events.sort(
+    (left, right) =>
+      new Date(left.startDate).getTime() - new Date(right.startDate).getTime() ||
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  );
 };
 
 export const syncBookingComRoom = async (hotel: SyncableHotel): Promise<SyncResult> => {
