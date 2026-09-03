@@ -8,33 +8,7 @@ import { Loader2 } from "lucide-react";
 const wait = (ms: number) =>
   new Promise((resolve) => window.setTimeout(resolve, ms));
 
-const normalizeCallbackToken = (rawToken: string | null) => {
-  if (!rawToken) {
-    return null;
-  }
-
-  let token = rawToken.trim();
-
-  if (token.toLowerCase().startsWith("bearer ")) {
-    token = token.slice(7).trim();
-  }
-
-  // Some callback URLs may carry a percent-encoded token; decode a couple of times
-  // to handle accidental double-encoding during redirects.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (!/%[0-9a-f]{2}/i.test(token)) {
-      break;
-    }
-
-    try {
-      token = decodeURIComponent(token);
-    } catch {
-      break;
-    }
-  }
-
-  return token || null;
-};
+// Note: token normalization/processing removed — frontend relies on cookie-based session.
 
 const AuthCallback = () => {
   const [searchParams] = useSearchParams();
@@ -52,7 +26,6 @@ const AuthCallback = () => {
 
     const error = searchParams.get("error");
     const provider = searchParams.get("provider");
-    const token = normalizeCallbackToken(searchParams.get("token"));
 
     void (async () => {
       if (error) {
