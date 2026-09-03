@@ -290,7 +290,8 @@ router.post("/execute", verifyMcpToken, async (req: Request, res: Response) => {
         }
 
         const localUpcoming = await Booking.find(localFilter)
-          .sort(horizon === "past" ? { checkIn: -1, createdAt: -1 } : { checkIn: 1, createdAt: 1 })
+          // Avoid multi-field server-side sorts on Cosmos/Mongo API; sort by single field only
+          .sort(horizon === "past" ? { checkIn: -1 } : { checkIn: 1 })
           .select("_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo");
 
         // Imported events (Booking.com) - active only
@@ -302,7 +303,8 @@ router.post("/execute", verifyMcpToken, async (req: Request, res: Response) => {
         }
 
         const importedUpcoming = await ExternalCalendarEvent.find(importedFilter)
-          .sort(horizon === "past" ? { startDate: -1, createdAt: -1 } : { startDate: 1, createdAt: 1 })
+          // Avoid multi-field server-side sorts on Cosmos/Mongo API; sort by single field only
+          .sort(horizon === "past" ? { startDate: -1 } : { startDate: 1 })
           .select("_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo totalCost adultCount childCount");
 
         const toLocalRow = (booking: any) => {

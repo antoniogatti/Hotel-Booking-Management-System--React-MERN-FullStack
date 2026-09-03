@@ -77,7 +77,8 @@ router.get("/export/:hotelId/:token.ics", async (req: Request, res: Response) =>
       hotelId: hotel._id,
       status: { $in: ["pending", "confirmed", "arrived", "completed"] },
     })
-      .sort({ checkIn: 1, createdAt: -1 })
+      // Use single-field sort for Cosmos DB compatibility (avoid multi-field server-side sort)
+      .sort({ checkIn: 1 })
       .select("_id reservationNumber firstName lastName checkIn checkOut updatedAt status");
 
     const closedDays = await BookingDayStatus.find({
