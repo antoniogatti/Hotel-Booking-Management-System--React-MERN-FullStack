@@ -14,18 +14,19 @@ concurrency:
   group: deploy-production-main
   cancel-in-progress: true
 
+env:
+  FRONTEND_APP_NAME: palazzopinto-web-2603151048-pro
+  BACKEND_APP_NAME: palazzopinto-api-secure-pro
+  APP_SLOT: Production
+  VITE_API_BASE_URL: https://palazzopinto-api-secure-pro.azurewebsites.net
+  VITE_APP_ENV: production
+  VITE_APP_VERSION: "1.11.3"
+  VITE_TURNSTILE_SITE_KEY: "0x4AAAAAAELRojYEByXtdZLr"
+  VITE_ENABLE_DEV_CAPTCHA: "false"
+
 jobs:
   build-and-deploy-frontend:
     runs-on: ubuntu-latest
-
-    env:
-      APP_NAME: palazzopinto-web-2603151048-pro
-      APP_SLOT: Production
-      VITE_API_BASE_URL: https://palazzopinto-api-secure-pro.azurewebsites.net
-      VITE_APP_ENV: production
-      VITE_APP_VERSION: "1.11.3"
-      VITE_TURNSTILE_SITE_KEY: "0x4AAAAAAELRojYEByXtdZLr"
-      VITE_ENABLE_DEV_CAPTCHA: "false"
 
     steps:
       - name: Checkout repository
@@ -63,7 +64,7 @@ jobs:
       - name: Deploy frontend to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.APP_NAME }}
+          app-name: ${{ env.FRONTEND_APP_NAME }}
           slot-name: ${{ env.APP_SLOT }}
           package: frontend-release.zip
 
@@ -116,6 +117,6 @@ jobs:
       - name: Deploy backend to Azure Web App
         uses: azure/webapps-deploy@v3
         with:
-          app-name: ${{ env.APP_NAME }}
+          app-name: ${{ env.BACKEND_APP_NAME }}
           slot-name: ${{ env.APP_SLOT }}
           package: backend-release.zip
