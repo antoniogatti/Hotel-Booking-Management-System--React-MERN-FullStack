@@ -40,6 +40,7 @@ type BookingDecisionPayload = {
   checkOut: string;
   decision: "confirmed" | "rejected";
   reason?: string;
+  notifyUser?: boolean;
 };
 
 type CheckInNotificationPayload = {
@@ -651,14 +652,17 @@ export const sendBookingDecisionEmails = async (
     replyTo: payload.email,
   });
 
-  await sendMail({
-    token,
-    senderAddress,
-    to: payload.email,
-    subject: `Booking ${decisionLabel} - ${BRAND_NAME} - ${payload.hotelName} (${payload.reservationNumber})`,
-    html: toBookingDecisionUserHtml(payload),
-    text: `Booking ${decisionLabel.toLowerCase()} for reservation ${payload.reservationNumber}`,
-  });
+  // Send friendly email to guest only when explicitly enabled (default: enabled)
+  if (payload.notifyUser !== false) {
+    await sendMail({
+      token,
+      senderAddress,
+      to: payload.email,
+      subject: `Booking ${decisionLabel} - ${BRAND_NAME} - ${payload.hotelName} (${payload.reservationNumber})`,
+      html: toBookingDecisionUserHtml(payload),
+      text: `Booking ${decisionLabel.toLowerCase()} for reservation ${payload.reservationNumber}`,
+    });
+  }
 };
 
 export const sendCheckInNotificationEmail = async (

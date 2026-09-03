@@ -648,6 +648,7 @@ router.post(
       .isIn(["confirm", "reject"])
       .withMessage("Action must be confirm or reject"),
     body("reason").optional().isString().isLength({ max: 400 }),
+    body("notifyClient").optional().isBoolean().withMessage("notifyClient must be boolean"),
   ],
   async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -738,6 +739,8 @@ router.post(
       let warning: string | undefined;
 
       try {
+        const notifyClient = req.body.notifyClient !== false;
+
         await sendBookingDecisionEmails({
           bookingId: String(booking._id),
           reservationNumber: booking.reservationNumber || "N/A",
@@ -750,6 +753,7 @@ router.post(
           checkOut: booking.checkOut.toISOString(),
           decision: action === "confirm" ? "confirmed" : "rejected",
           reason: req.body.reason,
+          notifyUser: notifyClient,
         });
       } catch (emailError) {
         notificationsSent = false;

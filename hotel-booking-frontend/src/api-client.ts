@@ -368,12 +368,15 @@ export const processRequestedBooking = async (payload: {
   bookingId: string;
   action: "confirm" | "reject";
   reason?: string;
+  notifyClient?: boolean;
 }) => {
   const response = await axiosInstance.post(
     `/api/bookings/${payload.bookingId}/decision`,
     {
       action: payload.action,
       reason: payload.reason,
+      // Optional flag to control whether a friendly email is sent to the guest
+      notifyClient: (payload as any).notifyClient,
     }
   );
   return response.data;
