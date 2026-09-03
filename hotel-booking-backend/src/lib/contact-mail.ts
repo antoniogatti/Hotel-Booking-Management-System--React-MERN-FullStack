@@ -642,13 +642,15 @@ export const sendBookingDecisionEmails = async (
   const token = await getGraphAccessToken(tenantId, clientId, clientSecret);
   const decisionLabel = payload.decision === "confirmed" ? "Confirmed" : "Rejected";
 
+  // Technical/admin notification: keep subject only and minimal body (no friendly text)
   await sendMail({
     token,
     senderAddress,
     to: inboxAddress,
     subject: `${TECH_SUBJECT_PREFIX} ${decisionLabel} | ${payload.roomName} - ${payload.reservationNumber}`,
-    html: toBookingDecisionAdminHtml(payload),
-    text: `Booking ${decisionLabel.toLowerCase()} for ${payload.reservationNumber}`,
+    // Intentionally minimal/empty HTML body for technical notification
+    html: "",
+    text: "",
     replyTo: payload.email,
   });
 
