@@ -1,4 +1,4 @@
-name: Build and deploy FE then BE to Azure Web Apps - palazzopinto-web+api-pro
+name: deploy-production
 
 on:
   push:
@@ -11,12 +11,8 @@ permissions:
   id-token: write
 
 concurrency:
-  group: deploy-api-pro-main
+  group: deploy-production-main
   cancel-in-progress: true
-
-env:
-  APP_NAME: palazzopinto-api-secure-pro
-  APP_SLOT: Production
 
 jobs:
   build-and-deploy-frontend:
