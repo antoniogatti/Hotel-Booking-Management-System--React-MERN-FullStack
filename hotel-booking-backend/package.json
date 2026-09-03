@@ -65,7 +65,8 @@
   },
   "overrides": {
     "@apidevtools/swagger-parser": "12.1.0",
-    "@apidevtools/json-schema-ref-parser": "15.3.5"
+    "@apidevtools/json-schema-ref-parser": "15.3.5",
+    "qs": "6.16.0"
   },
   "devDependencies": {
     "mongodb-memory-server": "^11.0.1"
