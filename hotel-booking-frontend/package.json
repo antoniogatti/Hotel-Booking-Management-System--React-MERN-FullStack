@@ -31,7 +31,7 @@
     "react-hook-form": "^7.48.2",
     "react-icons": "^4.12.0",
     "react-query": "^3.39.3",
-    "react-router-dom": "^6.18.0",
+    "react-router-dom": "^7.18.3",
     "recharts": "^3.1.2",
     "tailwind-merge": "^3.3.1",
     "vanilla-cookieconsent": "^3.1.0"
