@@ -24,6 +24,7 @@ import trafficInsightsRoutes from "./routes/traffic-insights";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./swagger";
 import helmet from "helmet";
+import csrfProtection from "./middleware/csrf";
 import morgan from "morgan";
 import compression from "compression";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
@@ -163,6 +164,8 @@ app.use(
           preload: true,
         }
       : false,
+    // Enable a conservative CSP in production. In non-production this is disabled to aid local development.
+    contentSecurityPolicy: isProduction ? { useDefaults: true } : false,
   })
 );
 
@@ -293,6 +296,8 @@ app.use(
       "Authorization",
       "Cookie",
       "X-Requested-With",
+      "X-XSRF-TOKEN",
+      "X-CSRF-Token",
     ],
   })
 );
@@ -321,6 +326,10 @@ app.use((req, res, next) => {
   res.header("Vary", "Origin");
   next();
 });
+
+// Global CSRF protection for cookie-authenticated browser requests.
+// This middleware will allow API clients using Authorization headers to bypass CSRF checks.
+app.use(csrfProtection);
 
 app.get("/", (req: Request, res: Response) => {
   res.send("<h1>Palazzo Pinto B&B Backend API is running 🚀</h1>");

@@ -1,3 +1,4 @@
+import React from "react";
 import {
   ExternalLink,
   FileText,
@@ -8,10 +9,22 @@ import {
 } from "lucide-react";
 import { getApiBaseUrl } from "../api-client";
 
-const ApiDocs = () => {
-  const apiBaseUrl = getApiBaseUrl();
+type Endpoint = {
+  method: string;
+  path: string;
+  description: string;
+};
 
-  const apiEndpoints = [
+type ApiCategory = {
+  category: string;
+  icon: React.ReactNode;
+  endpoints: Endpoint[];
+};
+
+const ApiDocs = () => {
+  const apiBaseUrl: string = getApiBaseUrl();
+
+  const apiEndpoints: ApiCategory[] = [
     {
       category: "Authentication",
       icon: <Shield className="w-5 h-5" />,

@@ -4,6 +4,7 @@ import User from "../models/user";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import rateLimit from "express-rate-limit";
 import verifyToken, { verifyTokenOrAzureAd } from "../middleware/auth";
 import {
   normalizeEmail,
@@ -42,6 +43,7 @@ const useInMemoryMongo =
 const allowLocalPasswordLogin =
   !isProduction && process.env.ENABLE_LOCAL_PASSWORD_LOGIN === "true";
 const sessionCookieName = "session_id";
+const CSRF_COOKIE_NAME = "XSRF-TOKEN";
 const oauthStateCookieName = "oauth_state";
 const forceLocalAdminRole =
   !isProduction && String(process.env.FORCE_LOCAL_ADMIN_ROLE || "true").toLowerCase() !== "false";
@@ -58,6 +60,17 @@ const normalizeCredential = (value: unknown) => {
   // Tolerate accidental wrapping quotes and trailing whitespace/newlines from env files.
   return value.trim().replace(/^['\"]|['\"]$/g, "");
 };
+
+// Service token configuration (seconds)
+const SERVICE_TOKEN_TTL_SECONDS = Number(process.env.SERVICE_TOKEN_TTL_SECONDS || "3600");
+
+const serviceAuthLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 10, // limit to 10 attempts per IP per hour
+  message: "Too many service auth attempts, please try again later.",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const getSessionCookieOptions = (
   overrides: Partial<CookieOptions> = {}
@@ -255,15 +268,13 @@ router.get("/callback/google", async (req: Request, res: Response) => {
 
     const token = issueToken(user.id, computedRole);
 
+    // Set an HttpOnly session cookie and a non-HttpOnly XSRF cookie, then redirect
+    res.cookie(sessionCookieName, token, getSessionCookieOptions());
+    const xsrfToken = crypto.randomBytes(32).toString("hex");
+    res.cookie(CSRF_COOKIE_NAME, xsrfToken, getSessionCookieOptions({ httpOnly: false }));
     const redirectUrl = new URL(`${FRONTEND_URL}/auth/callback`);
-    redirectUrl.searchParams.set("token", token);
     redirectUrl.searchParams.set("provider", "google");
-    redirectUrl.searchParams.set("userId", String(user._id));
-    redirectUrl.searchParams.set("email", user.email);
-    redirectUrl.searchParams.set("firstName", user.firstName);
-    redirectUrl.searchParams.set("lastName", user.lastName);
-    redirectUrl.searchParams.set("role", computedRole);
-    if (image) redirectUrl.searchParams.set("image", image);
+    redirectUrl.searchParams.set("success", "1");
 
     res.redirect(redirectUrl.toString());
   } catch (err) {
@@ -365,11 +376,12 @@ router.get("/callback/microsoft", async (req: Request, res: Response) => {
 
     res.clearCookie(oauthStateCookieName, getOAuthStateCookieOptions({ maxAge: 0 }));
     res.cookie(sessionCookieName, token, getSessionCookieOptions());
+    const xsrfToken = crypto.randomBytes(32).toString("hex");
+    res.cookie(CSRF_COOKIE_NAME, xsrfToken, getSessionCookieOptions({ httpOnly: false }));
 
     return redirectToAuthCallback(res, {
       provider: "microsoft",
       success: "1",
-      token,
     });
   } catch (err) {
     logError("Microsoft OAuth callback failed", err, { provider: "microsoft" });
@@ -456,11 +468,12 @@ router.post(
       const computedRole = await ensurePersistedRole(user, email);
       const token = issueToken(user.id, computedRole);
 
-      // Return JWT token in response body for localStorage storage
+      // Set HttpOnly session cookie for browser clients and return token in body for API clients
+      res.cookie(sessionCookieName, token, getSessionCookieOptions());
       res.status(200).json({
         userId: user._id,
         message: "Login successful",
-        token: token, // JWT token in response body
+        token: token, // JWT token in response body (API clients only)
         user: {
           id: user._id,
           email: user.email,
@@ -579,6 +592,18 @@ router.get("/validate-token", verifyTokenOrAzureAd, async (req: Request, res: Re
     });
   }
 
+  // Ensure an XSRF cookie exists for browser clients using cookie-based sessions
+  try {
+    if (!req.cookies || !req.cookies[CSRF_COOKIE_NAME]) {
+      if (req.cookies && req.cookies[sessionCookieName]) {
+        const xsrfToken = crypto.randomBytes(32).toString("hex");
+        res.cookie(CSRF_COOKIE_NAME, xsrfToken, getSessionCookieOptions({ httpOnly: false }));
+      }
+    }
+  } catch (e) {
+    // no-op: cookie setting failure should not block validate-token
+  }
+
   res.status(200).send({
     userId: req.userId,
     role,
@@ -637,7 +662,7 @@ router.post("/logout", (req: Request, res: Response) => {
  *       503:
  *         description: Service auth not configured
  */
-router.post("/service", async (req: Request, res: Response) => {
+router.post("/service", serviceAuthLimiter, async (req: Request, res: Response) => {
   const SOFIA_CLIENT_SECRET = process.env.SOFIA_CLIENT_SECRET;
   const expectedClientId = normalizeCredential(SOFIA_CLIENT_ID);
   const expectedClientSecret = normalizeCredential(SOFIA_CLIENT_SECRET);
@@ -682,11 +707,11 @@ router.post("/service", async (req: Request, res: Response) => {
       await user.save();
     }
 
-    // JWT 12 ore
+    // JWT (configurable) - default 1 hour
     const token = jwt.sign(
       { userId: user.id, role: "admin" },
       process.env.JWT_SECRET_KEY as string,
-      { expiresIn: "12h" }
+      { expiresIn: SERVICE_TOKEN_TTL_SECONDS }
     );
 
     await recordAuditEvent({
@@ -699,7 +724,7 @@ router.post("/service", async (req: Request, res: Response) => {
       metadata: { service: "sofia-hermes" },
     });
 
-    return res.status(200).json({ token, expiresIn: 43200, role: "admin" });
+    return res.status(200).json({ token, expiresIn: SERVICE_TOKEN_TTL_SECONDS, role: "admin" });
   } catch (err) {
     logError("Service auth handler failed", err, { route: "auth.service" });
     return res.status(500).json({ message: "Something went wrong" });

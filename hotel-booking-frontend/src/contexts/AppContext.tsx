@@ -35,9 +35,8 @@ export const AppContextProvider = ({
     "Hotel room is getting ready..."
   );
   const { toast } = useToast();
-  const storedSessionToken =
-    typeof window !== "undefined" ? localStorage.getItem("session_id") : null;
-
+  // With cookie-based sessions we cannot read HttpOnly cookies from JS,
+  // so we always call validateToken() on app start to determine session state.
   const { isError, isLoading, data } = useQuery(
     "validateToken",
     apiClient.validateToken,
@@ -45,7 +44,7 @@ export const AppContextProvider = ({
       retry: false,
       refetchOnWindowFocus: false,
       staleTime: 5 * 60 * 1000,
-      enabled: !!storedSessionToken,
+      enabled: true,
     }
   );
 
@@ -68,7 +67,7 @@ export const AppContextProvider = ({
 
   // Keep the last known auth state during token validation so protected routes
   // do not immediately redirect on refresh or direct entry.
-  const isRestoringSession = isLoading && !!storedSessionToken;
+  const isRestoringSession = isLoading;
 
   const isLoggedIn = finalIsLoggedIn || isRestoringSession;
   const userRole = finalIsLoggedIn

@@ -74,9 +74,8 @@ const AuthCallback = () => {
       }
 
       try {
-        apiClient.persistSessionToken(token);
-
-        let result: Awaited<ReturnType<typeof apiClient.validateToken>> = null;
+      // Do not persist tokens in localStorage; rely on HttpOnly session cookie set by the backend.
+      let result: Awaited<ReturnType<typeof apiClient.validateToken>> = null;
 
         for (let attempt = 0; attempt < 5; attempt++) {
           result = await apiClient.validateToken();

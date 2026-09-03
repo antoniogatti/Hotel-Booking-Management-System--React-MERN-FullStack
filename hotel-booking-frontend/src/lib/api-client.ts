@@ -1,7 +1,5 @@
 import axios, { InternalAxiosRequestConfig } from "axios";
 
-const getStoredSessionToken = () => localStorage.getItem("session_id");
-
 // Define base URL based on environment
 const getBaseURL = () => {
   if (import.meta.env.VITE_API_BASE_URL) {
@@ -34,6 +32,12 @@ const clearStoredProfile = () => {
   localStorage.removeItem("user_role");
 };
 
+const getCookie = (name: string) => {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp("(^|;)\\s*" + name + "=([^;]+)"));
+  return match ? decodeURIComponent(match[2]) : null;
+};
+
 // Create axios instance with consistent configuration
 const axiosInstance = axios.create({
   baseURL: getBaseURL(),
@@ -47,9 +51,23 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use((config: CustomAxiosRequestConfig) => {
   config.metadata = { retryCount: 0 };
 
-  const token = getStoredSessionToken();
-  if (!config.skipAuth && token && !config.headers.Authorization) {
-    config.headers.Authorization = `Bearer ${token}`;
+  // Do not inject Authorization header from localStorage. Browser clients
+  // rely on HttpOnly session cookies. API clients may set Authorization
+  // explicitly in request config if needed.
+
+  // Attach XSRF header for mutating requests when an XSRF cookie exists.
+  try {
+    const method = (config.method || "get").toString().toUpperCase();
+    const safeMethods = ["GET", "HEAD", "OPTIONS"];
+    if (!safeMethods.includes(method)) {
+      const xsrf = getCookie("XSRF-TOKEN");
+      if (xsrf) {
+        config.headers = config.headers || {};
+        (config.headers as any)["X-XSRF-TOKEN"] = xsrf;
+      }
+    }
+  } catch (e) {
+    // ignore cookie read errors
   }
 
   return config;

@@ -46,7 +46,8 @@ export const persistSessionToken = (token?: string | null) => {
     return;
   }
 
-  localStorage.setItem("session_id", token);
+  // Intentionally do not persist session tokens in localStorage.
+  // Browser clients rely on HttpOnly cookies set by the backend.
 };
 
 export const register = async (formData: RegisterFormData) => {
@@ -57,7 +58,6 @@ export const register = async (formData: RegisterFormData) => {
 export const signIn = async (formData: SignInFormData) => {
   const response = await axiosInstance.post("/api/auth/login", formData);
 
-  persistSessionToken(response.data?.token);
 
   if (response.data?.userId) {
     localStorage.setItem("user_id", response.data.userId);
