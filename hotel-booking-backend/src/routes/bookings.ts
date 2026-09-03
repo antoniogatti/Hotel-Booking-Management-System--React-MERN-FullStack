@@ -2038,7 +2038,8 @@ router.get(
                   checkIn: { $gte: today, $lt: windowEnd },
                 }),
           })
-            .sort(horizon === "past" ? { checkIn: -1, createdAt: -1 } : { checkIn: 1, createdAt: 1 })
+            // Use single-field sort to avoid multi-field sort issues on Cosmos/Mongo API
+            .sort(horizon === "past" ? { checkIn: -1 } : { checkIn: 1 })
             .select(
               "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
             ),
@@ -2050,7 +2051,8 @@ router.get(
               ? { startDate: { $lt: today } }
               : { startDate: { $gte: today, $lt: windowEnd } }),
           })
-            .sort(horizon === "past" ? { startDate: -1, createdAt: -1 } : { startDate: 1, createdAt: 1 })
+            // Use single-field sort to avoid multi-field sort issues on Cosmos/Mongo API
+            .sort(horizon === "past" ? { startDate: -1 } : { startDate: 1 })
             .select(
               "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
             ),
@@ -2064,7 +2066,8 @@ router.get(
               { checkIn: { $lt: today } },
             ],
           })
-            .sort({ checkIn: 1, createdAt: 1 })
+            // Use single-field sort to avoid multi-field sort issues on Cosmos/Mongo API
+            .sort({ checkIn: 1 })
             .select(
               "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
             ),
@@ -2079,7 +2082,8 @@ router.get(
               { startDate: { $lt: today } },
             ],
           })
-            .sort({ startDate: 1, createdAt: 1 })
+            // Use single-field sort to avoid multi-field sort issues on Cosmos/Mongo API
+            .sort({ startDate: 1 })
             .select(
               "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
             ),
