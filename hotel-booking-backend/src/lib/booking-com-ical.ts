@@ -158,13 +158,27 @@ export const findOverlappingImportedEvent = async (params: {
   checkIn: Date;
   checkOut: Date;
 }) => {
-  return ExternalCalendarEvent.findOne({
+  // Avoid multi-field server-side sort (Cosmos DB may require composite index).
+  // Fetch matching events and perform the compound ordering in-memory.
+  const events = await ExternalCalendarEvent.find({
     hotelId: params.hotelId,
     source: BOOKING_COM_SOURCE,
     status: "active",
     startDate: { $lt: params.checkOut },
     endDate: { $gt: params.checkIn },
-  }).sort({ startDate: 1, updatedAt: -1 });
+  });
+
+  if (!events || events.length === 0) {
+    return null;
+  }
+
+  events.sort(
+    (left, right) =>
+      new Date(left.startDate).getTime() - new Date(right.startDate).getTime() ||
+      new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime()
+  );
+
+  return events[0];
 };
 
 export const getImportedCalendarEvents = async (params: {
