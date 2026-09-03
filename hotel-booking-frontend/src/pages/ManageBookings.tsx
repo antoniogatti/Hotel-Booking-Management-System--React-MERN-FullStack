@@ -340,6 +340,10 @@ const ManageBookings = () => {
     });
   }, [calendarData?.bookings, selectedDay]);
 
+  const hasRequestedBookings = selectedDayBookings.some(
+    (b) => b.status === "Requested"
+  );
+
   const requestedCount =
     calendarData?.bookings.filter((booking) => booking.status === "Requested").length || 0;
   const bookedCount =
@@ -680,18 +684,19 @@ const ManageBookings = () => {
                 </div>
               )}
 
-              <div className="mt-2 flex items-center gap-3">
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={notifyClientEmails}
-                    onChange={(e) => setNotifyClientEmails(e.target.checked)}
-                    className="h-4 w-4 rounded border-gray-300"
-                  />
-                  <span className="font-medium text-gray-800">Send guest notification</span>
-                </label>
-                <p className="text-xs text-gray-500">Technical notification to admin is always sent.</p>
-              </div>
+              {hasRequestedBookings && (
+                <div className="mt-2">
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={notifyClientEmails}
+                      onChange={(e) => setNotifyClientEmails(e.target.checked)}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <span className="font-medium text-gray-800">Send guest notification</span>
+                  </label>
+                </div>
+              )}
 
               {selectedDayInfo?.status !== "Requested" &&
                 selectedDayInfo?.status !== "Booked" &&
