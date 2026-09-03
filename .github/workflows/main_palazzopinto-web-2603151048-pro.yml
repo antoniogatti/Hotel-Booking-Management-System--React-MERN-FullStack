@@ -1,12 +1,7 @@
 name: Build and deploy Vite app to Azure Web App - palazzopinto-web-2603151048-pro
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - hotel-booking-frontend/**
-      - .github/workflows/main_palazzopinto-web-2603151048-pro.yml
+  # Manual dispatch only — automatic deploys are handled by the combined workflow
   workflow_dispatch:
 
 permissions:
