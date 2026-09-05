@@ -42,6 +42,12 @@ const toUtcStartOfDay = (value: string | Date) => {
 
 const formatDayKey = (date: Date) => date.toISOString().slice(0, 10);
 
+const getSortableTime = (value: Date | string | number | null | undefined) => {
+  const date = new Date(value ?? "");
+  const time = date.getTime();
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+};
+
 const ROOM_DISPLAY_ORDER = ["malvasia", "verdeca", "aleatico", "fuocorosa"] as const;
 
 const getManagedRoomOrderKey = (hotel: { slug?: string; name?: string }) => {
@@ -2038,7 +2044,6 @@ router.get(
                   checkIn: { $gte: today, $lt: windowEnd },
                 }),
           })
-            .sort(horizon === "past" ? { checkIn: -1, createdAt: -1 } : { checkIn: 1, createdAt: 1 })
             .select(
               "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
             ),
@@ -2050,7 +2055,6 @@ router.get(
               ? { startDate: { $lt: today } }
               : { startDate: { $gte: today, $lt: windowEnd } }),
           })
-            .sort(horizon === "past" ? { startDate: -1, createdAt: -1 } : { startDate: 1, createdAt: 1 })
             .select(
               "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
             ),
@@ -2064,7 +2068,6 @@ router.get(
               { checkIn: { $lt: today } },
             ],
           })
-            .sort({ checkIn: 1, createdAt: 1 })
             .select(
               "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
             ),
@@ -2079,7 +2082,6 @@ router.get(
               { startDate: { $lt: today } },
             ],
           })
-            .sort({ startDate: 1, createdAt: 1 })
             .select(
               "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
             ),
@@ -2094,6 +2096,26 @@ router.get(
             "checkInInfo.checkedInAt": { $gte: today, $lt: tomorrow },
           }),
         ]);
+
+      const localSortDirection = horizon === "past" ? -1 : 1;
+      localUpcoming.sort((left, right) =>
+        (getSortableTime(left.checkIn) - getSortableTime(right.checkIn)) * localSortDirection ||
+        getSortableTime(left.createdAt) - getSortableTime(right.createdAt)
+      );
+      importedUpcoming.sort((left, right) =>
+        (getSortableTime(left.startDate) - getSortableTime(right.startDate)) * localSortDirection ||
+        getSortableTime(left.createdAt) - getSortableTime(right.createdAt)
+      );
+      localInHouse.sort(
+        (left, right) =>
+          getSortableTime(left.checkIn) - getSortableTime(right.checkIn) ||
+          getSortableTime(left.createdAt) - getSortableTime(right.createdAt)
+      );
+      importedInHouse.sort(
+        (left, right) =>
+          getSortableTime(left.startDate) - getSortableTime(right.startDate) ||
+          getSortableTime(left.createdAt) - getSortableTime(right.createdAt)
+      );
 
       const toLocalRow = (booking: any) => {
           const hotel = hotelMap.get(String(booking.hotelId));
