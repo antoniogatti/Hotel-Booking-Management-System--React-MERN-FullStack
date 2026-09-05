@@ -100,47 +100,89 @@ router.get("/export/:hotelId/:token.ics", async (req: Request, res: Response) =>
       )}`,
     ];
 
-    bookings.forEach((booking) => {
-      const summary =
-        booking.status === "pending"
-          ? `${hotel.name} - Pending request`
-          : `${hotel.name} - Reserved`;
+    for (const booking of bookings) {
+      try {
+        const checkInDate = new Date(booking.checkIn);
+        const checkOutDate = new Date(booking.checkOut);
 
-      lines.push(
-        buildEvent([
-          `UID:local-booking-${booking._id}@palazzopinto`,
-          `DTSTAMP:${formatUtcDateTime(now)}`,
-          `DTSTART;VALUE=DATE:${formatDateOnly(new Date(booking.checkIn))}`,
-          `DTEND;VALUE=DATE:${formatDateOnly(new Date(booking.checkOut))}`,
-          `SUMMARY:${escapeIcsText(summary)}`,
-          `DESCRIPTION:${escapeIcsText(
-            `Reservation ${booking.reservationNumber || booking._id} exported from local PMS.`
-          )}`,
-          "STATUS:CONFIRMED",
-          "TRANSP:OPAQUE",
-          `LAST-MODIFIED:${formatUtcDateTime(new Date(booking.updatedAt || booking.checkIn))}`,
-        ])
-      );
-    });
+        if (isNaN(checkInDate.getTime()) || isNaN(checkOutDate.getTime())) {
+          logError("Skipping booking with invalid dates for export feed", undefined, {
+            route: "booking-com-sync.export",
+            hotelId: String(hotel._id),
+            bookingId: String(booking._id),
+            checkIn: booking.checkIn,
+            checkOut: booking.checkOut,
+          });
+          continue;
+        }
 
-    closedDays.forEach((closedDay) => {
-      const start = new Date(closedDay.date);
-      const end = new Date(start.getTime() + 86400000);
+        const summary =
+          booking.status === "pending"
+            ? `${hotel.name} - Pending request`
+            : `${hotel.name} - Reserved`;
 
-      lines.push(
-        buildEvent([
-          `UID:local-closure-${closedDay._id}@palazzopinto`,
-          `DTSTAMP:${formatUtcDateTime(now)}`,
-          `DTSTART;VALUE=DATE:${formatDateOnly(start)}`,
-          `DTEND;VALUE=DATE:${formatDateOnly(end)}`,
-          "SUMMARY:CLOSED - Not available",
-          `DESCRIPTION:${escapeIcsText(closedDay.note || "Manually closed in local PMS.")}`,
-          "STATUS:CONFIRMED",
-          "TRANSP:OPAQUE",
-          `LAST-MODIFIED:${formatUtcDateTime(new Date(closedDay.updatedAt || closedDay.date))}`,
-        ])
-      );
-    });
+        lines.push(
+          buildEvent([
+            `UID:local-booking-${booking._id}@palazzopinto`,
+            `DTSTAMP:${formatUtcDateTime(now)}`,
+            `DTSTART;VALUE=DATE:${formatDateOnly(checkInDate)}`,
+            `DTEND;VALUE=DATE:${formatDateOnly(checkOutDate)}`,
+            `SUMMARY:${escapeIcsText(summary)}`,
+            `DESCRIPTION:${escapeIcsText(
+              `Reservation ${booking.reservationNumber || booking._id} exported from local PMS.`
+            )}`,
+            "STATUS:CONFIRMED",
+            "TRANSP:OPAQUE",
+            `LAST-MODIFIED:${formatUtcDateTime(new Date(booking.updatedAt || booking.checkIn))}`,
+          ])
+        );
+      } catch (err) {
+        logError("Error building iCal event for booking", err as any, {
+          route: "booking-com-sync.export",
+          hotelId: String(hotel._id),
+          bookingId: String(booking._id),
+        });
+        continue;
+      }
+    }
+
+    for (const closedDay of closedDays) {
+      try {
+        const start = new Date(closedDay.date);
+        const end = new Date(start.getTime() + 86400000);
+
+        if (isNaN(start.getTime())) {
+          logError("Skipping closed day with invalid date for export feed", undefined, {
+            route: "booking-com-sync.export",
+            hotelId: String(hotel._id),
+            closedDayId: String(closedDay._id),
+            date: closedDay.date,
+          });
+          continue;
+        }
+
+        lines.push(
+          buildEvent([
+            `UID:local-closure-${closedDay._id}@palazzopinto`,
+            `DTSTAMP:${formatUtcDateTime(now)}`,
+            `DTSTART;VALUE=DATE:${formatDateOnly(start)}`,
+            `DTEND;VALUE=DATE:${formatDateOnly(end)}`,
+            "SUMMARY:CLOSED - Not available",
+            `DESCRIPTION:${escapeIcsText(closedDay.note || "Manually closed in local PMS.")}`,
+            "STATUS:CONFIRMED",
+            "TRANSP:OPAQUE",
+            `LAST-MODIFIED:${formatUtcDateTime(new Date(closedDay.updatedAt || closedDay.date))}`,
+          ])
+        );
+      } catch (err) {
+        logError("Error building iCal event for closed day", err as any, {
+          route: "booking-com-sync.export",
+          hotelId: String(hotel._id),
+          closedDayId: String(closedDay._id),
+        });
+        continue;
+      }
+    }
 
     lines.push("END:VCALENDAR");
 
