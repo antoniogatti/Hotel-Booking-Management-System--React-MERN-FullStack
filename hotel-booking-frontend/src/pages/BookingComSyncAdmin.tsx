@@ -1,7 +1,19 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
-import { CalendarClock, RefreshCw, Save, Settings2, ExternalLink, Copy, KeyRound, Link2 } from "lucide-react";
+import {
+  CalendarClock,
+  RefreshCw,
+  Save,
+  Settings2,
+  ExternalLink,
+  Copy,
+  KeyRound,
+  Link2,
+  ChevronDown,
+  ChevronUp,
+  Trash2,
+} from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -56,6 +68,7 @@ const BookingComSyncAdmin = () => {
   const { showToast } = useAppContext();
   const queryClient = useQueryClient();
   const [drafts, setDrafts] = useState<RoomDraftState>({});
+  const [errorsExpanded, setErrorsExpanded] = useState(false);
 
   const { data: rooms, isLoading: roomsLoading } = useQueryWithLoading(
     ["bookingManagementRooms"],
@@ -141,6 +154,25 @@ const BookingComSyncAdmin = () => {
     },
     onError: (error: any) => {
       const message = error?.response?.data?.message || "Unable to sync Booking.com calendars";
+      showToast({ title: message, type: "ERROR" });
+    },
+  });
+
+  const clearErrorsMutation = useMutation(apiClient.clearBookingComSyncErrors, {
+    onSuccess: async (result: any) => {
+      const clearedCount = Number(result?.clearedCount || 0);
+      showToast({
+        title:
+          clearedCount > 0
+            ? `Cleared sync errors for ${clearedCount} room${clearedCount > 1 ? "s" : ""}`
+            : "Sync errors cleared",
+        type: "SUCCESS",
+      });
+      await queryClient.invalidateQueries(["bookingManagementRooms"]);
+      setErrorsExpanded(false);
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.message || "Unable to clear Booking.com sync errors";
       showToast({ title: message, type: "ERROR" });
     },
   });
@@ -249,13 +281,45 @@ const BookingComSyncAdmin = () => {
 
       <Card id="sync-errors">
         <CardHeader>
-          <CardTitle className="text-xl">Sync Errors and History</CardTitle>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle className="text-xl">Sync Errors and History</CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge className={syncErrorRows.length > 0 ? "bg-rose-100 text-rose-800 border-rose-200" : "bg-emerald-100 text-emerald-800 border-emerald-200"}>
+                {syncErrorRows.length} issue{syncErrorRows.length === 1 ? "" : "s"}
+              </Badge>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => clearErrorsMutation.mutate({})}
+                disabled={clearErrorsMutation.isLoading || syncErrorRows.length === 0}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Clear All
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setErrorsExpanded((current) => !current)}
+              >
+                {errorsExpanded ? (
+                  <ChevronUp className="mr-2 h-4 w-4" />
+                ) : (
+                  <ChevronDown className="mr-2 h-4 w-4" />
+                )}
+                {errorsExpanded ? "Collapse" : "Expand"}
+              </Button>
+            </div>
+          </div>
           <CardDescription>
             Current and past Booking.com sync errors are kept here for troubleshooting.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {syncErrorRows.length === 0 ? (
+          {!errorsExpanded ? (
+            <p className="text-sm text-gray-600">
+              Error details are collapsed. Expand to review recent issues.
+            </p>
+          ) : syncErrorRows.length === 0 ? (
             <p className="text-sm text-gray-600">No sync errors recorded yet.</p>
           ) : (
             <div className="space-y-3">

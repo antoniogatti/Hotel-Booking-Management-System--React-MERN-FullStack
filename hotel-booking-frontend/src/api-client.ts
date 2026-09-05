@@ -347,6 +347,13 @@ export const syncBookingComCalendars = async (payload?: { hotelId?: string }) =>
   return response.data;
 };
 
+export const clearBookingComSyncErrors = async (payload?: { hotelId?: string }) => {
+  const response = await axiosInstance.post("/api/integrations/booking-com/errors/clear", {
+    hotelId: payload?.hotelId,
+  });
+  return response.data;
+};
+
 export const updateRoomDayStatus = async (payload: {
   hotelId: string;
   date: string;

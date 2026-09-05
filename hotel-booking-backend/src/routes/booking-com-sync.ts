@@ -325,6 +325,87 @@ router.post(
 );
 
 router.post(
+  "/errors/clear",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  [body("hotelId").optional().isString().withMessage("Hotel ID must be a string")],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const hotelId = typeof req.body.hotelId === "string" ? req.body.hotelId : "";
+
+      if (hotelId) {
+        const accessCheck = await getAccessibleHotel(hotelId, req);
+        if (accessCheck.error) {
+          return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+        }
+
+        await Hotel.findByIdAndUpdate(hotelId, {
+          $set: {
+            "bookingComIcal.lastSyncError": "",
+            "bookingComIcal.lastSyncStatus": "idle",
+            "bookingComIcal.syncErrorHistory": [],
+          },
+        });
+
+        await recordAuditEvent({
+          action: "integration.booking-com.errors-cleared",
+          entityType: "integration",
+          entityId: hotelId,
+          hotelId,
+          actorId: req.userId,
+          actorRole: req.userRole,
+          req,
+          metadata: {
+            scope: "single-room",
+          },
+        });
+
+        return res.status(200).json({ clearedCount: 1 });
+      }
+
+      const hotelQuery = req.userRole === "admin" ? {} : { userId: req.userId };
+
+      const updateResult = await Hotel.updateMany(hotelQuery, {
+        $set: {
+          "bookingComIcal.lastSyncError": "",
+          "bookingComIcal.lastSyncStatus": "idle",
+          "bookingComIcal.syncErrorHistory": [],
+        },
+      });
+
+      await recordAuditEvent({
+        action: "integration.booking-com.errors-cleared",
+        entityType: "integration",
+        entityId: req.userRole === "admin" ? "all" : String(req.userId || "self"),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: {
+          scope: req.userRole === "admin" ? "all-rooms" : "owner-rooms",
+          matchedCount: updateResult.matchedCount,
+          modifiedCount: updateResult.modifiedCount,
+        },
+      });
+
+      return res.status(200).json({
+        clearedCount: updateResult.modifiedCount,
+      });
+    } catch (error) {
+      logError("Unable to clear Booking.com sync errors", error, {
+        route: "booking-com-sync.clear-errors",
+        hotelId: typeof req.body.hotelId === "string" ? req.body.hotelId : undefined,
+      });
+      return res.status(500).json({ message: "Unable to clear Booking.com sync errors" });
+    }
+  }
+);
+
+router.post(
   "/sync",
   verifyToken,
   requireRole("hotel_owner", "admin"),
