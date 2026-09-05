@@ -13,8 +13,8 @@ const getBaseURL = () => {
     return "http://localhost:5000";
   }
 
-  // Production fallback to the active App Service API host.
-  return "https://palazzopinto-api-secure-pro.azurewebsites.net";
+  // Production fallback to the custom API host.
+  return "https://api.palazzopintobnb.com";
 };
 
 export const getApiBaseUrl = getBaseURL;
