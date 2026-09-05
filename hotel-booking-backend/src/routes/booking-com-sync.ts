@@ -37,6 +37,12 @@ const formatDateOnly = (value: Date) =>
 
 const buildEvent = (lines: string[]) => ["BEGIN:VEVENT", ...lines, "END:VEVENT"].join("\r\n");
 
+const getSortableTime = (value: Date | string | number | null | undefined) => {
+  const date = new Date(value ?? "");
+  const time = date.getTime();
+  return Number.isFinite(time) ? time : Number.MAX_SAFE_INTEGER;
+};
+
 const getBackendBaseUrl = (req: Request) => {
   const configuredBase = process.env.BACKEND_URL?.trim();
   if (configuredBase) {
@@ -77,16 +83,17 @@ router.get("/export/:hotelId/:token.ics", async (req: Request, res: Response) =>
       hotelId: hotel._id,
       status: { $in: ["pending", "confirmed", "arrived", "completed"] },
     })
-      // Use single-field sort for Cosmos DB compatibility (avoid multi-field server-side sort)
-      .sort({ checkIn: 1 })
       .select("_id reservationNumber firstName lastName checkIn checkOut updatedAt status");
 
     const closedDays = await BookingDayStatus.find({
       hotelId: hotel._id,
       status: "closed",
     })
-      .sort({ date: 1 })
       .select("_id date note updatedAt");
+
+    // Sort in memory to avoid Cosmos DB composite-index requirements for ORDER BY queries.
+    bookings.sort((a, b) => getSortableTime(a.checkIn) - getSortableTime(b.checkIn));
+    closedDays.sort((a, b) => getSortableTime(a.date) - getSortableTime(b.date));
 
     const lines = [
       "BEGIN:VCALENDAR",
