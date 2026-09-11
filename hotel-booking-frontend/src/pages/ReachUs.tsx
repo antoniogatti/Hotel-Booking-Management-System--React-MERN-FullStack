@@ -62,8 +62,9 @@ const travelSections: TravelSection[] = [
     points: [
       <span key="park-1"><strong>White lines</strong>: free parking where available, including Via Spalato (Piazzale Spalato area) and around Brindisi central station.</span>,
       <span key="park-2"><strong>Blue lines</strong>: paid parking. Typical time window is <strong>08:00-21:00</strong> (often until <strong>24:00</strong> on pre-holiday evenings).</span>,
-      <span key="park-3">A commonly displayed blue-line rate in Brindisi centre is <strong>1.00 EUR/hour</strong>.</span>,
-      <span key="park-4">Road signs and on-street meters always prevail, so please verify local signage at the exact parking spot.</span>,
+      <span key="park-3">Blue-line parking cost is typically <strong>from 1.00 to 1.50 EUR/hour</strong>.</span>,
+      <span key="park-4"><strong>Please always check the parking sign on the street for updated information</strong> at your exact parking spot.</span>,
+      <span key="park-5">Parking apps are available and can be used to pay for blue-line parking in many areas.</span>,
     ],
   },
 ];
