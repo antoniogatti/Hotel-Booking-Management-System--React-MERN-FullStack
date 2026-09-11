@@ -32,13 +32,13 @@ const MainNav = () => {
         {siteConfig.singlePropertyMode ? "Rooms" : "Hotels"}
       </Link>
       <Link to="/contact-us" className={navLinkClass}>
-        Contact Us
+        Contact
       </Link>
       <Link to="/our-recommendations" className={navLinkClass}>
-        Our Recommendations
+        Local Tips
       </Link>
       <Link to="/reach-us" className={navLinkClass}>
-        Reach Us
+        Directions
       </Link>
 
       {userRole === "admin" && (

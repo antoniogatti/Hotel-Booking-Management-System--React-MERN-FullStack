@@ -98,15 +98,15 @@ const MobileNavLinks = ({ onNavigate }: MobileNavLinksProps) => {
       </Link>
       <Link to="/contact-us" onClick={onNavigate} className={linkClass}>
         <Mail className="h-4 w-4" />
-        Contact Us
+        Contact
       </Link>
       <Link to="/our-recommendations" onClick={onNavigate} className={linkClass}>
         <Sparkles className="h-4 w-4" />
-        Our Recommendations
+        Local Tips
       </Link>
       <Link to="/reach-us" onClick={onNavigate} className={linkClass}>
         <MapPin className="h-4 w-4" />
-        Reach Us
+        Directions
       </Link>
 
       <div className="h-px bg-border my-4" />

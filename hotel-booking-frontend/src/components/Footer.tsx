@@ -112,7 +112,7 @@ const Footer = () => {
                   to="/contact-us"
                   className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
                 >
-                  Contact Us
+                  Contact
                 </Link>
               </li>
               <li>
@@ -120,7 +120,7 @@ const Footer = () => {
                   to="/our-recommendations"
                   className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
                 >
-                  Our Recommendations
+                  Local Tips
                 </Link>
               </li>
               <li>
@@ -128,7 +128,7 @@ const Footer = () => {
                   to="/reach-us"
                   className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
                 >
-                  Reach Us
+                  Directions
                 </Link>
               </li>
             </ul>
