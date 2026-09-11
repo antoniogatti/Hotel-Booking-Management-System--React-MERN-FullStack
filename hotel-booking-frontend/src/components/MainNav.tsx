@@ -22,9 +22,6 @@ const MainNav = () => {
 
   return (
     <nav className="flex items-center gap-1 lg:gap-2">
-      <Link to="/" className={navLinkClass}>
-        Home
-      </Link>
       <Link
         to={siteConfig.singlePropertyMode ? "/rooms" : getHotelsSearchUrl()}
         className={navLinkClass}

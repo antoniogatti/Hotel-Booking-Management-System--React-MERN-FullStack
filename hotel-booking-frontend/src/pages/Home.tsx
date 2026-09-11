@@ -66,7 +66,7 @@ const Home = () => {
 
       <section className="bg-[#f7f7f7] border-b border-[#ececec]">
         <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-14 lg:py-16">
-          <div className="max-w-3xl">
+          <div>
             <p className="uppercase tracking-[0.28em] text-[#ea836c] text-xs sm:text-sm font-semibold mb-4">
               OUR STAFF
             </p>
@@ -77,6 +77,29 @@ const Home = () => {
               A small team caring for every detail of your stay, from the first welcome to the day-to-day running of the house.
             </p>
           </div>
+
+          <article className="mt-10 rounded-[24px] border border-[#e8e3d8] bg-white shadow-[0_16px_32px_rgba(47,63,87,0.08)] p-5 sm:p-6 lg:p-7">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-center">
+              <div className="md:col-span-5">
+                <img
+                  src="/staff/palazzopintoteam.jpeg"
+                  alt="Palazzo Pinto family team"
+                  className="w-full h-[250px] sm:h-[300px] md:h-[320px] rounded-[18px] object-cover shadow-[0_12px_24px_rgba(0,0,0,0.12)]"
+                />
+              </div>
+              <div className="md:col-span-7">
+                <p className="uppercase tracking-[0.24em] text-[#ea836c] text-xs font-semibold mb-3">
+                  Family Business
+                </p>
+                <h3 className="text-[#2f3f57] font-serif text-2xl sm:text-3xl font-semibold leading-tight mb-4">
+                  A home of hospitality inspired by journeys around the world
+                </h3>
+                <p className="text-[#536276] text-base leading-8">
+                  <strong>Palazzo Pinto B&amp;B is a family business</strong> with one clear ambition: bringing the travel experience we have gathered around the world into the way we host at home in Brindisi. Guests enjoy a warm family atmosphere together with <strong>careful attention to every detail and service</strong>, so each stay feels personal, comfortable, and thoughtfully curated.
+                </p>
+              </div>
+            </div>
+          </article>
 
           <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-12 justify-items-center md:justify-items-stretch">
             {staffMembers.map((member) => (

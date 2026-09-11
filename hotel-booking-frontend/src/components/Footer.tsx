@@ -87,11 +87,6 @@ const Footer = () => {
             <h3 className="text-lg font-semibold text-[#2b4463]">Explore</h3>
             <ul className="space-y-2">
               <li>
-                <Link to="/" className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li>
                 <Link
                   to={siteConfig.singlePropertyMode ? "/rooms" : "/search"}
                   className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors"
@@ -217,12 +212,6 @@ const Footer = () => {
               className="text-[#2b4463]/85 hover:text-[#ea836c] text-sm transition-colors"
             >
               Terms & Conditions
-            </Link>
-            <Link
-              to={siteConfig.links.website}
-              className="text-[#2b4463]/85 hover:text-[#ea836c] text-sm transition-colors"
-            >
-              Official Website
             </Link>
           </div>
         </div>
