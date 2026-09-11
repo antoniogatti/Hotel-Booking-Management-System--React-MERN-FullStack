@@ -1,49 +1,72 @@
-import { Car, Clock, Mail, MapPin, Phone, Plane, TrainFront } from "lucide-react";
+import type { ReactNode } from "react";
+import { Car, Clock, Mail, MapPin, Plane, TrainFront } from "lucide-react";
 import { FaWhatsapp } from "react-icons/fa";
 import { siteConfig } from "../config/siteConfig";
 
-const travelSections = [
+type TravelSection = {
+  title: string;
+  Icon: React.ComponentType<{ className?: string }>;
+  summary: ReactNode;
+  points: ReactNode[];
+};
+
+const travelSections: TravelSection[] = [
   {
     title: "By Air",
     Icon: Plane,
-    summary: "Brindisi Airport is a short drive from Palazzo Pinto and is usually the fastest arrival option.",
+    summary: <span>Brindisi Airport is a short drive from Palazzo Pinto and is usually the <strong>fastest arrival option</strong>.</span>,
     points: [
-      "The journey from the airport to the property is typically around 10 to 15 minutes by car.",
-      "Taxis are available outside arrivals, and airport shuttles stop near Brindisi station for guests who prefer public transport.",
-      "If you are landing late, we recommend arranging your transfer before departure for a smoother arrival.",
+      <span key="air-1">The journey from the airport to the property is typically around <strong>10-15 minutes by car</strong>.</span>,
+      <span key="air-2">A <strong>city bus</strong> also runs from the airport to the <strong>town centre</strong>; the ticket is typically <strong>1.50 EUR</strong>.</span>,
+      <span key="air-3">
+        For official routes and timetable updates, see
+        {" "}
+        <a
+          href="https://www.stpbrindisi.it/index.php/en/routes-timetables/various/bus-to-airport-town-centre-costa-morena"
+          target="_blank"
+          rel="noreferrer"
+          className="font-semibold text-[#2b4463] underline underline-offset-2 hover:text-[#ea836c] transition-colors"
+        >
+          STP Brindisi - Bus to Airport – Town centre - Costa Morena
+        </a>
+        .
+      </span>,
+      <span key="air-4">If you are landing late, we recommend arranging your transfer before departure for a smoother arrival.</span>,
     ],
   },
   {
     title: "By Train",
     Icon: TrainFront,
-    summary: "The property is well positioned for rail travellers and can be reached comfortably on foot from the station.",
+    summary: <span>The property is well positioned for rail travellers and can be reached comfortably <strong>on foot from the station</strong>.</span>,
     points: [
-      "Brindisi train and bus station is about 5 minutes away on foot.",
-      "From the station, continue along Corso Umberto I toward the centre and turn into Via Masaniello.",
-      "This is often the easiest option for guests arriving from Lecce, Bari, or elsewhere in Puglia.",
+      <span key="train-1">Brindisi train and bus station is about <strong>5 minutes away on foot</strong>.</span>,
+      <span key="train-2">From the station, continue along Corso Umberto I toward the centre and turn into Via Masaniello.</span>,
+      <span key="train-3">This is often the easiest option for guests arriving from Lecce, Bari, or elsewhere in Puglia.</span>,
     ],
   },
   {
     title: "By Car",
     Icon: Car,
-    summary: "Palazzo Pinto is easy to approach by car while still being in a central and quiet location.",
+    summary: <span>Palazzo Pinto is easy to reach by car, with practical <strong>street-parking options</strong> close to the B&amp;B.</span>,
     points: [
-      "The nearest access from the SS379 allows a straightforward drive into the city centre area.",
-      "Via Masaniello is convenient for unloading luggage before moving the car to parking.",
-      "If needed, contact us before arrival and we can help you choose the simplest approach.",
+      <span key="car-1">The nearest access from the SS379 allows a straightforward drive into the city centre area.</span>,
+      <span key="car-2">Via Masaniello is convenient for unloading luggage before moving the car to parking.</span>,
+      <span key="car-3">Guests can usually park near the B&amp;B on <strong>white lines (free)</strong>, especially around <strong>Via Spalato</strong> and streets near <strong>Brindisi central station</strong>.</span>,
+      <span key="car-4"><strong>Blue lines</strong> in central areas are paid parking, so always check nearby signs and payment instructions before leaving the car.</span>,
     ],
   },
   {
     title: "Parking",
     Icon: MapPin,
-    summary: "Parking solutions are available in the surrounding area and can vary depending on the time of day.",
+    summary: <span>If you arrive by car, both <strong>free</strong> and <strong>paid</strong> street parking are available near the city centre and station side.</span>,
     points: [
-      "Public options are usually available near the station side of the centre and in nearby streets.",
-      "During busier periods, it is useful to plan your parking before arrival rather than searching at the last minute.",
-      "If you want the most practical option for your stay, send us a message and we will guide you.",
+      <span key="park-1"><strong>White lines</strong>: free parking where available, including Via Spalato (Piazzale Spalato area) and around Brindisi central station.</span>,
+      <span key="park-2"><strong>Blue lines</strong>: paid parking. Typical time window is <strong>08:00-21:00</strong> (often until <strong>24:00</strong> on pre-holiday evenings).</span>,
+      <span key="park-3">A commonly displayed blue-line rate in Brindisi centre is <strong>1.00 EUR/hour</strong>.</span>,
+      <span key="park-4">Road signs and on-street meters always prevail, so please verify local signage at the exact parking spot.</span>,
     ],
   },
-] as const;
+];
 
 const ReachUs = () => {
   const mapsQuery = encodeURIComponent(siteConfig.contact.address);
@@ -54,19 +77,22 @@ const ReachUs = () => {
     <section className="bg-[#f7f7f7] min-h-[70vh]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 lg:py-16">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <div className="lg:col-span-6 bg-white border border-[#e7e9df] rounded-[28px] p-6 sm:p-8 shadow-soft">
+          <div className="lg:col-span-12 bg-white border border-[#e7e9df] rounded-[28px] p-6 sm:p-8 shadow-soft">
             <p className="uppercase tracking-[0.25em] text-[#ea836c] text-xs font-semibold mb-3">
               Palazzo Pinto B&B
             </p>
             <h1 className="text-3xl sm:text-5xl font-serif text-[#2b4463] leading-tight mb-4">
               Reach Us
             </h1>
+            <p className="text-lg sm:text-xl font-serif text-[#2b4463] mb-4">
+              <strong>Via Masaniello, 30</strong>
+            </p>
             <div className="space-y-4 text-[#3f4d5f] leading-7 text-[15px] sm:text-base">
               <p>
-                Palazzo Pinto is in a central but calm part of Brindisi, close to the station and well placed for arrivals by air, rail, or car.
+                Palazzo Pinto is in a central but calm part of Brindisi, <strong>close to the station</strong> and well placed for arrivals by air, rail, or car.
               </p>
               <p>
-                This page brings together the practical information you may want before travelling, including local access, parking guidance, and direct map access.
+                This page brings together practical information before travelling, including local access, parking guidance, and direct map access.
               </p>
             </div>
 
@@ -77,7 +103,7 @@ const ReachUs = () => {
                   <span className="text-xs uppercase tracking-[0.18em] font-semibold">Station</span>
                 </div>
                 <p className="text-2xl font-semibold text-[#2b4463]">5 min</p>
-                <p className="text-sm text-[#5b6573]">walk from Brindisi train and bus station</p>
+                <p className="text-sm text-[#5b6573]"><strong>5 min by foot</strong> from Brindisi train and bus station</p>
               </div>
               <div className="rounded-2xl bg-[#eef1e7] px-4 py-4 border border-[#dde4cf]">
                 <div className="flex items-center gap-2 text-[#2b4463] mb-2">
@@ -85,15 +111,15 @@ const ReachUs = () => {
                   <span className="text-xs uppercase tracking-[0.18em] font-semibold">Airport</span>
                 </div>
                 <p className="text-2xl font-semibold text-[#2b4463]">10-15 min</p>
-                <p className="text-sm text-[#5b6573]">by car from Brindisi Airport</p>
+                <p className="text-sm text-[#5b6573]"><strong>10-15 min by car</strong> from Brindisi Airport</p>
               </div>
               <div className="rounded-2xl bg-[#f5f7fb] px-4 py-4 border border-[#dfe5ef]">
                 <div className="flex items-center gap-2 text-[#2b4463] mb-2">
                   <Car className="w-4 h-4 text-[#ea836c]" />
                   <span className="text-xs uppercase tracking-[0.18em] font-semibold">Road Access</span>
                 </div>
-                <p className="text-2xl font-semibold text-[#2b4463]">Easy</p>
-                <p className="text-sm text-[#5b6573]">from the nearest SS379 exit</p>
+                <p className="text-2xl font-semibold text-[#2b4463]">Parking</p>
+                <p className="text-sm text-[#5b6573]"><strong>No private parking</strong> available in the facilities</p>
               </div>
             </div>
 
@@ -107,69 +133,6 @@ const ReachUs = () => {
                 <MapPin className="w-4 h-4" />
                 Open in Google Maps
               </a>
-            </div>
-          </div>
-
-          <div className="lg:col-span-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="sm:col-span-2 overflow-hidden rounded-[28px] border border-[#e7e9df] bg-white shadow-soft">
-              <img
-                src="/home/home-story.png"
-                alt="Historic Palazzo Pinto building"
-                className="h-[320px] w-full object-cover"
-              />
-              <div className="px-5 py-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-[#ea836c] font-semibold mb-2">Historic Setting</p>
-                <p className="text-sm text-[#495463] leading-6">
-                  The property sits in the historic fabric of Brindisi, giving you central access without the feel of a busy transit corridor.
-                </p>
-              </div>
-            </div>
-
-            <div className="overflow-hidden rounded-[24px] border border-[#e7e9df] bg-white shadow-soft">
-              <img
-                src="/home/sildeshow/IMG_8900.jpg"
-                alt="Brindisi city view"
-                className="h-[220px] w-full object-cover"
-              />
-              <div className="px-5 py-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-[#ea836c] font-semibold mb-2">Arrival Atmosphere</p>
-                <p className="text-sm text-[#495463] leading-6">
-                  Once you arrive, you are already close to the centre, the waterfront, and the main points that make Brindisi easy to explore on foot.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-[24px] border border-[#e7e9df] bg-white shadow-soft p-5">
-              <p className="text-xs uppercase tracking-[0.2em] text-[#ea836c] font-semibold mb-3">Direct Contact</p>
-              <div className="space-y-4 text-[#2b4463]">
-                <div className="flex items-start gap-3">
-                  <Phone className="w-4 h-4 mt-1 text-[#ea836c]" />
-                  <div>
-                    <p className="font-semibold">Phone</p>
-                    <a href={`tel:${siteConfig.contact.phone.replace(/\s+/g, "")}`} className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors">
-                      {siteConfig.contact.phone}
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <FaWhatsapp className="w-4 h-4 mt-1 text-[#ea836c]" />
-                  <div>
-                    <p className="font-semibold">WhatsApp</p>
-                    <a href={`https://wa.me/${siteConfig.contact.whatsapp}`} target="_blank" rel="noreferrer" className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors">
-                      Message us directly
-                    </a>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3">
-                  <Mail className="w-4 h-4 mt-1 text-[#ea836c]" />
-                  <div>
-                    <p className="font-semibold">Email</p>
-                    <a href={`mailto:${siteConfig.contact.email}`} className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors break-all">
-                      {siteConfig.contact.email}
-                    </a>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </div>
@@ -188,8 +151,8 @@ const ReachUs = () => {
               </div>
               <p className="text-[#3f4d5f] leading-7 mb-4">{summary}</p>
               <ul className="space-y-3 text-sm leading-6 text-[#556171]">
-                {points.map((point) => (
-                  <li key={point} className="flex gap-3">
+                {points.map((point, index) => (
+                  <li key={`${title}-${index}`} className="flex gap-3">
                     <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[#ea836c] flex-shrink-0" />
                     <span>{point}</span>
                   </li>
@@ -199,8 +162,8 @@ const ReachUs = () => {
           ))}
         </div>
 
-        <div className="mt-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-          <div className="lg:col-span-7 rounded-[28px] overflow-hidden border border-[#e7e9df] bg-white shadow-soft">
+        <div className="mt-10 space-y-6">
+          <div className="rounded-[28px] overflow-hidden border border-[#e7e9df] bg-white shadow-soft">
             <iframe
               title="Palazzo Pinto map"
               src={mapsEmbedLink}
@@ -210,46 +173,28 @@ const ReachUs = () => {
             />
           </div>
 
-          <div className="lg:col-span-5 bg-white border border-[#e7e9df] rounded-[28px] p-6 sm:p-8 shadow-soft">
-            <p className="uppercase tracking-[0.25em] text-[#ea836c] text-xs font-semibold mb-3">
-              Address
-            </p>
-            <h2 className="text-3xl font-serif text-[#2b4463] leading-tight mb-4">
-              Via Masaniello, 30
-            </h2>
-            <p className="text-[#3f4d5f] leading-7 mb-6">
-              Keep this page handy while travelling if you would like a quick route reference once you reach Brindisi.
-            </p>
-
-            <div className="space-y-5 text-[#2b4463] mb-8">
+          <div className="rounded-[24px] border border-[#e7e9df] bg-white shadow-soft p-6 sm:p-7">
+            <p className="text-xs uppercase tracking-[0.2em] text-[#ea836c] font-semibold mb-3">Direct Contact</p>
+            <div className="space-y-4 text-[#2b4463]">
               <div className="flex items-start gap-3">
-                <MapPin className="w-5 h-5 mt-1 text-[#ea836c]" />
+                <FaWhatsapp className="w-4 h-4 mt-1 text-[#ea836c]" />
                 <div>
-                  <p className="font-semibold">Address</p>
-                  <a href={mapsLink} target="_blank" rel="noreferrer" className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors">
-                    {siteConfig.contact.address}
-                  </a>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <Phone className="w-5 h-5 mt-1 text-[#ea836c]" />
-                <div>
-                  <p className="font-semibold">Phone</p>
-                  <a href={`tel:${siteConfig.contact.phone.replace(/\s+/g, "")}`} className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors">
+                  <p className="font-semibold">WhatsApp</p>
+                  <a href={`https://wa.me/${siteConfig.contact.whatsapp}`} target="_blank" rel="noreferrer" className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors">
                     {siteConfig.contact.phone}
                   </a>
                 </div>
               </div>
+              <div className="flex items-start gap-3">
+                <Mail className="w-4 h-4 mt-1 text-[#ea836c]" />
+                <div>
+                  <p className="font-semibold">Email</p>
+                  <a href={`mailto:${siteConfig.contact.email}`} className="text-[#2b4463]/85 hover:text-[#ea836c] transition-colors break-all">
+                    {siteConfig.contact.email}
+                  </a>
+                </div>
+              </div>
             </div>
-
-            <a
-              href={mapsLink}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center justify-center rounded-lg bg-[#ea836c] text-white px-6 py-3 font-semibold hover:bg-[#db755f] transition-colors"
-            >
-              Open in Google Maps
-            </a>
           </div>
         </div>
       </div>
