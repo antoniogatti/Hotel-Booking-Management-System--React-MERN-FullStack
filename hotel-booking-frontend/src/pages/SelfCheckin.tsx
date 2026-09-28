@@ -23,6 +23,14 @@ const emptyGuest = (): GuestFormState => ({
   file: null,
 });
 
+const isBreakfastTimeInRange = (value: string) => {
+  if (!/^\d{2}:\d{2}$/.test(value)) {
+    return false;
+  }
+
+  return value >= "08:30" && value <= "10:00";
+};
+
 const SelfCheckin = () => {
   const { toast } = useToast();
   const [searchParams] = useSearchParams();
@@ -124,8 +132,9 @@ const SelfCheckin = () => {
       qParam.trim() &&
       guestCount >= 1 &&
       guestCount <= 4 &&
-      numberOfNights > 0 &&
-      (!breakfastIncluded || /^\d{2}:\d{2}$/.test(breakfastTime));
+      numberOfNights >= 1 &&
+      numberOfNights <= 10 &&
+      (!breakfastIncluded || isBreakfastTimeInRange(breakfastTime));
 
     const hasGuests =
       guests.length === guestCount &&
@@ -231,10 +240,51 @@ const SelfCheckin = () => {
     });
   };
 
-  const isBreakfastTimeValid = /^\d{2}:\d{2}$/.test(breakfastTime);
+  const isBreakfastTimeValid = !breakfastIncluded || isBreakfastTimeInRange(breakfastTime);
   const isNameValid = Boolean(fullName.trim());
   const isGuestCountValid = guestCount >= 1 && guestCount <= 4;
-  const isNightsValid = numberOfNights > 0;
+  const isNightsValid = numberOfNights >= 1 && numberOfNights <= 10;
+  const isQueryCodeValid = Boolean(qParam.trim());
+  const isCaptchaValid = !shouldLoadTurnstile || !!turnstileToken || devCaptchaBypass;
+  const invalidGuestIndexes = guests
+    .map((guest, index) => {
+      const guestValid =
+        guest.givenName.trim() &&
+        guest.familyName.trim() &&
+        guest.documentNumber.trim() &&
+        guest.file &&
+        (!breakfastIncluded || ["Savoury", "Sweet"].includes(guest.breakfastChoice));
+
+      return guestValid ? -1 : index;
+    })
+    .filter((index) => index >= 0);
+
+  const formErrorMessages: string[] = [];
+  if (attemptedSubmit && !canSubmit) {
+    if (!isQueryCodeValid) {
+      formErrorMessages.push("The check-in link is incomplete. Please use the original link sent by the property.");
+    }
+    if (!isNameValid) {
+      formErrorMessages.push("Enter the name on the reservation.");
+    }
+    if (!isGuestCountValid) {
+      formErrorMessages.push("Select a number of guests between 1 and 4.");
+    }
+    if (!isNightsValid) {
+      formErrorMessages.push("Select a number of nights between 1 and 10.");
+    }
+    if (breakfastIncluded && !isBreakfastTimeValid) {
+      formErrorMessages.push("Breakfast time must be between 08:30 and 10:00.");
+    }
+    if (invalidGuestIndexes.length > 0) {
+      formErrorMessages.push(
+        `Complete all required details for guest ${invalidGuestIndexes.map((index) => index + 1).join(", ")}.`
+      );
+    }
+    if (!isCaptchaValid) {
+      formErrorMessages.push("Complete the captcha verification before submitting.");
+    }
+  }
 
   if (result) {
     return (
@@ -295,6 +345,25 @@ const SelfCheckin = () => {
         </p>
         <p className="mt-1 text-xs font-medium text-[#2b4463]">Fields marked with * are mandatory.</p>
 
+        {breakfastIncluded && (
+          <div className="mt-4 rounded-xl border border-[#2b4463]/20 bg-[#f8fbff] px-4 py-3 text-sm text-slate-700">
+            Breakfast time info: please select a time between 08:30 and 10:00.
+          </div>
+        )}
+
+        {attemptedSubmit && !canSubmit && (
+          <div className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3" role="alert" aria-live="polite">
+            <p className="text-sm font-semibold text-red-700">Please correct the highlighted fields before submitting.</p>
+            {formErrorMessages.length > 0 && (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-red-700">
+                {formErrorMessages.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
         <div className="mt-6 space-y-4">
           <div>
             <label className="text-sm font-medium text-slate-700">
@@ -333,15 +402,19 @@ const SelfCheckin = () => {
               <label className="block min-h-[2.5rem] text-sm font-medium text-slate-700 sm:min-h-[2.75rem]">
                 Number of nights <span className="text-red-600">*</span>
               </label>
-              <input
-                type="number"
-                min={1}
+              <select
                 className={`mt-1 w-full rounded-xl border px-3 py-2.5 ${attemptedSubmit && !isNightsValid ? "border-red-500 bg-red-50" : "border-slate-300"}`}
                 value={numberOfNights}
-                onChange={(e) => setNumberOfNights(Number(e.target.value) || 1)}
-              />
+                onChange={(e) => setNumberOfNights(Number(e.target.value))}
+              >
+                {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
               {attemptedSubmit && !isNightsValid && (
-                <p className="mt-1 text-xs text-red-600">Number of nights must be at least 1.</p>
+                <p className="mt-1 text-xs text-red-600">Number of nights must be between 1 and 10.</p>
               )}
             </div>
             {breakfastIncluded && (
@@ -352,12 +425,15 @@ const SelfCheckin = () => {
                 </label>
                 <input
                   type="time"
+                  min="08:30"
+                  max="10:00"
+                  step={300}
                   className={`mt-1 w-full rounded-xl border px-3 py-2.5 ${attemptedSubmit && !isBreakfastTimeValid ? "border-red-500 bg-red-50" : "border-slate-300"}`}
                   value={breakfastTime}
                   onChange={(e) => setBreakfastTime(e.target.value)}
                 />
                 {attemptedSubmit && !isBreakfastTimeValid && (
-                  <p className="mt-1 text-xs text-red-600">Please select a valid breakfast time.</p>
+                  <p className="mt-1 text-xs text-red-600">Please select a breakfast time between 08:30 and 10:00.</p>
                 )}
               </div>
             )}
@@ -472,15 +548,20 @@ const SelfCheckin = () => {
           </div>
 
           {shouldLoadTurnstile && (
-            <div className="rounded-xl border border-slate-200 p-3">
+            <div
+              className={`rounded-xl border p-3 ${attemptedSubmit && !isCaptchaValid ? "border-red-500 bg-red-50" : "border-slate-200"}`}
+            >
               <div ref={turnstileContainerRef} className="w-full" />
+              {attemptedSubmit && !isCaptchaValid && (
+                <p className="mt-2 text-xs text-red-600">Please complete captcha verification to continue.</p>
+              )}
             </div>
           )}
 
           <button
             type="button"
             className="w-full rounded-2xl bg-[#2b4463] px-4 py-3 text-white disabled:opacity-50"
-            disabled={!canSubmit || mutation.isLoading}
+            disabled={mutation.isLoading}
             onClick={() => {
               setAttemptedSubmit(true);
               submit();
