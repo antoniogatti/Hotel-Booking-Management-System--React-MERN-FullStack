@@ -128,15 +128,6 @@ const SelfCheckin = () => {
     });
   }, [guestCount]);
 
-  useEffect(() => {
-    if (submitAttemptCount < 1 || canSubmit || !errorSummaryRef.current) {
-      return;
-    }
-
-    errorSummaryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
-    errorSummaryRef.current.focus();
-  }, [canSubmit, submitAttemptCount]);
-
   const canSubmit = useMemo(() => {
     const hasTopLevel =
       fullName.trim() &&
@@ -296,6 +287,15 @@ const SelfCheckin = () => {
       formErrorMessages.push("Complete the captcha verification before submitting.");
     }
   }
+
+  useEffect(() => {
+    if (submitAttemptCount < 1 || canSubmit || !errorSummaryRef.current) {
+      return;
+    }
+
+    errorSummaryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    errorSummaryRef.current.focus();
+  }, [canSubmit, submitAttemptCount]);
 
   if (result) {
     return (
