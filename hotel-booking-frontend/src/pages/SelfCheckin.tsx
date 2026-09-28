@@ -45,12 +45,14 @@ const SelfCheckin = () => {
   const [breakfastTime, setBreakfastTime] = useState("08:30");
   const [guests, setGuests] = useState<GuestFormState[]>([emptyGuest()]);
   const [attemptedSubmit, setAttemptedSubmit] = useState(false);
+  const [submitAttemptCount, setSubmitAttemptCount] = useState(0);
 
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [result, setResult] = useState<{ code?: string; instructionVideoUrl?: string } | null>(null);
 
   const turnstileContainerRef = useRef<HTMLDivElement | null>(null);
   const turnstileWidgetIdRef = useRef<string | null>(null);
+  const errorSummaryRef = useRef<HTMLDivElement | null>(null);
   const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const devCaptchaBypass = import.meta.env.VITE_ENABLE_DEV_CAPTCHA === "true";
   const shouldLoadTurnstile = Boolean(turnstileSiteKey) && !devCaptchaBypass;
@@ -125,6 +127,15 @@ const SelfCheckin = () => {
       return prev.slice(0, guestCount);
     });
   }, [guestCount]);
+
+  useEffect(() => {
+    if (submitAttemptCount < 1 || canSubmit || !errorSummaryRef.current) {
+      return;
+    }
+
+    errorSummaryRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    errorSummaryRef.current.focus();
+  }, [canSubmit, submitAttemptCount]);
 
   const canSubmit = useMemo(() => {
     const hasTopLevel =
@@ -352,7 +363,13 @@ const SelfCheckin = () => {
         )}
 
         {attemptedSubmit && !canSubmit && (
-          <div className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3" role="alert" aria-live="polite">
+          <div
+            ref={errorSummaryRef}
+            tabIndex={-1}
+            className="mt-4 rounded-xl border border-red-300 bg-red-50 px-4 py-3"
+            role="alert"
+            aria-live="polite"
+          >
             <p className="text-sm font-semibold text-red-700">Please correct the highlighted fields before submitting.</p>
             {formErrorMessages.length > 0 && (
               <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-red-700">
@@ -564,6 +581,7 @@ const SelfCheckin = () => {
             disabled={mutation.isLoading}
             onClick={() => {
               setAttemptedSubmit(true);
+              setSubmitAttemptCount((prev) => prev + 1);
               submit();
             }}
           >
