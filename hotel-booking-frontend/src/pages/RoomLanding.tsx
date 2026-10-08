@@ -88,7 +88,12 @@ const RoomLanding = () => {
   const highlight = getHighlight(room.services);
   const { data: hotels, isLoading, isError } = useQueryWithLoading(
     ["fetchHotelsForRoomLanding"],
-    () => apiClient.fetchHotels(),
+    async () => {
+      // Use the public search endpoint here because it remains available even
+      // when the legacy list endpoint (/api/rooms) is temporarily failing.
+      const response = await apiClient.searchHotels({});
+      return response.data;
+    },
     {
       loadingMessage: "Loading room availability...",
     }

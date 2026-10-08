@@ -176,7 +176,6 @@ const Checkout = () => {
       childCount: bookingDetails.childCount,
       checkIn: bookingDetails.checkIn,
       checkOut: bookingDetails.checkOut,
-      totalCost: bookingDetails.totalPrice,
       nights: bookingDetails.nights,
       roomName: bookingDetails.roomName,
       hotelName: bookingDetails.hotelName,

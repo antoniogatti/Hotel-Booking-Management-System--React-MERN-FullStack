@@ -618,7 +618,7 @@ export type BookingRequestPayload = {
   childCount: number;
   checkIn: string;
   checkOut: string;
-  totalCost: number;
+  totalCost?: number;
   nights: number;
   roomName: string;
   hotelName: string;

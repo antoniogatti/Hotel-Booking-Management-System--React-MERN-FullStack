@@ -1,4 +1,12 @@
 # Version History
+## 1.12.1 - 2026-10-08
+
+### Booking Flow Recovery and Guest Request Submission Fixes
+- Fixed room-page booking availability loading by switching `RoomLanding` data sourcing from `GET /api/rooms` to the resilient public search feed (`GET /api/rooms/search`), preventing room pages from entering a temporary-unavailable fallback when the legacy list endpoint returns 500.
+- Fixed guest checkout submission authorization failures (`401 unauthorized`) by removing guest-sent price override fields from checkout request payloads so backend pricing is computed server-side for public booking requests.
+- Updated frontend booking-request payload typing to keep `totalCost` optional, aligning client behavior with backend authorization rules for admin/owner-only price overrides.
+- Verified end-to-end guest booking-request flow (room page to checkout submit) after the fixes, including successful booking reference generation.
+
 ## 1.12.0 - 2026-05-31
 
 ### API Auth: Service account compatibility
