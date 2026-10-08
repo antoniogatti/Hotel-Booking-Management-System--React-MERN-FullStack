@@ -475,6 +475,11 @@ router.post(
     body("childCount").isInt({ min: 0 }).withMessage("Child count must be 0 or greater"),
     body("checkIn").isISO8601().withMessage("Check-in date is invalid"),
     body("checkOut").isISO8601().withMessage("Check-out date is invalid"),
+    body("clientRequestId")
+      .optional({ checkFalsy: true })
+      .isString()
+      .isLength({ min: 8, max: 128 })
+      .withMessage("clientRequestId must be between 8 and 128 characters when provided"),
     body("totalCost").optional().isNumeric().withMessage("Total cost must be numeric when provided"),
     body("pricePerNight").optional().isNumeric().withMessage("pricePerNight must be numeric when provided"),
     body("nights").isInt({ min: 1 }).withMessage("Nights is required"),
@@ -501,6 +506,8 @@ router.post(
       const checkIn = normalizeBookingDate(String(req.body.checkIn || ""));
       const checkOut = normalizeBookingDate(String(req.body.checkOut || ""));
       const normalizedEmail = String(req.body.email).trim().toLowerCase();
+      const clientRequestId =
+        typeof req.body.clientRequestId === "string" ? req.body.clientRequestId.trim() : "";
 
       if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime())) {
         return res.status(400).json({ message: "Invalid booking dates" });
@@ -508,6 +515,24 @@ router.post(
 
       if (checkOut < checkIn) {
         return res.status(400).json({ message: "Check-out date cannot be earlier than check-in date" });
+      }
+
+      if (clientRequestId) {
+        const existingByClientRequestId = await Booking.findOne({
+          hotelId,
+          clientRequestId,
+          status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+        }).sort({ createdAt: -1 });
+
+        if (existingByClientRequestId) {
+          return res.status(200).json({
+            message: "Booking request already submitted",
+            bookingId: existingByClientRequestId._id,
+            reservationNumber: existingByClientRequestId.reservationNumber,
+            emailsSent: true,
+            warning: "Duplicate request replayed using the original booking reference.",
+          });
+        }
       }
 
       const availability = await assessHotelAvailability({
@@ -597,6 +622,7 @@ router.post(
 
       const bookingRequest = {
         reservationNumber,
+        clientRequestId: clientRequestId || undefined,
         userId: "guest-request",
         hotelId,
         firstName: req.body.firstName,
@@ -616,8 +642,35 @@ router.post(
         status: "pending",
       };
 
-      const newBooking = new Booking(bookingRequest);
-      await newBooking.save();
+      let newBooking: any;
+
+      try {
+        newBooking = new Booking(bookingRequest);
+        await newBooking.save();
+      } catch (saveError: any) {
+        const duplicateKeyError =
+          saveError && typeof saveError === "object" && Number((saveError as any).code) === 11000;
+
+        if (duplicateKeyError && clientRequestId) {
+          const existingByClientRequestId = await Booking.findOne({
+            hotelId,
+            clientRequestId,
+            status: { $in: [...ACTIVE_BOOKING_STATUSES] },
+          }).sort({ createdAt: -1 });
+
+          if (existingByClientRequestId) {
+            return res.status(200).json({
+              message: "Booking request already submitted",
+              bookingId: existingByClientRequestId._id,
+              reservationNumber: existingByClientRequestId.reservationNumber,
+              emailsSent: true,
+              warning: "Duplicate request replayed using the original booking reference.",
+            });
+          }
+        }
+
+        throw saveError;
+      }
 
       await recordAuditEvent({
         action: "booking.requested",
@@ -629,6 +682,7 @@ router.post(
         req,
         metadata: {
           reservationNumber,
+          clientRequestId: clientRequestId || undefined,
           checkIn: checkIn.toISOString(),
           checkOut: checkOut.toISOString(),
           totalCost,

@@ -604,6 +604,7 @@ export type TrafficInsightsDashboardResponse = {
 
 export type BookingRequestPayload = {
   hotelId: string;
+  clientRequestId?: string;
   firstName: string;
   lastName: string;
   email: string;

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AxiosError } from "axios";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useMutation } from "react-query";
@@ -43,6 +43,9 @@ const Checkout = () => {
   const { showToast } = useAppContext();
   const [reservationNumber, setReservationNumber] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
+  const [isSubmitLocked, setIsSubmitLocked] = useState(false);
+  const submitInFlightRef = useRef(false);
+  const submissionCompletedRef = useRef(false);
 
   const persistedState = (() => {
     const raw = sessionStorage.getItem("checkoutState");
@@ -59,14 +62,59 @@ const Checkout = () => {
 
   const state = (location.state as CheckoutState | undefined) || persistedState;
 
+  const idempotencyScope = useMemo(() => {
+    if (!state?.guestDetails || !state?.bookingDetails) {
+      return null;
+    }
+
+    return [
+      state.bookingDetails.hotelId,
+      state.bookingDetails.checkIn,
+      state.bookingDetails.checkOut,
+      state.guestDetails.email.trim().toLowerCase(),
+    ].join("|");
+  }, [state]);
+
+  const getOrCreateClientRequestId = () => {
+    if (!idempotencyScope) {
+      return undefined;
+    }
+
+    const storageKey = `checkoutRequestId:${idempotencyScope}`;
+    const existing = sessionStorage.getItem(storageKey);
+
+    if (existing) {
+      return existing;
+    }
+
+    const generated =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+    sessionStorage.setItem(storageKey, generated);
+    return generated;
+  };
+
+  const clearClientRequestId = () => {
+    if (!idempotencyScope) {
+      return;
+    }
+
+    sessionStorage.removeItem(`checkoutRequestId:${idempotencyScope}`);
+  };
+
   const { mutate: sendRequest, isLoading } = useMutation(
     apiClient.submitBookingRequest,
     {
       onSuccess: (data) => {
+        submissionCompletedRef.current = true;
+        setIsSubmitLocked(true);
         setSubmissionError(null);
         setReservationNumber(data.reservationNumber);
         sessionStorage.removeItem("checkoutState");
         sessionStorage.removeItem("bookingDraft");
+        clearClientRequestId();
         showToast({
           title: data.emailsSent === false ? "Booking Saved" : "Booking Request Sent",
           description:
@@ -83,6 +131,16 @@ const Checkout = () => {
 
         if (axiosError.response?.status === 409) {
           if (duplicateReservationNumber) {
+            // A late duplicate response for the same already-confirmed booking should not display as an error.
+            if (reservationNumber && reservationNumber === duplicateReservationNumber) {
+              submissionCompletedRef.current = true;
+              setSubmissionError(null);
+              setIsSubmitLocked(true);
+              return;
+            }
+
+            submissionCompletedRef.current = true;
+            setIsSubmitLocked(true);
             setReservationNumber(duplicateReservationNumber);
             setSubmissionError(
               `${responseMessage || "A conflicting booking already exists for these dates."} Existing booking reference: ${duplicateReservationNumber}.`
@@ -153,6 +211,10 @@ const Checkout = () => {
   );
 
   const handleSendBookingRequest = () => {
+    if (submitInFlightRef.current || isSubmitLocked || isLoading || !!reservationNumber) {
+      return;
+    }
+
     if (isBelowMinimumStay) {
       setSubmissionError(
         `Minimum stay for this room is ${minimumNights} night${minimumNights === 1 ? "" : "s"}.`
@@ -160,8 +222,14 @@ const Checkout = () => {
       return;
     }
 
+    submitInFlightRef.current = true;
+    submissionCompletedRef.current = false;
+    setIsSubmitLocked(true);
+    setSubmissionError(null);
+
     sendRequest({
       hotelId: bookingDetails.hotelId,
+      clientRequestId: getOrCreateClientRequestId(),
       firstName: guestDetails.firstName,
       lastName: guestDetails.lastName,
       email: guestDetails.email,
@@ -179,6 +247,14 @@ const Checkout = () => {
       nights: bookingDetails.nights,
       roomName: bookingDetails.roomName,
       hotelName: bookingDetails.hotelName,
+    }, {
+      onSettled: () => {
+        submitInFlightRef.current = false;
+
+        if (!submissionCompletedRef.current) {
+          setIsSubmitLocked(false);
+        }
+      },
     });
   };
 
@@ -254,7 +330,7 @@ const Checkout = () => {
         <button
           type="button"
           onClick={handleSendBookingRequest}
-          disabled={isLoading || !!reservationNumber || isBelowMinimumStay}
+          disabled={isLoading || isSubmitLocked || !!reservationNumber || isBelowMinimumStay}
           className="w-full bg-[#ea836c] hover:bg-[#db755f] disabled:opacity-70 text-white font-semibold py-3 rounded"
         >
           {isLoading ? "Sending..." : reservationNumber ? "Booking Request Sent" : "Send Booking Request"}

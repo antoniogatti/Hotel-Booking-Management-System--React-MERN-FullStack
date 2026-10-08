@@ -430,6 +430,99 @@ test("should reject a repeated guest booking request in the duplicate protection
   expect(duplicateBody.reservationNumber).toBe(firstBody.reservationNumber);
 });
 
+test("should replay the same reservation when booking-request is retried with the same clientRequestId", async ({ request }) => {
+  const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
+  expect(hotelsResponse.ok()).toBeTruthy();
+
+  const hotels = (await hotelsResponse.json()) as HotelRecord[];
+  expect(hotels.length).toBeGreaterThan(0);
+
+  const hotel = hotels[0];
+  const minimumNights = getMinimumNights(hotel);
+  const idempotentTestEmail = `antoniogatti+idempotent-${Date.now()}@gmail.com`;
+
+  let payload: {
+    hotelId: string;
+    hotelName: string;
+    roomName: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    city: string;
+    country: string;
+    nationality: string;
+    specialRequests: string;
+    arrivalTime: "Morning";
+    adultCount: number;
+    childCount: number;
+    checkIn: string;
+    checkOut: string;
+    nights: number;
+    clientRequestId: string;
+  } | null = null;
+
+  let firstResponse: Awaited<ReturnType<typeof request.post>> | null = null;
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const checkIn = new Date(Date.UTC(2027, 6, 2 + attempt * 19));
+    const checkOut = new Date(checkIn);
+    checkOut.setUTCDate(checkIn.getUTCDate() + Math.max(2, minimumNights));
+
+    const candidatePayload = {
+      hotelId: hotel._id,
+      hotelName: hotel.name,
+      roomName: Array.isArray(hotel.type) && hotel.type.length > 0 ? hotel.type[0] : "Room",
+      firstName: "Idempotent",
+      lastName: "Guest",
+      email: idempotentTestEmail,
+      phone: "1234567890",
+      city: "Brindisi",
+      country: "Italy",
+      nationality: "Italian",
+      specialRequests: "None",
+      arrivalTime: "Morning" as const,
+      adultCount: 1,
+      childCount: 0,
+      checkIn: checkIn.toISOString().slice(0, 10),
+      checkOut: checkOut.toISOString().slice(0, 10),
+      nights: Math.max(2, minimumNights),
+      clientRequestId: `it-${Date.now()}-${attempt}`,
+    };
+
+    const candidateResponse = await request.post(`${API_URL}/api/rooms/${hotel._id}/booking-request`, {
+      data: candidatePayload,
+    });
+
+    if (candidateResponse.ok()) {
+      payload = candidatePayload;
+      firstResponse = candidateResponse;
+      break;
+    }
+
+    if (candidateResponse.status() !== 409) {
+      firstResponse = candidateResponse;
+      break;
+    }
+  }
+
+  expect(firstResponse).not.toBeNull();
+  expect(firstResponse!.ok()).toBeTruthy();
+  expect(payload).not.toBeNull();
+
+  const firstBody = await firstResponse!.json();
+  expect(firstBody.reservationNumber).toMatch(/^PP-\d{8}-[A-F0-9]{6}$/);
+
+  const replayResponse = await request.post(`${API_URL}/api/rooms/${hotel._id}/booking-request`, {
+    data: payload!,
+  });
+
+  expect(replayResponse.ok()).toBeTruthy();
+  const replayBody = await replayResponse.json();
+  expect(replayBody.reservationNumber).toBe(firstBody.reservationNumber);
+  expect(String(replayBody.message || "").toLowerCase()).toContain("already submitted");
+});
+
 test("should complete guest booking for 2 adults and 2 children for 4 nights in the week after current week", async ({ page, request }) => {
   const hotelsResponse = await request.get(`${API_URL}/api/rooms`);
   expect(hotelsResponse.ok()).toBeTruthy();

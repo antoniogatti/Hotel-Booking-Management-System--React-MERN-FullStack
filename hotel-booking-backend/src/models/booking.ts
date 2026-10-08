@@ -1,8 +1,9 @@
 import mongoose, { Document } from "mongoose";
 
 export interface IBooking extends Document {
-  _id: string;
+  _id: mongoose.Types.ObjectId;
   reservationNumber: string;
+  clientRequestId?: string;
   userId: string;
   hotelId: string;
   firstName: string;
@@ -86,6 +87,7 @@ export interface IBooking extends Document {
 const bookingSchema = new mongoose.Schema(
   {
     reservationNumber: { type: String },
+    clientRequestId: { type: String, index: true },
     userId: { type: String, required: true, index: true },
     hotelId: { type: String, required: true, index: true },
     firstName: { type: String, required: true },
@@ -187,6 +189,7 @@ bookingSchema.index({ hotelId: 1, checkIn: 1 });
 bookingSchema.index({ status: 1, createdAt: -1 });
 bookingSchema.index({ checkIn: 1, status: 1 });
 bookingSchema.index({ reservationNumber: 1 }, { unique: true, sparse: true });
+bookingSchema.index({ hotelId: 1, clientRequestId: 1 }, { unique: true, sparse: true });
 bookingSchema.index({ hotelId: 1, email: 1, checkIn: 1, checkOut: 1, createdAt: -1 });
 
 export default mongoose.model<IBooking>("Booking", bookingSchema);

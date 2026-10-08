@@ -25,6 +25,12 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   skipAuth?: boolean;
 }
 
+const isBookingRequestSubmission = (config?: InternalAxiosRequestConfig) => {
+  const method = String(config?.method || "").toLowerCase();
+  const url = String(config?.url || "");
+  return method === "post" && url.includes("/booking-request");
+};
+
 const clearStoredProfile = () => {
   localStorage.removeItem("session_id");
   localStorage.removeItem("user_id");
@@ -60,6 +66,10 @@ axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const { config } = error;
+
+    if (isBookingRequestSubmission(config)) {
+      return Promise.reject(error);
+    }
 
     if (error.response?.status === 401) {
       clearStoredProfile();
