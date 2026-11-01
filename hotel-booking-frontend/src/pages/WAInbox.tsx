@@ -568,6 +568,7 @@ const WAInbox = () => {
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
   const listSentinelRef = useRef<HTMLDivElement>(null);
+  const replyRef = useRef<HTMLTextAreaElement>(null);
 
   // Refs mirror state that async callbacks / timers need to read without going stale
   const activePhoneRef = useRef<string | null>(null);
@@ -714,6 +715,7 @@ const WAInbox = () => {
         loadingThreadRef.current = false;
         setLoadingThread(false);
         setTimeout(forceScrollToBottom, 50);
+        setTimeout(() => replyRef.current?.focus(), 80);
       });
 
     return () => ctrl.abort();
@@ -1123,6 +1125,7 @@ const WAInbox = () => {
           {/* Reply input */}
           <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-end gap-2 shrink-0">
             <textarea
+              ref={replyRef}
               value={reply}
               onChange={(e) => setReply(e.target.value)}
               onKeyDown={handleKeyDown}
