@@ -198,6 +198,7 @@ ${knowledge}
       { role: "user", content: text },
     ];
     let reply = "";
+    let messagesBeforeFinalReply: ChatCompletionMessageParam[] = [];
 
     for (let i = 0; i < 3; i++) {
       const response = await aoai.chat.completions.create({
@@ -221,13 +222,48 @@ ${knowledge}
         continue;
       }
 
+      // Track the message context just before this final content reply (for alt suggestions)
+      messagesBeforeFinalReply = messages.slice(0, -1); // exclude the assistant message just pushed
       reply = choice.message.content || "";
       break;
     }
 
     if (!reply) reply = "Grazie per il messaggio! Ti risponderemo a info@palazzopintobnb.com\n\nThank you! We'll reply at info@palazzopintobnb.com";
 
-    // Persist conversation (upsert)
+    // Check auto mode for this conversation
+    const convoMeta = await WAConversation.findOne({ phone: from }).select("auto").lean() as any;
+    const isAuto = convoMeta?.auto ?? false;
+
+    if (!isAuto) {
+      // Draft mode: generate 2 alternative suggestions, store all, don't send
+      const suggestions: string[] = [reply];
+      for (let altIdx = 0; altIdx < 2; altIdx++) {
+        try {
+          const altResp = await aoai.chat.completions.create({
+            model: "gpt-5-mini",
+            max_completion_tokens: 600,
+            messages: messagesBeforeFinalReply.length > 0 ? messagesBeforeFinalReply : messages,
+          });
+          const alt = altResp.choices[0]?.message?.content?.trim();
+          if (alt && alt !== suggestions[0]) suggestions.push(alt);
+        } catch { /* ignore alt failures */ }
+      }
+
+      await WAConversation.findOneAndUpdate(
+        { phone: from },
+        {
+          $push: { messages: { role: "user", content: text, ts: new Date() } },
+          $set: {
+            pendingReply: { inReplyTo: text, suggestions, createdAt: new Date() },
+            updated_at: new Date(),
+          },
+        },
+        { upsert: true }
+      );
+      return; // Don't send — awaiting admin approval
+    }
+
+    // Auto mode: persist both messages and send immediately
     await WAConversation.findOneAndUpdate(
       { phone: from },
       {
@@ -235,7 +271,7 @@ ${knowledge}
           messages: {
             $each: [
               { role: "user", content: text, ts: new Date() },
-              { role: "assistant", content: reply, ts: new Date() },
+              { role: "assistant", content: reply, ts: new Date(), source: "auto" },
             ],
           },
         },

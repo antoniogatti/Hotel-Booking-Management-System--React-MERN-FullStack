@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { FaWhatsapp } from "react-icons/fa";
-import { WAContact, WAConversation, WAMessage } from "../../../shared/types";
+import { PendingReply, WAContact, WAConversation, WAMessage } from "../../../shared/types";
 import * as apiClient from "../api-client";
 import axios from "axios";
 
@@ -37,9 +37,21 @@ function formatDate(ts: string): string {
   return new Date(ts).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
 }
 
-function displayName(phone: string, contacts: Map<string, WAContact>): string {
-  return contacts.get(phone)?.name ?? formatPhone(phone);
+function displayName(phone: string, contacts: Map<string, WAContact>, fallbackName?: string): string {
+  return contacts.get(phone)?.name ?? fallbackName ?? formatPhone(phone);
 }
+
+const PAGE_SIZE = 20;
+const THREAD_PAGE_SIZE = 30;
+const POLL_MS = 8_000;
+const MAX_POLL_MS = 60_000;
+
+// WhatsApp-style doodle wallpaper (original artwork, tiled)
+const CHAT_WALLPAPER: React.CSSProperties = {
+  backgroundColor: "#cfe3df",
+  backgroundImage: "url('/common/wa-doodle.svg')",
+  backgroundSize: "260px 260px",
+};
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
@@ -65,11 +77,19 @@ const ConvoItem = ({ convo, active, disabled, contacts, onClick }: ConvoItemProp
       `}
     >
       <div className="flex items-center justify-between mb-0.5">
-        <span className="font-semibold text-sm text-gray-900">{displayName(convo.phone, contacts)}</span>
-        <span className="text-xs text-gray-400 shrink-0 ml-2">{relativeTime(convo.updated_at)}</span>
+        <span className="font-semibold text-sm text-gray-900 truncate">{displayName(convo.phone, contacts, convo.name)}</span>
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
+          {convo.hasPending && (
+            <span className="h-2 w-2 rounded-full bg-orange-400" title="Sofia draft pending approval" />
+          )}
+          <span className="text-xs text-gray-400">{relativeTime(convo.updated_at)}</span>
+        </div>
       </div>
       <div className="flex items-center gap-1">
-        {convo.lastMessage?.role === "assistant" && (
+        {convo.hasPending && (
+          <span className="text-[10px] bg-orange-400 text-white px-1 rounded shrink-0">draft</span>
+        )}
+        {!convo.hasPending && convo.lastMessage?.role === "assistant" && (
           <span className="text-[10px] bg-[#25D366] text-white px-1 rounded shrink-0">Sofia</span>
         )}
         <p className="text-xs text-gray-500 truncate">{preview}</p>
@@ -82,16 +102,17 @@ type BubbleProps = { msg: WAMessage };
 
 const Bubble = ({ msg }: BubbleProps) => {
   const isUser = msg.role === "user";
+  const label = msg.source === "approved_ai" ? "Sofia ✓" : msg.source === "manual" ? "You" : "Sofia";
   return (
     <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-2`}>
       <div className="max-w-[75%]">
         {!isUser && (
-          <span className="text-[10px] text-[#25D366] font-semibold ml-1 block text-right">Sofia</span>
+          <span className="text-[10px] text-[#25D366] font-semibold ml-1 block text-right">{label}</span>
         )}
         <div
           className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
             isUser
-              ? "bg-white border border-gray-200 text-gray-800 rounded-tl-sm"
+              ? "bg-white shadow-sm text-gray-800 rounded-tl-sm"
               : "text-white rounded-tr-sm"
           }`}
           style={isUser ? {} : { backgroundColor: "#25D366" }}
@@ -106,7 +127,97 @@ const Bubble = ({ msg }: BubbleProps) => {
   );
 };
 
-const BubbleSkeleton = ({ right }: { right?: boolean }) => (
+// ─── Pending reply card ────────────────────────────────────────────────────────
+
+type PendingCardProps = {
+  pending: PendingReply;
+  onApprove: (text: string) => Promise<void>;
+  onDiscard: () => Promise<void>;
+};
+
+const PendingCard = ({ pending, onApprove, onDiscard }: PendingCardProps) => {
+  const [selected, setSelected] = useState(pending.suggestions[0] ?? "");
+  const [edited, setEdited] = useState(pending.suggestions[0] ?? "");
+  const [approving, setApproving] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
+
+  const handleSelect = (s: string) => { setSelected(s); setEdited(s); };
+
+  const handleApprove = async () => {
+    if (!edited.trim() || approving) return;
+    setApproving(true);
+    try { await onApprove(edited.trim()); } finally { setApproving(false); }
+  };
+
+  const handleDiscard = async () => {
+    setDiscarding(true);
+    try { await onDiscard(); } finally { setDiscarding(false); }
+  };
+
+  return (
+    <div className="border-t border-orange-200 bg-orange-50 px-4 py-3 shrink-0">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-xs font-semibold text-orange-700">Sofia's draft</span>
+        <span className="text-[10px] bg-orange-200 text-orange-700 px-1.5 py-0.5 rounded-full">pending approval</span>
+        <span className="text-[10px] text-gray-400 ml-auto truncate max-w-[120px]" title={pending.inReplyTo}>
+          re: {pending.inReplyTo.slice(0, 40)}{pending.inReplyTo.length > 40 ? "…" : ""}
+        </span>
+      </div>
+      {pending.suggestions.length > 1 && (
+        <div className="flex flex-col gap-1 mb-2">
+          {pending.suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => handleSelect(s)}
+              className={`text-left text-xs px-2 py-1.5 rounded-lg border transition-colors truncate ${
+                selected === s
+                  ? "border-orange-400 bg-orange-100 text-orange-800 font-medium"
+                  : "border-gray-200 bg-white text-gray-600 hover:border-orange-300"
+              }`}
+              title={s}
+            >
+              <span className="font-mono text-[10px] mr-1 text-gray-400">#{i + 1}</span>
+              {s.slice(0, 80)}{s.length > 80 ? "…" : ""}
+            </button>
+          ))}
+        </div>
+      )}
+      <textarea
+        value={edited}
+        onChange={(e) => setEdited(e.target.value)}
+        rows={3}
+        className="w-full resize-none border border-orange-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white mb-2"
+        placeholder="Edit Sofia's reply before sending…"
+      />
+      <div className="flex gap-2">
+        <button
+          onClick={handleDiscard}
+          disabled={discarding || approving}
+          className="flex-1 py-1.5 rounded-lg border border-gray-200 text-sm text-gray-500 hover:bg-gray-50 disabled:opacity-40 transition-colors"
+        >
+          {discarding ? "Discarding…" : "Discard"}
+        </button>
+        <button
+          onClick={handleApprove}
+          disabled={!edited.trim() || approving || discarding}
+          className="flex-[2] py-1.5 rounded-lg text-sm text-white font-semibold disabled:opacity-40 transition-colors"
+          style={{ backgroundColor: "#25D366" }}
+        >
+          {approving ? "Sending…" : "Send"}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const ConvoSkeleton = () => (
+  <div className="px-4 py-3 border-b border-gray-100 animate-pulse">
+    <div className="h-3 w-32 bg-gray-200 rounded mb-2" />
+    <div className="h-2.5 w-48 bg-gray-100 rounded" />
+  </div>
+);
+
+const BubbleSkeleton =({ right }: { right?: boolean }) => (
   <div className={`flex ${right ? "justify-end" : "justify-start"} mb-2`}>
     <div className={`h-8 rounded-2xl animate-pulse ${right ? "bg-[#25D366]/30 w-48" : "bg-gray-200 w-40"}`} />
   </div>
@@ -188,13 +299,26 @@ const NewChatModal = ({ onClose, onStart, contacts }: NewChatModalProps) => {
 
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
+const is404 = (e: unknown) => axios.isAxiosError(e) && e.response?.status === 404;
+
 const WAInbox = () => {
   const [conversations, setConversations] = useState<WAConversation[]>([]);
+  const [totalConvos, setTotalConvos] = useState(0);
+  const [listLoading, setListLoading] = useState(true);
+  const [loadingMoreConvos, setLoadingMoreConvos] = useState(false);
+  const [listError, setListError] = useState(false);
+
   const [activePhone, setActivePhone] = useState<string | null>(null);
   const [messages, setMessages] = useState<WAMessage[]>([]);
+  const [threadStart, setThreadStart] = useState(0); // index of messages[0] in the full thread
+  const [threadName, setThreadName] = useState<string | undefined>();
+  const [loadingThread, setLoadingThread] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [threadError, setThreadError] = useState(false);
+  const [threadReloadKey, setThreadReloadKey] = useState(0);
+
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
-  const [loadingThread, setLoadingThread] = useState(false);
   const [contacts, setContacts] = useState<Map<string, WAContact>>(new Map());
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactName, setContactName] = useState("");
@@ -202,12 +326,29 @@ const WAInbox = () => {
   const [mobileShowList, setMobileShowList] = useState(true);
   const [showNewChat, setShowNewChat] = useState(false);
 
+  // Draft/approve mode state
+  const [pendingReply, setPendingReply] = useState<PendingReply | undefined>(undefined);
+  const [autoByPhone, setAutoByPhone] = useState<Map<string, boolean>>(new Map());
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+  const listSentinelRef = useRef<HTMLDivElement>(null);
 
-  // AbortController refs — cancel in-flight requests before starting new ones
-  const listAbortRef = useRef<AbortController | null>(null);
+  // Refs mirror state that async callbacks / timers need to read without going stale
+  const activePhoneRef = useRef<string | null>(null);
+  activePhoneRef.current = activePhone;
+  const conversationsRef = useRef<WAConversation[]>([]);
+  conversationsRef.current = conversations;
+  const threadRef = useRef({ start: 0, total: 0 });
+  const loadingThreadRef = useRef(false);
+  const loadingOlderRef = useRef(false);
+  const loadingMoreConvosRef = useRef(false);
+  const contactsLoadedRef = useRef(false);
+  const restoreScrollRef = useRef<number | null>(null);
   const threadAbortRef = useRef<AbortController | null>(null);
+
+  const hasMoreConvos = conversations.length < totalConvos;
 
   // Scroll helpers
   const maybeScrollToBottom = useCallback(() => {
@@ -221,83 +362,239 @@ const WAInbox = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, []);
 
-  // Load conversations — cancels any in-flight list request first
-  const loadConversations = useCallback(async () => {
-    listAbortRef.current?.abort();
-    listAbortRef.current = new AbortController();
+  // After older messages are prepended, keep the viewport on the message the user was reading
+  useLayoutEffect(() => {
+    const el = messagesContainerRef.current;
+    if (el && restoreScrollRef.current !== null) {
+      el.scrollTop += el.scrollHeight - restoreScrollRef.current;
+      restoreScrollRef.current = null;
+    }
+  }, [messages]);
+
+  // ── Conversation list (lazy: first page, then more on scroll) ──────────────────
+
+  // Refresh the first page. Already-loaded later pages are kept.
+  const refreshFirstPage = useCallback(async (): Promise<boolean> => {
     try {
-      const data = await apiClient.getWAConversations(listAbortRef.current.signal);
-      setConversations(data);
+      const page = await apiClient.getWAConversations({ limit: PAGE_SIZE, skip: 0 });
+      setConversations((prev) => {
+        const seen = new Set(page.conversations.map((c) => c.phone));
+        return [...page.conversations, ...prev.filter((c) => !seen.has(c.phone))];
+      });
+      setTotalConvos(page.total);
+      setListError(false);
+      return true;
     } catch (e: unknown) {
-      if (!isCancelled(e)) console.warn("[inbox] list error:", e);
+      if (!isCancelled(e)) {
+        console.warn("[inbox] list error:", e);
+        setListError(true);
+      }
+      return false;
+    } finally {
+      setListLoading(false);
     }
   }, []);
 
-  // Load thread — cancels any in-flight thread request first
-  const loadThread = useCallback(async (phone: string, force = false): Promise<WAMessage[] | null> => {
-    threadAbortRef.current?.abort();
-    threadAbortRef.current = new AbortController();
+  const loadMoreConvos = useCallback(async () => {
+    if (loadingMoreConvosRef.current) return;
+    loadingMoreConvosRef.current = true;
+    setLoadingMoreConvos(true);
     try {
-      const thread = await apiClient.getWAThread(phone, threadAbortRef.current.signal);
-      return thread.messages;
-    } catch (e: unknown) {
-      if (!isCancelled(e)) console.warn("[inbox] thread error:", e);
-      return force ? [] : null; // null = aborted/ignored; [] = real empty
+      const page = await apiClient.getWAConversations({
+        limit: PAGE_SIZE,
+        skip: conversationsRef.current.length,
+      });
+      setConversations((prev) => {
+        const seen = new Set(prev.map((c) => c.phone));
+        return [...prev, ...page.conversations.filter((c) => !seen.has(c.phone))];
+      });
+      setTotalConvos(page.total);
+    } catch {
+      /* the sentinel fires again on the next scroll */
+    } finally {
+      loadingMoreConvosRef.current = false;
+      setLoadingMoreConvos(false);
     }
   }, []);
 
-  // Load contacts
-  const loadContacts = useCallback(async () => {
+  // Load the next page when the sentinel at the bottom of the list scrolls into view
+  useEffect(() => {
+    const sentinel = listSentinelRef.current;
+    if (!sentinel || !hasMoreConvos || listLoading) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) void loadMoreConvos();
+      },
+      { root: listContainerRef.current, rootMargin: "120px" }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasMoreConvos, listLoading, conversations.length, loadMoreConvos]);
+
+  const loadContacts = useCallback(async (): Promise<boolean> => {
     try {
       const data = await apiClient.getWAContacts();
       setContacts(new Map(data.map((c) => [c.phone, c])));
-    } catch { /* ignore */ }
+      contactsLoadedRef.current = true;
+      return true;
+    } catch {
+      return false; // retried on the next poll tick
+    }
   }, []);
 
-  // Initial load
-  useEffect(() => {
-    void loadConversations();
-    void loadContacts();
-  }, [loadConversations, loadContacts]);
+  // ── Thread (lazy: latest page, older history on scroll up) ─────────────────────
 
-  // Poll conversations every 8s (aborts previous before firing)
-  useEffect(() => {
-    const id = setInterval(() => void loadConversations(), 8_000);
-    return () => clearInterval(id);
-  }, [loadConversations]);
-
-  // Load thread when active phone changes
   useEffect(() => {
     if (!activePhone) return;
+    const ctrl = new AbortController();
+    threadAbortRef.current = ctrl;
+    loadingThreadRef.current = true;
     setLoadingThread(true);
-    loadThread(activePhone, true).then((msgs) => {
-      if (msgs !== null) {
-        setMessages(msgs);
+    setThreadError(false);
+
+    apiClient
+      .getWAThread(activePhone, { limit: THREAD_PAGE_SIZE }, ctrl.signal)
+      .then((t) => {
+        threadRef.current = { start: t.start, total: t.total };
+        setMessages(t.messages);
+        setThreadStart(t.start);
+        setThreadName(t.name);
+        setPendingReply(t.pendingReply);
+        setAutoByPhone((prev) => new Map(prev).set(activePhone, t.auto ?? false));
+      })
+      .catch((e: unknown) => {
+        if (isCancelled(e)) return;
+        if (is404(e)) {
+          // brand-new chat: nothing stored yet
+          threadRef.current = { start: 0, total: 0 };
+          setMessages([]);
+          setThreadStart(0);
+          setPendingReply(undefined);
+        } else {
+          console.warn("[inbox] thread error:", e);
+          setThreadError(true);
+        }
+      })
+      .finally(() => {
+        if (ctrl.signal.aborted) return;
+        loadingThreadRef.current = false;
         setLoadingThread(false);
         setTimeout(forceScrollToBottom, 50);
-      }
-    });
-  }, [activePhone, loadThread, forceScrollToBottom]);
-
-  // Poll thread every 8s when a conversation is open
-  useEffect(() => {
-    if (!activePhone) return;
-    const id = setInterval(async () => {
-      const msgs = await loadThread(activePhone);
-      if (msgs === null) return; // aborted — ignore
-      setMessages((prev) => {
-        if (JSON.stringify(prev) === JSON.stringify(msgs)) return prev;
-        setTimeout(maybeScrollToBottom, 50);
-        return msgs;
       });
-    }, 8_000);
-    return () => clearInterval(id);
-  }, [activePhone, loadThread, maybeScrollToBottom]);
+
+    return () => ctrl.abort();
+  }, [activePhone, threadReloadKey, forceScrollToBottom]);
+
+  const loadOlder = useCallback(async () => {
+    const phone = activePhoneRef.current;
+    const { start } = threadRef.current;
+    if (!phone || start === 0 || loadingOlderRef.current || loadingThreadRef.current) return;
+    loadingOlderRef.current = true;
+    setLoadingOlder(true);
+    try {
+      const t = await apiClient.getWAThread(phone, { before: start, limit: THREAD_PAGE_SIZE });
+      if (activePhoneRef.current !== phone) return;
+      restoreScrollRef.current = messagesContainerRef.current?.scrollHeight ?? null;
+      threadRef.current = { start: t.start, total: threadRef.current.total };
+      setThreadStart(t.start);
+      setMessages((prev) => [...t.messages, ...prev]);
+    } catch (e: unknown) {
+      if (!isCancelled(e)) console.warn("[inbox] older messages error:", e);
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlder(false);
+    }
+  }, []);
+
+  const handleMessagesScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    if (e.currentTarget.scrollTop < 60) void loadOlder();
+  };
+
+  // Fetch only messages newer than what we already hold
+  const pollThread = useCallback(async (): Promise<boolean> => {
+    const phone = activePhoneRef.current;
+    if (!phone || loadingThreadRef.current) return true;
+    try {
+      const t = await apiClient.getWAThread(phone, { after: threadRef.current.total });
+      if (activePhoneRef.current !== phone) return true;
+      if (t.total < threadRef.current.total) {
+        setThreadReloadKey((k) => k + 1); // history shrank (e.g. expired) — reload from scratch
+        return true;
+      }
+      if (t.messages.length > 0) {
+        threadRef.current = { start: threadRef.current.start, total: t.total };
+        setMessages((prev) => [...prev, ...t.messages]);
+        setTimeout(maybeScrollToBottom, 50);
+      }
+      if (t.name) setThreadName(t.name);
+      // Always sync pendingReply and auto on each poll
+      setPendingReply(t.pendingReply);
+      setAutoByPhone((prev) => new Map(prev).set(phone, t.auto ?? false));
+      return true;
+    } catch (e: unknown) {
+      return is404(e); // no conversation stored yet is not an outage
+    }
+  }, [maybeScrollToBottom]);
+
+  // ── Initial load + polling ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    void refreshFirstPage();
+    void loadContacts();
+  }, [refreshFirstPage, loadContacts]);
+
+  // Self-scheduling poll: never overlaps itself, pauses while the tab is hidden and
+  // backs off exponentially while the server is failing (instead of hammering it).
+  useEffect(() => {
+    let stopped = false;
+    let running = false;
+    let delay = POLL_MS;
+    let timer: ReturnType<typeof setTimeout>;
+
+    const tick = async () => {
+      if (running || stopped) return;
+      running = true;
+      if (!document.hidden) {
+        const results = await Promise.all([
+          refreshFirstPage(),
+          contactsLoadedRef.current ? Promise.resolve(true) : loadContacts(),
+          pollThread(),
+        ]);
+        delay = results.every(Boolean) ? POLL_MS : Math.min(delay * 2, MAX_POLL_MS);
+      }
+      running = false;
+      if (!stopped) timer = setTimeout(() => void tick(), delay);
+    };
+
+    const onVisible = () => {
+      if (!document.hidden) {
+        clearTimeout(timer);
+        void tick();
+      }
+    };
+
+    timer = setTimeout(() => void tick(), POLL_MS);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [refreshFirstPage, loadContacts, pollThread]);
+
+  const resetThread = () => {
+    threadRef.current = { start: 0, total: 0 };
+    setMessages([]);
+    setThreadStart(0);
+    setThreadName(undefined);
+    setThreadError(false);
+    setPendingReply(undefined);
+  };
 
   const handleSelectConvo = (phone: string) => {
     if (loadingThread && phone !== activePhone) return; // debounce rapid clicks
+    resetThread();
     setActivePhone(phone);
-    setMessages([]);
     setReply("");
     setShowContactForm(false);
     setContactName("");
@@ -318,6 +615,7 @@ const WAInbox = () => {
 
   const handleBack = () => {
     threadAbortRef.current?.abort();
+    loadingThreadRef.current = false;
     setMobileShowList(true);
     setActivePhone(null);
     setLoadingThread(false);
@@ -328,12 +626,44 @@ const WAInbox = () => {
     setSending(true);
     try {
       await apiClient.sendWAReply(activePhone, reply.trim());
-      setMessages((prev) => [...prev, { role: "assistant", content: reply.trim(), ts: new Date().toISOString() }]);
+      threadRef.current = { start: threadRef.current.start, total: threadRef.current.total + 1 };
+      setMessages((prev) => [...prev, { role: "assistant", content: reply.trim(), ts: new Date().toISOString(), source: "manual" }]);
+      setPendingReply(undefined);
       setReply("");
-      void loadConversations();
+      void refreshFirstPage();
       setTimeout(forceScrollToBottom, 50);
     } catch { /* ignore */ } finally {
       setSending(false);
+    }
+  };
+
+  const handleApprove = async (text: string) => {
+    if (!activePhone) return;
+    await apiClient.approveWAReply(activePhone, text);
+    threadRef.current = { start: threadRef.current.start, total: threadRef.current.total + 1 };
+    setMessages((prev) => [...prev, { role: "assistant", content: text, ts: new Date().toISOString(), source: "approved_ai" }]);
+    setPendingReply(undefined);
+    void refreshFirstPage();
+    setTimeout(forceScrollToBottom, 50);
+  };
+
+  const handleDiscard = async () => {
+    if (!activePhone) return;
+    await apiClient.dismissWAPending(activePhone);
+    setPendingReply(undefined);
+    void refreshFirstPage();
+  };
+
+  const handleToggleAuto = async () => {
+    if (!activePhone) return;
+    const current = autoByPhone.get(activePhone) ?? false;
+    const next = !current;
+    setAutoByPhone((prev) => new Map(prev).set(activePhone, next));
+    try {
+      await apiClient.toggleWAAuto(activePhone, next);
+      void refreshFirstPage();
+    } catch {
+      setAutoByPhone((prev) => new Map(prev).set(activePhone, current)); // revert on error
     }
   };
 
@@ -370,23 +700,40 @@ const WAInbox = () => {
           +
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto">
-        {conversations.length === 0 ? (
+      <div ref={listContainerRef} className="flex-1 overflow-y-auto">
+        {listLoading ? (
+          <>
+            <ConvoSkeleton />
+            <ConvoSkeleton />
+            <ConvoSkeleton />
+          </>
+        ) : conversations.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2 p-6">
             <FaWhatsapp className="h-10 w-10 opacity-30" />
-            <p className="text-sm text-center">No conversations yet. When guests message the B&amp;B, they'll appear here.</p>
+            <p className="text-sm text-center">
+              {listError
+                ? "Can't reach the server — retrying automatically…"
+                : "No conversations yet. When guests message the B&B, they'll appear here."}
+            </p>
           </div>
         ) : (
-          conversations.map((c) => (
-            <ConvoItem
-              key={c.phone}
-              convo={c}
-              active={activePhone === c.phone}
-              disabled={loadingThread && activePhone !== c.phone}
-              contacts={contacts}
-              onClick={() => handleSelectConvo(c.phone)}
-            />
-          ))
+          <>
+            {conversations.map((c) => (
+              <ConvoItem
+                key={c.phone}
+                convo={c}
+                active={activePhone === c.phone}
+                disabled={loadingThread && activePhone !== c.phone}
+                contacts={contacts}
+                onClick={() => handleSelectConvo(c.phone)}
+              />
+            ))}
+            {hasMoreConvos && (
+              <div ref={listSentinelRef} className="py-3 text-center text-xs text-gray-400">
+                {loadingMoreConvos ? "Loading…" : ""}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -394,9 +741,11 @@ const WAInbox = () => {
 
   // ── Thread panel ─────────────────────────────────────────────────────────────
   const contactForActive = activePhone ? contacts.get(activePhone) : undefined;
+  const activeName = contactForActive?.name ?? threadName;
+  const isAuto = activePhone ? (autoByPhone.get(activePhone) ?? false) : false;
 
   const threadPanel = (
-    <div className={`flex-1 flex flex-col bg-[#f0ece4] overflow-hidden md:flex ${!mobileShowList ? "flex w-full" : "hidden md:flex"}`}>
+    <div className={`flex-1 flex flex-col bg-[#cfe3df] overflow-hidden md:flex ${!mobileShowList ? "flex w-full" : "hidden md:flex"}`}>
       {activePhone ? (
         <>
           {/* Header */}
@@ -408,22 +757,34 @@ const WAInbox = () => {
                 </svg>
               </button>
               <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold shrink-0">
-                {(contactForActive?.name ?? formatPhone(activePhone)).slice(0, 2).toUpperCase()}
+                {(activeName ?? formatPhone(activePhone)).slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm truncate">
-                  {contactForActive?.name ?? formatPhone(activePhone)}
+                  {activeName ?? formatPhone(activePhone)}
                 </p>
                 <p className="text-xs text-white/80">
-                  {loadingThread ? "Loading…" : contactForActive ? formatPhone(activePhone) : "Active · Sofia is monitoring"}
+                  {loadingThread ? "Loading…" : activeName ? formatPhone(activePhone) : "Active · Sofia is monitoring"}
                 </p>
               </div>
               <span className="h-2 w-2 rounded-full bg-white/60 animate-pulse shrink-0" title="Live polling" />
+              {/* Auto/draft toggle */}
               <button
-                onClick={() => { setShowContactForm((v) => !v); setContactName(contactForActive?.name ?? ""); }}
+                onClick={() => void handleToggleAuto()}
+                title={isAuto ? "Auto ON — Sofia sends immediately. Click for draft mode." : "Draft mode — Sofia drafts, you approve. Click for auto."}
+                className={`shrink-0 text-xs rounded-full px-2.5 py-1 font-semibold border transition-colors ${
+                  isAuto
+                    ? "bg-white text-[#25D366] border-white"
+                    : "bg-white/10 text-white/80 border-white/30 hover:bg-white/20"
+                }`}
+              >
+                {isAuto ? "Auto" : "Draft"}
+              </button>
+              <button
+                onClick={() => { setShowContactForm((v) => !v); setContactName(activeName ?? ""); }}
                 className="shrink-0 text-xs text-white/80 hover:text-white border border-white/30 rounded px-2 py-1 transition-colors"
               >
-                {contactForActive ? "Edit" : "+ Save contact"}
+                {activeName ? "Edit" : "+ Contact"}
               </button>
             </div>
 
@@ -452,7 +813,12 @@ const WAInbox = () => {
           </div>
 
           {/* Messages */}
-          <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
+          <div
+            ref={messagesContainerRef}
+            onScroll={handleMessagesScroll}
+            className="flex-1 overflow-y-auto px-4 py-4"
+            style={CHAT_WALLPAPER}
+          >
             {loadingThread ? (
               <>
                 <BubbleSkeleton />
@@ -460,13 +826,45 @@ const WAInbox = () => {
                 <BubbleSkeleton />
                 <BubbleSkeleton right />
               </>
+            ) : threadError ? (
+              <div className="flex flex-col justify-center items-center h-full gap-2 text-sm text-gray-600">
+                <p>Couldn't load this conversation.</p>
+                <button
+                  onClick={() => setThreadReloadKey((k) => k + 1)}
+                  className="px-3 py-1 rounded-full bg-white shadow-sm text-[#25D366] font-medium"
+                >
+                  Retry
+                </button>
+              </div>
             ) : messages.length === 0 ? (
-              <div className="flex justify-center items-center h-full text-gray-400 text-sm">No messages</div>
+              <div className="flex justify-center items-center h-full text-gray-600 text-sm">No messages</div>
             ) : (
-              messages.map((m, i) => <Bubble key={i} msg={m} />)
+              <>
+                {threadStart > 0 && (
+                  <div className="flex justify-center mb-3">
+                    <button
+                      onClick={() => void loadOlder()}
+                      disabled={loadingOlder}
+                      className="text-xs px-3 py-1 rounded-full bg-white/90 shadow-sm text-gray-600 disabled:opacity-60"
+                    >
+                      {loadingOlder ? "Loading…" : `Load earlier messages (${threadStart})`}
+                    </button>
+                  </div>
+                )}
+                {messages.map((m, i) => <Bubble key={threadStart + i} msg={m} />)}
+              </>
             )}
             <div ref={messagesEndRef} />
           </div>
+
+          {/* Pending draft card */}
+          {pendingReply && (
+            <PendingCard
+              pending={pendingReply}
+              onApprove={handleApprove}
+              onDiscard={handleDiscard}
+            />
+          )}
 
           {/* Reply input */}
           <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-end gap-2 shrink-0">
@@ -474,7 +872,7 @@ const WAInbox = () => {
               value={reply}
               onChange={(e) => setReply(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type a reply… (Enter to send, Shift+Enter for newline)"
+              placeholder="Type a manual reply… (Enter to send, Shift+Enter for newline)"
               rows={2}
               className="flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:border-transparent"
             />
@@ -520,14 +918,22 @@ const WAInbox = () => {
           <FaWhatsapp className="h-6 w-6 text-[#25D366]" />
           <h1 className="text-xl font-bold text-[#2b4463]">Sofia Inbox</h1>
           <span className="ml-2 text-xs bg-[#f0fdf4] text-[#25D366] border border-[#bbf7d0] px-2 py-0.5 rounded-full font-medium">
-            {conversations.length} conversation{conversations.length !== 1 ? "s" : ""}
+            {totalConvos || conversations.length} conversation{(totalConvos || conversations.length) !== 1 ? "s" : ""}
           </span>
+          {(() => {
+            const pendingCount = conversations.filter((c) => c.hasPending).length;
+            return pendingCount > 0 ? (
+              <span className="text-xs bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full font-medium">
+                {pendingCount} draft{pendingCount !== 1 ? "s" : ""} pending
+              </span>
+            ) : null;
+          })()}
           <span className="ml-1 flex items-center gap-1 text-xs text-gray-400">
             <span className="h-1.5 w-1.5 rounded-full bg-[#25D366] animate-pulse inline-block" />
             live
           </span>
         </div>
-        <p className="text-sm text-gray-500 mt-0.5">WhatsApp messages handled by Sofia AI</p>
+        <p className="text-sm text-gray-500 mt-0.5">WhatsApp messages handled by Sofia AI · default: draft mode</p>
       </div>
       <div className="flex flex-1 overflow-hidden">
         {listPanel}

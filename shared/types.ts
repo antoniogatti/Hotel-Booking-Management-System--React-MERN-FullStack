@@ -304,18 +304,41 @@ export type WAMessage = {
   role: "user" | "assistant";
   content: string;
   ts: string;
+  source?: "auto" | "approved_ai" | "manual";
+};
+
+export type PendingReply = {
+  inReplyTo: string;
+  suggestions: string[];
+  createdAt: string;
 };
 
 export type WAConversation = {
   phone: string;
+  name?: string;
   lastMessage: { role: "user" | "assistant"; content: string; ts: string } | null;
   updated_at: string;
   messageCount: number;
+  auto: boolean;
+  hasPending: boolean;
+};
+
+export type WAConversationPage = {
+  conversations: WAConversation[];
+  total: number;
+  hasMore: boolean;
 };
 
 export type WAThread = {
   phone: string;
+  name?: string;
+  auto: boolean;
   messages: WAMessage[];
+  pendingReply?: PendingReply;
+  /** Index (in the full thread) of messages[0] */
+  start: number;
+  /** Total number of messages in the full thread */
+  total: number;
   updated_at: string;
 };
 

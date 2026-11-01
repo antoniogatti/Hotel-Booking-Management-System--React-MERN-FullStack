@@ -7,7 +7,7 @@ import {
   BookingType,
   BookingManagementRoomType,
   BookingCalendarResponseType,
-  WAConversation,
+  WAConversationPage,
   WAThread,
   WAContact,
 } from "../../shared/types";
@@ -162,18 +162,38 @@ export const fetchMyHotels = async (): Promise<HotelType[]> => {
 
 // ─── WhatsApp inbox ────────────────────────────────────────────────────────────
 
-export const getWAConversations = async (signal?: AbortSignal): Promise<WAConversation[]> => {
-  const response = await axiosInstance.get("/api/wa-inbox", { signal });
+export const getWAConversations = async (
+  params: { limit?: number; skip?: number } = {},
+  signal?: AbortSignal
+): Promise<WAConversationPage> => {
+  const response = await axiosInstance.get("/api/wa-inbox", { params, signal });
   return response.data;
 };
 
-export const getWAThread = async (phone: string, signal?: AbortSignal): Promise<WAThread> => {
-  const response = await axiosInstance.get(`/api/wa-inbox/${phone}`, { signal });
+/** Latest page (default), older history (`before`), or only new messages (`after`). */
+export const getWAThread = async (
+  phone: string,
+  params: { limit?: number; before?: number; after?: number } = {},
+  signal?: AbortSignal
+): Promise<WAThread> => {
+  const response = await axiosInstance.get(`/api/wa-inbox/${phone}`, { params, signal });
   return response.data;
 };
 
 export const sendWAReply = async (phone: string, message: string): Promise<void> => {
   await axiosInstance.post(`/api/wa-inbox/${phone}/reply`, { message });
+};
+
+export const approveWAReply = async (phone: string, text: string): Promise<void> => {
+  await axiosInstance.post(`/api/wa-inbox/${phone}/approve`, { text });
+};
+
+export const dismissWAPending = async (phone: string): Promise<void> => {
+  await axiosInstance.delete(`/api/wa-inbox/${phone}/pending`);
+};
+
+export const toggleWAAuto = async (phone: string, auto: boolean): Promise<void> => {
+  await axiosInstance.patch(`/api/wa-inbox/${phone}/auto`, { auto });
 };
 
 export const getWAContacts = async (): Promise<WAContact[]> => {
