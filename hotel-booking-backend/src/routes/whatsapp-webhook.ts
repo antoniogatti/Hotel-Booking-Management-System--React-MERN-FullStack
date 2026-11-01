@@ -211,6 +211,33 @@ router.post("/", async (req: Request, res: Response) => {
       return;
     }
 
+    if (msg.type === "image") {
+      const mediaId: string = msg.image?.id || "";
+      const caption: string = msg.image?.caption || "";
+      await WAConversation.findOneAndUpdate(
+        { phone: from },
+        {
+          $push: { messages: { role: "user", content: caption || "[Image]", ts: new Date(), mediaId, mediaType: "image", caption } },
+          $set: { updated_at: new Date() },
+        },
+        { upsert: true }
+      );
+      const convoMetaImg = await WAConversation.findOne({ phone: from }).select("auto").lean();
+      const isAutoImg = (convoMetaImg as any)?.auto ?? false;
+      if (isAutoImg) {
+        const imgReply = "Ho ricevuto la tua immagine! Come posso aiutarti? 😊\n\nI received your image! How can I help you? 😊";
+        const msgIdImg = await sendWhatsApp(phoneNumberId, from, imgReply);
+        await WAConversation.findOneAndUpdate(
+          { phone: from },
+          {
+            $push: { messages: { role: "assistant", content: imgReply, ts: new Date(), source: "auto", messageId: msgIdImg, status: msgIdImg ? "sent" : undefined } },
+            $set: { updated_at: new Date() },
+          }
+        );
+      }
+      return;
+    }
+
     if (msg.type !== "text") return;
 
     const text: string = msg.text?.body || "";

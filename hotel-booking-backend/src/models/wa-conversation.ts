@@ -8,8 +8,9 @@ export interface IWAMessage {
   messageId?: string;
   status?: "sent" | "delivered" | "read";
   mediaId?: string;
-  mediaType?: "audio";
+  mediaType?: "audio" | "image";
   duration?: number;
+  caption?: string;
 }
 
 export interface IWAConversation extends Document {
@@ -37,6 +38,7 @@ const WAConversationSchema = new Schema<IWAConversation>({
       mediaId: { type: String, required: false },
       mediaType: { type: String, required: false },
       duration: { type: Number, required: false },
+      caption: { type: String, required: false },
     },
   ],
   updated_at: { type: Date, default: Date.now, expires: 86400 },

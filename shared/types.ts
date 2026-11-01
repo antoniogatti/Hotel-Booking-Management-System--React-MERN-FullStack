@@ -308,8 +308,9 @@ export type WAMessage = {
   messageId?: string;
   status?: "sent" | "delivered" | "read";
   mediaId?: string;
-  mediaType?: "audio";
+  mediaType?: "audio" | "image";
   duration?: number;
+  caption?: string;
 };
 
 export type PendingReply = {

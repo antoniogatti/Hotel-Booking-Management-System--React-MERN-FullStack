@@ -116,6 +116,72 @@ const Ticks = ({ status }: { status?: "sent" | "delivered" | "read" }) => {
   );
 };
 
+// ─── Rich text parser ──────────────────────────────────────────────────────────
+
+const URL_RE = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+
+function applyMarkdown(text: string, keyBase: number): React.ReactNode[] {
+  const BOLD_RE = /\*([^*\n]+)\*/g;
+  const ITALIC_RE = /_([^_\n]+)_/g;
+  const STRIKE_RE = /~([^~\n]+)~/g;
+
+  let result: React.ReactNode[] = [text];
+
+  const applyPattern = (
+    nodes: React.ReactNode[],
+    re: RegExp,
+    wrap: (s: string, k: number) => React.ReactNode
+  ): React.ReactNode[] => {
+    const out: React.ReactNode[] = [];
+    nodes.forEach((node, ni) => {
+      if (typeof node !== "string") { out.push(node); return; }
+      const parts = node.split(re);
+      parts.forEach((p, pi) => {
+        if (pi % 2 === 1) out.push(wrap(p, keyBase * 1000 + ni * 100 + pi));
+        else if (p) out.push(p);
+      });
+    });
+    return out;
+  };
+
+  result = applyPattern(result, BOLD_RE, (s, k) => <strong key={k}>{s}</strong>);
+  result = applyPattern(result, ITALIC_RE, (s, k) => <em key={k}>{s}</em>);
+  result = applyPattern(result, STRIKE_RE, (s, k) => <s key={k}>{s}</s>);
+
+  // Newlines → <br/>
+  const withBreaks: React.ReactNode[] = [];
+  result.forEach((node, ni) => {
+    if (typeof node !== "string") { withBreaks.push(node); return; }
+    node.split("\n").forEach((line, li) => {
+      if (li > 0) withBreaks.push(<br key={`br-${keyBase}-${ni}-${li}`} />);
+      if (line) withBreaks.push(line);
+    });
+  });
+  return withBreaks;
+}
+
+function parseWhatsAppText(text: string): React.ReactNode[] {
+  URL_RE.lastIndex = 0;
+  const parts = text.split(URL_RE);
+  const nodes: React.ReactNode[] = [];
+  parts.forEach((part, i) => {
+    URL_RE.lastIndex = 0;
+    if (URL_RE.test(part)) {
+      URL_RE.lastIndex = 0;
+      nodes.push(
+        <a key={i} href={part} target="_blank" rel="noopener noreferrer"
+           className="underline opacity-90 hover:opacity-100 break-all">
+          {part}
+        </a>
+      );
+    } else {
+      nodes.push(...applyMarkdown(part, i));
+    }
+  });
+  URL_RE.lastIndex = 0;
+  return nodes;
+}
+
 // ─── Audio bubble ──────────────────────────────────────────────────────────────
 
 const WAVEFORM_HEIGHTS = [3,5,8,12,7,10,14,9,6,11,15,8,5,12,9,7,13,10,6,8,11,14,7,9,5,12,8,4];
@@ -197,6 +263,53 @@ const AudioBubble = ({ msg, isUser }: { msg: WAMessage; isUser: boolean }) => {
   );
 };
 
+// ─── Image bubble ──────────────────────────────────────────────────────────────
+
+const ImageBubble = ({ msg, isUser }: { msg: WAMessage; isUser: boolean }) => {
+  const [open, setOpen] = useState(false);
+  const src = msg.mediaId ? apiClient.getWAMediaUrl(msg.mediaId) : "";
+  return (
+    <>
+      <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-2`}>
+        <div className="max-w-[240px]">
+          <button
+            onClick={() => setOpen(true)}
+            className="block rounded-2xl overflow-hidden shadow-sm hover:opacity-95 transition-opacity"
+            style={isUser ? { border: "1px solid #e5e7eb" } : {}}
+          >
+            <img
+              src={src}
+              alt={msg.caption || "Image"}
+              className="w-full object-cover max-h-[200px]"
+              loading="lazy"
+            />
+          </button>
+          {msg.caption && (
+            <p className={`text-xs mt-1 px-1 ${isUser ? "text-gray-600" : "text-white/80"}`}>{msg.caption}</p>
+          )}
+          <p className={`text-[10px] text-gray-400 mt-0.5 flex items-center gap-0.5 ${isUser ? "justify-start ml-1" : "justify-end mr-1"}`}>
+            <span>{formatDate(msg.ts)} {formatTime(msg.ts)}</span>
+            {!isUser && <Ticks status={msg.status} />}
+          </p>
+        </div>
+      </div>
+      {open && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setOpen(false)}
+        >
+          <img src={src} alt={msg.caption || "Image"} className="max-w-full max-h-full object-contain rounded-lg" />
+          <button
+            className="absolute top-4 right-4 text-white text-2xl leading-none opacity-70 hover:opacity-100"
+            onClick={() => setOpen(false)}
+            aria-label="Close"
+          >✕</button>
+        </div>
+      )}
+    </>
+  );
+};
+
 // ─── Text bubble ───────────────────────────────────────────────────────────────
 
 type BubbleProps = { msg: WAMessage };
@@ -204,6 +317,7 @@ type BubbleProps = { msg: WAMessage };
 const Bubble = ({ msg }: BubbleProps) => {
   const isUser = msg.role === "user";
   if (msg.mediaType === "audio") return <AudioBubble msg={msg} isUser={isUser} />;
+  if (msg.mediaType === "image") return <ImageBubble msg={msg} isUser={isUser} />;
   const label = msg.source === "approved_ai" ? "Sofia ✓" : msg.source === "manual" ? "You" : "Sofia";
   return (
     <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-2`}>
@@ -212,14 +326,14 @@ const Bubble = ({ msg }: BubbleProps) => {
           <span className="text-[10px] text-[#25D366] font-semibold ml-1 block text-right">{label}</span>
         )}
         <div
-          className={`px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+          className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
             isUser
               ? "bg-white shadow-sm text-gray-800 rounded-tl-sm"
               : "text-white rounded-tr-sm"
           }`}
           style={isUser ? {} : { backgroundColor: "#25D366" }}
         >
-          {msg.content}
+          {parseWhatsAppText(msg.content)}
         </div>
         <p className={`text-[10px] text-gray-400 mt-0.5 flex items-center gap-0.5 ${isUser ? "justify-start ml-1" : "justify-end mr-1"}`}>
           <span>{formatDate(msg.ts)} {formatTime(msg.ts)}</span>
