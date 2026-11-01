@@ -2,7 +2,9 @@
 // Brand (from the website): navy #1f4465 logo, coral #f0846a payoff, Cormorant Garamond headings, Manrope body.
 const ctx = $('Build Query').item.json;
 const props = $('Azure Cost Query').item.json.properties || {};
-const usage = $json.value || [];
+const usage = $('Azure OpenAI Usage').item.json.value || [];
+const wa = $json;
+const waOk = wa && wa.status && !wa.error;
 
 const cols = (props.columns || []).map((c) => c.name);
 const iCost = cols.indexOf('Cost') >= 0 ? cols.indexOf('Cost') : cols.indexOf('PreTaxCost');
@@ -22,6 +24,7 @@ const metric = (name) => {
   const data = (m && m.timeseries && m.timeseries[0] && m.timeseries[0].data) || [];
   return data.reduce((s, d) => s + (d.total || 0), 0);
 };
+const waGood = waOk && wa.status === 'CONNECTED' && wa.quality_rating !== 'RED' && wa.quality_rating !== 'YELLOW';
 const tokensIn = metric('ProcessedPromptTokens');
 const tokensOut = metric('GeneratedTokens');
 const requests = metric('AzureOpenAIRequests');
@@ -94,6 +97,16 @@ const html = `
         <td align="right" style="font:13px ${sans};color:#5b6f82;">Billed so far<br><b style="font:bold 20px ${serif};color:${NAVY};">${fmt(aiCost)}</b></td>
       </tr></table>
       <div style="font:12px ${sans};color:#5b6f82;margin-top:8px;">Usage is live; cost is billed by Azure with a 1-2 day delay, so it may show 0.00 for recent activity.</div>
+    </div>
+  </td></tr>
+  <tr><td style="padding:16px 28px 0;">
+    <div style="background:#ffffff;border:1px solid ${TINT_BORDER};border-left:4px solid ${waGood ? '#2e7d32' : '#c62828'};border-radius:10px;padding:14px 18px;">
+      <div style="${label}color:${NAVY};">WhatsApp status (Sofia)</div>
+      <div style="font:15px ${sans};color:${INK};margin-top:6px;">${waOk
+        ? '<b style="color:' + (waGood ? '#2e7d32' : '#c62828') + ';">' + esc(wa.status) + '</b> · ' + esc(wa.display_phone_number) + ' · quality <b>' + esc(wa.quality_rating) + '</b>'
+        : '<b style="color:#c62828;">Status unavailable</b> - could not read the number status from Meta'}</div>
+      ${waOk ? '<div style="font:13px ' + sans + ';color:#5b6f82;margin-top:4px;">Display name: ' + esc(wa.verified_name) + ' (' + esc(wa.name_status) + ') · phone verification: ' + esc(wa.code_verification_status) + '</div>' : ''}
+      <div style="font:12px ${sans};color:#5b6f82;margin-top:6px;">Checked every 30 minutes by an automatic monitor; you are emailed immediately if something breaks.</div>
     </div>
   </td></tr>
   <tr><td style="padding:16px 28px 28px;">

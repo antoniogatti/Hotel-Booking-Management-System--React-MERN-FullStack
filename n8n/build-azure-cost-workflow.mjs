@@ -5,6 +5,8 @@ const OPENAI_RESOURCE_ID = "/subscriptions/9b57086c-fdb8-43eb-ad36-a02c7a19ab09/
 const MAIL_SENDER = "info@palazzopintobnb.com";
 const MAIL_TO = "info@palazzopintobnb.com";
 const GRAPH_CREDENTIAL_ID = "lzGvVXAiyOsdlVc7"; // n8n credential on n8n-palazzopinto (website's MS_ENTRA_* app)
+const META_CREDENTIAL_ID = "9ECuXnuigbGEyf58"; // n8n httpHeaderAuth credential holding the WhatsApp token
+const WA_PHONE_NUMBER_ID = "1373088652564505";
 const SUBSCRIPTION_ID = "9b57086c-fdb8-43eb-ad36-a02c7a19ab09";
 
 const buildQuery = `
@@ -112,11 +114,26 @@ const workflow = {
       waitBetweenTries: 5000,
     },
     {
+      // WhatsApp number status for the report; a Meta failure must not block the cost email
+      parameters: {
+        url: `https://graph.facebook.com/v21.0/${WA_PHONE_NUMBER_ID}?fields=display_phone_number,verified_name,status,quality_rating,name_status,messaging_limit_tier,code_verification_status`,
+        authentication: "genericCredentialType",
+        genericAuthType: "httpHeaderAuth",
+        options: {},
+      },
+      name: "WhatsApp Status",
+      type: "n8n-nodes-base.httpRequest",
+      typeVersion: 4.2,
+      position: [1100, 0],
+      onError: "continueRegularOutput",
+      credentials: { httpHeaderAuth: { id: META_CREDENTIAL_ID, name: "Meta WhatsApp token" } },
+    },
+    {
       parameters: { jsCode: formatEmail },
       name: "Format Email",
       type: "n8n-nodes-base.code",
       typeVersion: 2,
-      position: [1100, 0],
+      position: [1320, 0],
     },
     {
       // Same Entra app the website uses (client credentials, Mail.Send) -> Graph sendMail as info@
@@ -133,7 +150,7 @@ const workflow = {
       name: "Send via Microsoft Graph",
       type: "n8n-nodes-base.httpRequest",
       typeVersion: 4.2,
-      position: [1320, 0],
+      position: [1540, 0],
       credentials: { oAuth2Api: { id: GRAPH_CREDENTIAL_ID, name: "Microsoft Graph - Palazzo Pinto mail" } },
     },
   ],
@@ -142,7 +159,8 @@ const workflow = {
     "Build Query": { main: [[{ node: "Get Managed Identity Token", type: "main", index: 0 }]] },
     "Get Managed Identity Token": { main: [[{ node: "Azure Cost Query", type: "main", index: 0 }]] },
     "Azure Cost Query": { main: [[{ node: "Azure OpenAI Usage", type: "main", index: 0 }]] },
-    "Azure OpenAI Usage": { main: [[{ node: "Format Email", type: "main", index: 0 }]] },
+    "Azure OpenAI Usage": { main: [[{ node: "WhatsApp Status", type: "main", index: 0 }]] },
+    "WhatsApp Status": { main: [[{ node: "Format Email", type: "main", index: 0 }]] },
     "Format Email": { main: [[{ node: "Send via Microsoft Graph", type: "main", index: 0 }]] },
   },
   settings: { executionOrder: "v1", timezone: "Europe/Rome" },
