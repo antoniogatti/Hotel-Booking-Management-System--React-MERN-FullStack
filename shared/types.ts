@@ -109,6 +109,18 @@ export type HotelType = {
       message: string;
     }>;
   };
+  bookingComApi?: {
+    enabled?: boolean;
+    propertyId?: string;
+    roomId?: string;
+    rateId?: string;
+    pushAvailability?: boolean;
+    pushPrices?: boolean;
+    lastReservationsSyncAt?: Date;
+    lastAriPushAt?: Date;
+    lastSyncStatus?: string;
+    lastSyncError?: string;
+  };
   createdAt?: Date;
   updatedAt?: Date;
 };
@@ -230,6 +242,18 @@ export type BookingManagementRoomType = {
       message: string;
     }>;
   };
+  bookingComApi?: {
+    enabled?: boolean;
+    propertyId?: string;
+    roomId?: string;
+    rateId?: string;
+    pushAvailability?: boolean;
+    pushPrices?: boolean;
+    lastReservationsSyncAt?: Date;
+    lastAriPushAt?: Date;
+    lastSyncStatus?: string;
+    lastSyncError?: string;
+  };
 };
 
 export type BookingCalendarDayType = {
@@ -272,4 +296,25 @@ export type BookingCalendarResponseType = {
   month: string;
   days: BookingCalendarDayType[];
   bookings: BookingCalendarBookingRowType[];
+};
+
+// ─── WhatsApp inbox ────────────────────────────────────────────────────────────
+
+export type WAMessage = {
+  role: "user" | "assistant";
+  content: string;
+  ts: string;
+};
+
+export type WAConversation = {
+  phone: string;
+  lastMessage: { role: "user" | "assistant"; content: string; ts: string } | null;
+  updated_at: string;
+  messageCount: number;
+};
+
+export type WAThread = {
+  phone: string;
+  messages: WAMessage[];
+  updated_at: string;
 };

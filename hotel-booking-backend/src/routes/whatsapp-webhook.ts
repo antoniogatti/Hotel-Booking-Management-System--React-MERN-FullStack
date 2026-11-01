@@ -2,8 +2,10 @@ import express, { Request, Response } from "express";
 import axios from "axios";
 import { AzureOpenAI } from "openai";
 import mongoose, { Schema, Document } from "mongoose";
+// Schema/Document used for PropertyKnowledge inline model below
 import Hotel from "../models/hotel";
 import Booking from "../models/booking";
+import WAConversation, { IWAConversation } from "../models/wa-conversation";
 
 const router = express.Router();
 
@@ -35,22 +37,6 @@ const PropertyKnowledge = (
   mongoose.models.PropertyKnowledge ||
   mongoose.model<IPropertyKnowledge>("PropertyKnowledge", PropertyKnowledgeSchema)
 ) as mongoose.Model<IPropertyKnowledge>;
-
-// ─── MongoDB: per-guest conversation history (24h TTL) ───────────────────────
-interface IWAConversation extends Document {
-  phone: string;
-  messages: Array<{ role: "user" | "assistant"; content: string; ts: Date }>;
-  updated_at: Date;
-}
-const WAConversationSchema = new Schema<IWAConversation>({
-  phone: { type: String, required: true, unique: true },
-  messages: [{ role: String, content: String, ts: Date }],
-  updated_at: { type: Date, default: Date.now, expires: 86400 },
-});
-const WAConversation = (
-  mongoose.models.WAConversation ||
-  mongoose.model<IWAConversation>("WAConversation", WAConversationSchema)
-) as mongoose.Model<IWAConversation>;
 
 // ─── Knowledge cache (refresh hourly) ────────────────────────────────────────
 let knowledgeCache = "";

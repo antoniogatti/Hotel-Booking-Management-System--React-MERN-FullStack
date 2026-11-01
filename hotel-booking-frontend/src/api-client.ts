@@ -7,6 +7,8 @@ import {
   BookingType,
   BookingManagementRoomType,
   BookingCalendarResponseType,
+  WAConversation,
+  WAThread,
 } from "../../shared/types";
 import { queryClient } from "./lib/query-client";
 
@@ -155,6 +157,22 @@ export const addMyHotel = async (hotelFormData: FormData) => {
 export const fetchMyHotels = async (): Promise<HotelType[]> => {
   const response = await axiosInstance.get("/api/my-hotels");
   return response.data;
+};
+
+// ─── WhatsApp inbox ────────────────────────────────────────────────────────────
+
+export const getWAConversations = async (): Promise<WAConversation[]> => {
+  const response = await axiosInstance.get("/api/wa-inbox");
+  return response.data;
+};
+
+export const getWAThread = async (phone: string): Promise<WAThread> => {
+  const response = await axiosInstance.get(`/api/wa-inbox/${phone}`);
+  return response.data;
+};
+
+export const sendWAReply = async (phone: string, message: string): Promise<void> => {
+  await axiosInstance.post(`/api/wa-inbox/${phone}/reply`, { message });
 };
 
 export const fetchMyHotelById = async (hotelId: string): Promise<HotelType> => {
@@ -347,7 +365,33 @@ export const syncBookingComCalendars = async (payload?: { hotelId?: string }) =>
   return response.data;
 };
 
-export const clearBookingComSyncErrors = async (payload?: { hotelId?: string }) => {
+export const saveBookingComApiConfig = async (payload: {
+  hotelId: string;
+  enabled: boolean;
+  propertyId: string;
+  roomId: string;
+  rateId: string;
+  pushAvailability: boolean;
+  pushPrices: boolean;
+}) => {
+  const { hotelId, ...body } = payload;
+  const response = await axiosInstance.put(
+    `/api/integrations/booking-com/rooms/${hotelId}/api-config`,
+    body
+  );
+  return response.data;
+};
+
+export const syncBookingComApi = async (payload: {
+  hotelId?: string;
+  pull?: boolean;
+  push?: boolean;
+}) => {
+  const response = await axiosInstance.post("/api/integrations/booking-com/api/sync", payload);
+  return response.data;
+};
+
+export const clearBookingComSyncErrors =async (payload?: { hotelId?: string }) => {
   const response = await axiosInstance.post("/api/integrations/booking-com/errors/clear", {
     hotelId: payload?.hotelId,
   });

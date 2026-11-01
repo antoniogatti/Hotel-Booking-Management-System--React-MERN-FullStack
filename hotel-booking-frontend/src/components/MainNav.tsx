@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { ChevronDown, FileText, Activity } from "lucide-react";
+import { ChevronDown, FileText, Activity, MessageCircle } from "lucide-react";
 import { getHotelsSearchUrl } from "../lib/nav-utils";
 import { siteConfig } from "../config/siteConfig";
 
@@ -19,6 +19,7 @@ const navLinkClass =
 
 const MainNav = () => {
   const { isLoggedIn, userRole } = useAppContext();
+  const isAdminOrOwner = userRole === "admin" || userRole === "hotel_owner";
 
   return (
     <nav className="flex items-center gap-1 lg:gap-2">
@@ -37,6 +38,12 @@ const MainNav = () => {
       <Link to="/reach-us" className={navLinkClass}>
         Directions
       </Link>
+
+      {isAdminOrOwner && (
+        <Link to="/wa-inbox" className={navLinkClass} title="WhatsApp Inbox">
+          <MessageCircle className="h-4 w-4 text-[#25D366]" />
+        </Link>
+      )}
 
       {userRole === "admin" && (
         <>

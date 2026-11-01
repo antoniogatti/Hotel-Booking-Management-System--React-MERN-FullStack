@@ -20,6 +20,7 @@ import oneNoteRoutes from "./routes/onenote";
 import schedulerMonitorRoutes from "./routes/scheduler-monitor";
 import mcpRoutes from "./routes/mcp";
 import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
+import waInboxRoutes from "./routes/wa-inbox";
 import telemetryRoutes from "./routes/telemetry";
 import trafficInsightsRoutes from "./routes/traffic-insights";
 import swaggerUi from "swagger-ui-express";
@@ -29,6 +30,7 @@ import morgan from "morgan";
 import compression from "compression";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { startBookingComSyncScheduler } from "./lib/booking-com-ical";
+import { startBookingComApiScheduler } from "./lib/booking-com-api";
 import { startBookingEnrichmentScheduler } from "./lib/booking-enrichment-scheduler";
 import { logError, logInfo, logWarn } from "./lib/logger";
 import { initializeTelemetry } from "./lib/telemetry";
@@ -130,6 +132,7 @@ const connectDB = async () => {
       database: mongoose.connection.db.databaseName,
     });
     startBookingComSyncScheduler();
+    startBookingComApiScheduler();
     startBookingEnrichmentScheduler();
   } catch (error) {
     logError("MongoDB connection failed", error);
@@ -367,6 +370,9 @@ if (mcpEnabled) {
 
 // WhatsApp webhook (Sofia agent) — no auth, Meta-signed POST + verify token GET
 app.use("/webhook/whatsapp", whatsappWebhookRoutes);
+
+// WhatsApp inbox (admin) — JWT auth required
+app.use("/api/wa-inbox", waInboxRoutes);
 
 // Dynamic Port Configuration (for Coolify/VPS and local development)
 const PORT = process.env.PORT || 5000;

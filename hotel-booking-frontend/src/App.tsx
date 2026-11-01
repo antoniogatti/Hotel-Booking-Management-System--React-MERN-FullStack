@@ -42,6 +42,7 @@ import AdminSelfCheckins from "./pages/AdminSelfCheckins";
 import AdminSelfCheckinDetail from "./pages/AdminSelfCheckinDetail";
 import SchedulerMonitor from "./pages/SchedulerMonitor";
 import TrafficInsightsDashboard from "./pages/TrafficInsightsDashboard";
+import WAInbox from "./pages/WAInbox";
 import SelfCheckin from "./pages/SelfCheckin";
 import { siteConfig } from "./config/siteConfig";
 import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
@@ -93,6 +94,7 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/booking-com-sync") return `${BRAND_NAME} | Booking.com Sync`;
   if (pathname === "/scheduler-monitor") return `${BRAND_NAME} | Scheduler Monitor`;
   if (pathname === "/traffic-insights") return `${BRAND_NAME} | Traffic Insights`;
+  if (pathname === "/wa-inbox") return `${BRAND_NAME} | WhatsApp Inbox`;
   if (pathname === "/manage-bookings") return `${BRAND_NAME} | Manage Bookings`;
   if (pathname.startsWith("/hotel/") && pathname.endsWith("/booking")) {
     return `${BRAND_NAME} | Booking Details`;
@@ -455,6 +457,18 @@ const App = () => {
             userRole === "admin" ? (
               <Layout>
                 <ManageBookings />
+              </Layout>
+            ) : (
+              <Navigate to="/" />
+            )
+          }
+        />
+        <Route
+          path="/wa-inbox"
+          element={
+            userRole === "admin" || userRole === "hotel_owner" ? (
+              <Layout>
+                <WAInbox />
               </Layout>
             ) : (
               <Navigate to="/" />
