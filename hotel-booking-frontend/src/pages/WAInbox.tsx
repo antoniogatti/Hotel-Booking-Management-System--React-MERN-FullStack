@@ -77,12 +77,17 @@ const ConvoItem = ({ convo, active, disabled, contacts, onClick }: ConvoItemProp
       `}
     >
       <div className="flex items-center justify-between mb-0.5">
-        <span className="font-semibold text-sm text-gray-900 truncate">{displayName(convo.phone, contacts, convo.name)}</span>
+        <span className={`text-sm text-gray-900 truncate ${convo.unread ? "font-bold" : "font-semibold"}`}>
+          {displayName(convo.phone, contacts, convo.name)}
+        </span>
         <div className="flex items-center gap-1.5 shrink-0 ml-2">
           {convo.hasPending && (
             <span className="h-2 w-2 rounded-full bg-orange-400" title="Sofia draft pending approval" />
           )}
           <span className="text-xs text-gray-400">{relativeTime(convo.updated_at)}</span>
+          {convo.unread && !convo.hasPending && (
+            <span className="h-2.5 w-2.5 rounded-full bg-[#25D366] shrink-0" title="Unread" />
+          )}
         </div>
       </div>
       <div className="flex items-center gap-1">
@@ -92,7 +97,7 @@ const ConvoItem = ({ convo, active, disabled, contacts, onClick }: ConvoItemProp
         {!convo.hasPending && convo.lastMessage?.role === "assistant" && (
           <span className="text-[10px] bg-[#25D366] text-white px-1 rounded shrink-0">Sofia</span>
         )}
-        <p className="text-xs text-gray-500 truncate">{preview}</p>
+        <p className={`text-xs truncate ${convo.unread ? "text-gray-800 font-medium" : "text-gray-500"}`}>{preview}</p>
       </div>
     </button>
   );
@@ -518,6 +523,17 @@ const NewChatModal = ({ onClose, onStart, contacts }: NewChatModalProps) => {
 
 const is404 = (e: unknown) => axios.isAxiosError(e) && e.response?.status === 404;
 
+const sendErrorMessage = (e: unknown): string => {
+  if (axios.isAxiosError(e)) {
+    if (!e.response) return "Can't reach the server. Check your connection and try again.";
+    const msg = e.response.data?.message;
+    if (typeof msg === "string" && msg) return msg;
+    if (e.response.status === 401) return "Your session expired — please sign in again.";
+    return `The server returned an error (${e.response.status}). Try again in a moment.`;
+  }
+  return "Something went wrong. Please try again.";
+};
+
 const WAInbox = () => {
   const [conversations, setConversations] = useState<WAConversation[]>([]);
   const [totalConvos, setTotalConvos] = useState(0);
@@ -536,6 +552,7 @@ const WAInbox = () => {
 
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [contacts, setContacts] = useState<Map<string, WAContact>>(new Map());
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactName, setContactName] = useState("");
@@ -800,6 +817,7 @@ const WAInbox = () => {
   }, [refreshFirstPage, loadContacts, pollThread]);
 
   const resetThread = () => {
+    setSendError(null);
     threadRef.current = { start: 0, total: 0 };
     setMessages([]);
     setThreadStart(0);
@@ -816,6 +834,9 @@ const WAInbox = () => {
     setShowContactForm(false);
     setContactName("");
     setMobileShowList(false);
+    // Optimistically clear unread + fire-and-forget backend mark-read
+    setConversations((prev) => prev.map((c) => c.phone === phone ? { ...c, unread: false } : c));
+    void apiClient.markWARead(phone);
   };
 
   const handleNewChat = async (phone: string, name?: string) => {
@@ -841,6 +862,7 @@ const WAInbox = () => {
   const handleSend = async () => {
     if (!activePhone || !reply.trim() || sending) return;
     setSending(true);
+    setSendError(null);
     try {
       await apiClient.sendWAReply(activePhone, reply.trim());
       threadRef.current = { start: threadRef.current.start, total: threadRef.current.total + 1 };
@@ -849,14 +871,22 @@ const WAInbox = () => {
       setReply("");
       void refreshFirstPage();
       setTimeout(forceScrollToBottom, 50);
-    } catch { /* ignore */ } finally {
+    } catch (e: unknown) {
+      setSendError(sendErrorMessage(e));
+    } finally {
       setSending(false);
     }
   };
 
   const handleApprove = async (text: string) => {
     if (!activePhone) return;
-    await apiClient.approveWAReply(activePhone, text);
+    setSendError(null);
+    try {
+      await apiClient.approveWAReply(activePhone, text);
+    } catch (e: unknown) {
+      setSendError(sendErrorMessage(e));
+      return;
+    }
     threadRef.current = { start: threadRef.current.start, total: threadRef.current.total + 1 };
     setMessages((prev) => [...prev, { role: "assistant", content: text, ts: new Date().toISOString(), source: "approved_ai" }]);
     setPendingReply(undefined);
@@ -1083,6 +1113,13 @@ const WAInbox = () => {
             />
           )}
 
+          {sendError && (
+            <div role="alert" className="px-4 py-2 bg-red-50 border-t border-red-200 text-sm text-red-700 flex items-start gap-2 shrink-0">
+              <span className="flex-1">Message not sent: {sendError}</span>
+              <button onClick={() => setSendError(null)} className="text-red-400 hover:text-red-600" aria-label="Dismiss">✕</button>
+            </div>
+          )}
+
           {/* Reply input */}
           <div className="px-4 py-3 bg-white border-t border-gray-200 flex items-end gap-2 shrink-0">
             <textarea
@@ -1120,6 +1157,14 @@ const WAInbox = () => {
     </div>
   );
 
+  const unreadCount = conversations.filter((c) => c.unread).length;
+
+  // Update browser tab title with unread count
+  useEffect(() => {
+    document.title = unreadCount > 0 ? `(${unreadCount}) Sofia Inbox` : "Sofia Inbox";
+    return () => { document.title = "Palazzo Pinto"; };
+  }, [unreadCount]);
+
   return (
     <>
     {showNewChat && (
@@ -1137,6 +1182,11 @@ const WAInbox = () => {
           <span className="ml-2 text-xs bg-[#f0fdf4] text-[#25D366] border border-[#bbf7d0] px-2 py-0.5 rounded-full font-medium">
             {totalConvos || conversations.length} conversation{(totalConvos || conversations.length) !== 1 ? "s" : ""}
           </span>
+          {unreadCount > 0 && (
+            <span className="text-xs bg-red-500 text-white px-1.5 py-0.5 rounded-full font-bold">
+              {unreadCount} unread
+            </span>
+          )}
           {(() => {
             const pendingCount = conversations.filter((c) => c.hasPending).length;
             return pendingCount > 0 ? (

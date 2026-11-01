@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
 import {
@@ -41,6 +41,21 @@ const MobileNavLinks = ({ onNavigate }: MobileNavLinksProps) => {
   const { isLoggedIn, userRole, isOwnerOrAdmin } = useAppContext();
   const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [isApiOpen, setIsApiOpen] = useState(false);
+  const [unreadWA, setUnreadWA] = useState(0);
+
+  const checkUnread = useCallback(async () => {
+    if (!isOwnerOrAdmin) return;
+    try {
+      const page = await apiClient.getWAConversations({ limit: 50 });
+      setUnreadWA(page.conversations.filter((c) => c.unread).length);
+    } catch { /* ignore */ }
+  }, [isOwnerOrAdmin]);
+
+  useEffect(() => {
+    void checkUnread();
+    const id = setInterval(() => void checkUnread(), 15_000);
+    return () => clearInterval(id);
+  }, [checkUnread]);
 
   const email = localStorage.getItem("user_email");
   const name = localStorage.getItem("user_name") || "Palazzo Pinto";
@@ -161,6 +176,11 @@ const MobileNavLinks = ({ onNavigate }: MobileNavLinksProps) => {
                       >
                         <Icon className="h-4 w-4" />
                         {label}
+                        {to === "/wa-inbox" && unreadWA > 0 && (
+                          <span className="ml-auto h-5 w-5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center leading-none">
+                            {unreadWA > 9 ? "9+" : unreadWA}
+                          </span>
+                        )}
                       </Link>
                     ))}
 

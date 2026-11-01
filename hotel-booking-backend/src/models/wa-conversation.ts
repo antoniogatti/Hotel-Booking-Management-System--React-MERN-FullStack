@@ -18,6 +18,7 @@ export interface IWAConversation extends Document {
   messages: IWAMessage[];
   updated_at: Date;
   auto: boolean;
+  adminReadAt?: Date;
   pendingReply?: {
     inReplyTo: string;
     suggestions: string[];
@@ -43,6 +44,7 @@ const WAConversationSchema = new Schema<IWAConversation>({
   ],
   updated_at: { type: Date, default: Date.now, expires: 86400 },
   auto: { type: Boolean, default: false },
+  adminReadAt: { type: Date, required: false },
   pendingReply: {
     type: {
       inReplyTo: String,

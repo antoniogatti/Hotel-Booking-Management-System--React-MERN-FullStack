@@ -327,6 +327,7 @@ export type WAConversation = {
   messageCount: number;
   auto: boolean;
   hasPending: boolean;
+  unread: boolean;
 };
 
 export type WAConversationPage = {

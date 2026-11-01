@@ -17,6 +17,8 @@ const safe =
   (fn: (req: Request, res: Response) => Promise<unknown>): RequestHandler =>
   (req: Request, res: Response, next: NextFunction) => {
     fn(req, res).catch((err) => {
+      // 422 (not 5xx) so a rejected send is shown to the admin rather than looking like an outage
+      if (err instanceof WASendError && !res.headersSent) return res.status(422).json({ message: err.message });
       console.error("[wa-inbox] handler error:", err);
       if (!res.headersSent) res.status(500).json({ message: "Something went wrong" });
       else next(err);
@@ -28,14 +30,37 @@ const intParam = (value: unknown, fallback: number, min: number, max: number) =>
   return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
 };
 
+// A send failure whose message is safe to show to the admin in the inbox.
+class WASendError extends Error {}
+
+function explainSendError(err: unknown): string {
+  const meta = axios.isAxiosError(err) ? err.response?.data?.error : undefined;
+  switch (meta?.code) {
+    case 131047:
+      return "WhatsApp only allows free-form replies within 24h of the guest's last message, and that window has closed.";
+    case 131030:
+      return "This number is not on the allowed recipient list of the WhatsApp test account.";
+    case 190:
+      return "The WhatsApp access token is invalid or has expired.";
+  }
+  return meta?.message ?? (err instanceof Error ? err.message : "Could not send the message");
+}
+
 async function sendWhatsAppMsg(to: string, body: string): Promise<string | null> {
-  if (!WA_ACCESS_TOKEN) throw new Error("WA_ACCESS_TOKEN not configured");
-  const res = await axios.post(
-    `https://graph.facebook.com/v19.0/${WA_PHONE_NUMBER_ID}/messages`,
-    { messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body } },
-    { headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}`, "Content-Type": "application/json" } }
-  );
-  return (res.data?.messages?.[0]?.id as string) ?? null;
+  if (!WA_ACCESS_TOKEN) throw new WASendError("WA_ACCESS_TOKEN is not configured on the server.");
+  try {
+    const res = await axios.post(
+      `https://graph.facebook.com/v19.0/${WA_PHONE_NUMBER_ID}/messages`,
+      { messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body } },
+      { headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}`, "Content-Type": "application/json" } }
+    );
+    return (res.data?.messages?.[0]?.id as string) ?? null;
+  } catch (err) {
+    if (axios.isAxiosError(err)) {
+      console.error("[wa-inbox] Meta send failed:", err.response?.status, JSON.stringify(err.response?.data));
+    }
+    throw new WASendError(explainSendError(err));
+  }
 }
 
 // ─── Contacts (registered BEFORE /:phone to avoid routing conflicts) ──────────
@@ -105,6 +130,7 @@ router.get(
       WAConversation.aggregate<{
         phone: string;
         updated_at: Date;
+        adminReadAt?: Date;
         messageCount: number;
         auto: boolean;
         hasPending: boolean;
@@ -118,6 +144,7 @@ router.get(
             _id: 0,
             phone: 1,
             updated_at: 1,
+            adminReadAt: 1,
             auto: { $ifNull: ["$auto", false] },
             hasPending: { $cond: [{ $ifNull: ["$pendingReply", false] }, true, false] },
             messageCount: { $size: { $ifNull: ["$messages", []] } },
@@ -131,17 +158,24 @@ router.get(
     const contacts = await WAContact.find({ phone: { $in: rows.map((r) => r.phone) } }, { phone: 1, name: 1 }).lean();
     const nameByPhone = new Map(contacts.map((c) => [c.phone, c.name]));
 
-    const conversations = rows.map((r) => ({
-      phone: r.phone,
-      name: nameByPhone.get(r.phone),
-      auto: r.auto,
-      hasPending: r.hasPending,
-      lastMessage: r.lastMessage
-        ? { role: r.lastMessage.role, content: r.lastMessage.content, ts: r.lastMessage.ts }
-        : null,
-      updated_at: r.updated_at,
-      messageCount: r.messageCount,
-    }));
+    const conversations = rows.map((r) => {
+      const lastMsg = r.lastMessage;
+      const unread =
+        lastMsg?.role === "user" &&
+        (!r.adminReadAt || new Date(r.updated_at) > new Date(r.adminReadAt));
+      return {
+        phone: r.phone,
+        name: nameByPhone.get(r.phone),
+        auto: r.auto,
+        hasPending: r.hasPending,
+        unread,
+        lastMessage: lastMsg
+          ? { role: lastMsg.role, content: lastMsg.content, ts: lastMsg.ts }
+          : null,
+        updated_at: r.updated_at,
+        messageCount: r.messageCount,
+      };
+    });
 
     return res.json({ conversations, total, hasMore: skip + rows.length < total });
   })
@@ -206,6 +240,10 @@ router.get(
     }
 
     const contact = await WAContact.findOne({ phone }, { name: 1 }).lean();
+
+    // Mark as read (fire-and-forget)
+    void WAConversation.updateOne({ phone }, { $set: { adminReadAt: new Date() } });
+
     return res.json({
       phone,
       name: contact?.name,
@@ -216,6 +254,18 @@ router.get(
       updated_at,
       ...(pendingReply ? { pendingReply } : {}),
     });
+  })
+);
+
+// ─── Mark conversation as read ─────────────────────────────────────────────────
+
+router.post(
+  "/:phone/read",
+  verifyToken,
+  safe(async (req, res) => {
+    const { phone } = req.params;
+    await WAConversation.updateOne({ phone }, { $set: { adminReadAt: new Date() } });
+    return res.json({ ok: true });
   })
 );
 

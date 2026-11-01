@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Button } from "./ui/button";
 import UsernameMenu from "./UsernameMenu";
 import { Link } from "react-router-dom";
@@ -11,6 +12,7 @@ import {
 import { ChevronDown, FileText, Activity, MessageCircle } from "lucide-react";
 import { getHotelsSearchUrl } from "../lib/nav-utils";
 import { siteConfig } from "../config/siteConfig";
+import * as apiClient from "../api-client";
 
 const NAV_AUTH_WIDTH = "min-w-[120px]";
 
@@ -20,6 +22,20 @@ const navLinkClass =
 const MainNav = () => {
   const { isLoggedIn, userRole } = useAppContext();
   const isAdminOrOwner = userRole === "admin" || userRole === "hotel_owner";
+  const [unreadWA, setUnreadWA] = useState(0);
+
+  useEffect(() => {
+    if (!isAdminOrOwner) return;
+    const check = async () => {
+      try {
+        const page = await apiClient.getWAConversations({ limit: 50 });
+        setUnreadWA(page.conversations.filter((c) => c.unread).length);
+      } catch { /* ignore */ }
+    };
+    void check();
+    const id = setInterval(() => void check(), 15_000);
+    return () => clearInterval(id);
+  }, [isAdminOrOwner]);
 
   return (
     <nav className="flex items-center gap-1 lg:gap-2">
@@ -41,7 +57,14 @@ const MainNav = () => {
 
       {isAdminOrOwner && (
         <Link to="/wa-inbox" className={navLinkClass} title="WhatsApp Inbox">
-          <MessageCircle className="h-4 w-4 text-[#25D366]" />
+          <span className="relative">
+            <MessageCircle className="h-4 w-4 text-[#25D366]" />
+            {unreadWA > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full bg-red-500 text-white text-[8px] font-bold flex items-center justify-center leading-none">
+                {unreadWA > 9 ? "9+" : unreadWA}
+              </span>
+            )}
+          </span>
         </Link>
       )}
 

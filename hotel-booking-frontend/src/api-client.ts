@@ -196,6 +196,10 @@ export const toggleWAAuto = async (phone: string, auto: boolean): Promise<void> 
   await axiosInstance.patch(`/api/wa-inbox/${phone}/auto`, { auto });
 };
 
+export const markWARead = async (phone: string): Promise<void> => {
+  await axiosInstance.post(`/api/wa-inbox/${phone}/read`);
+};
+
 export const getWAMediaUrl = (mediaId: string): string =>
   `${getApiBaseUrl()}/api/wa-inbox/media/${mediaId}`;
 
