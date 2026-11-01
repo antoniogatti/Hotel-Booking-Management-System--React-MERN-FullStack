@@ -35,6 +35,7 @@ infra/Sub-Copy/exports/api-mongo-setting.json
 *.sw?
 
 .env
+.env.local
 .env.e2e
 node_modules
 .cursorignore
@@ -47,3 +48,4 @@ DROPDOWN_TEST_CREDENTIALS_DOCS.md
 HETZNER_VPS_MIGRATION_GUIDE.md
 CLERK_AUTH_COMPLETE_IMPLEMENTATION_GUIDE.md
 SUBDOMAIN_ARNOBMAHMUD_SETUP.md
+.neon
