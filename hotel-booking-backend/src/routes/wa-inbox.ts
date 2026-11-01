@@ -66,6 +66,32 @@ router.post(
   })
 );
 
+// ─── Media proxy (audio voice notes from Meta) ────────────────────────────────
+
+router.get(
+  "/media/:mediaId",
+  verifyToken,
+  safe(async (req, res) => {
+    const { mediaId } = req.params;
+    if (!WA_ACCESS_TOKEN) return res.status(500).json({ message: "WA token not configured" });
+    // Step 1: resolve the temporary download URL from Meta
+    const metaRes = await axios.get(`https://graph.facebook.com/v19.0/${mediaId}`, {
+      headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` },
+    });
+    const url: string = metaRes.data.url;
+    const mimeType: string = (metaRes.data.mime_type as string) || "audio/ogg";
+    // Step 2: stream the audio to the browser
+    const audioRes = await axios.get<NodeJS.ReadableStream>(url, {
+      headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}` },
+      responseType: "stream",
+    });
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    audioRes.data.pipe(res);
+    return;
+  })
+);
+
 // ─── Conversations list ────────────────────────────────────────────────────────
 
 router.get(

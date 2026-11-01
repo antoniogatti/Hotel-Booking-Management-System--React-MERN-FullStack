@@ -181,11 +181,39 @@ router.post("/", async (req: Request, res: Response) => {
     if (!value?.messages?.length) return;
 
     const msg = value.messages[0];
+    const from: string = msg.from;
+    const phoneNumberId: string = value.metadata?.phone_number_id || WA_PHONE_NUMBER_ID;
+
+    // Handle audio/voice messages
+    if (msg.type === "audio") {
+      const mediaId: string = msg.audio?.id || "";
+      await WAConversation.findOneAndUpdate(
+        { phone: from },
+        {
+          $push: { messages: { role: "user", content: "[Voice message]", ts: new Date(), mediaId, mediaType: "audio" } },
+          $set: { updated_at: new Date() },
+        },
+        { upsert: true }
+      );
+      const convoMeta = await WAConversation.findOne({ phone: from }).select("auto").lean();
+      const isAuto = (convoMeta as any)?.auto ?? false;
+      if (isAuto) {
+        const audioReply = "Ho ricevuto il tuo messaggio vocale! Al momento rispondo solo ai messaggi di testo — puoi scrivermi la tua richiesta? 😊\n\nI received your voice note! For now I can only reply to text messages — could you write your request? 😊";
+        const msgId = await sendWhatsApp(phoneNumberId, from, audioReply);
+        await WAConversation.findOneAndUpdate(
+          { phone: from },
+          {
+            $push: { messages: { role: "assistant", content: audioReply, ts: new Date(), source: "auto", messageId: msgId, status: msgId ? "sent" : undefined } },
+            $set: { updated_at: new Date() },
+          }
+        );
+      }
+      return;
+    }
+
     if (msg.type !== "text") return;
 
-    const from: string = msg.from;
     const text: string = msg.text?.body || "";
-    const phoneNumberId: string = value.metadata?.phone_number_id || WA_PHONE_NUMBER_ID;
 
     // Load knowledge + conversation history in parallel
     const [knowledge, convoDoc] = await Promise.all([

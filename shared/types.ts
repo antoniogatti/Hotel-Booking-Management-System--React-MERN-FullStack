@@ -307,6 +307,9 @@ export type WAMessage = {
   source?: "auto" | "approved_ai" | "manual";
   messageId?: string;
   status?: "sent" | "delivered" | "read";
+  mediaId?: string;
+  mediaType?: "audio";
+  duration?: number;
 };
 
 export type PendingReply = {

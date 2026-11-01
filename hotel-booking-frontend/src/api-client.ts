@@ -196,6 +196,9 @@ export const toggleWAAuto = async (phone: string, auto: boolean): Promise<void> 
   await axiosInstance.patch(`/api/wa-inbox/${phone}/auto`, { auto });
 };
 
+export const getWAMediaUrl = (mediaId: string): string =>
+  `${getApiBaseUrl()}/api/wa-inbox/media/${mediaId}`;
+
 export const getWAContacts = async (): Promise<WAContact[]> => {
   const response = await axiosInstance.get("/api/wa-inbox/contacts");
   return response.data;

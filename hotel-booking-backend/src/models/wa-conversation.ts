@@ -7,6 +7,9 @@ export interface IWAMessage {
   source?: "auto" | "approved_ai" | "manual";
   messageId?: string;
   status?: "sent" | "delivered" | "read";
+  mediaId?: string;
+  mediaType?: "audio";
+  duration?: number;
 }
 
 export interface IWAConversation extends Document {
@@ -31,6 +34,9 @@ const WAConversationSchema = new Schema<IWAConversation>({
       source: { type: String, enum: ["auto", "approved_ai", "manual"], required: false },
       messageId: { type: String, required: false },
       status: { type: String, enum: ["sent", "delivered", "read"], required: false },
+      mediaId: { type: String, required: false },
+      mediaType: { type: String, required: false },
+      duration: { type: Number, required: false },
     },
   ],
   updated_at: { type: Date, default: Date.now, expires: 86400 },

@@ -116,10 +116,94 @@ const Ticks = ({ status }: { status?: "sent" | "delivered" | "read" }) => {
   );
 };
 
+// ─── Audio bubble ──────────────────────────────────────────────────────────────
+
+const WAVEFORM_HEIGHTS = [3,5,8,12,7,10,14,9,6,11,15,8,5,12,9,7,13,10,6,8,11,14,7,9,5,12,8,4];
+
+const AudioBubble = ({ msg, isUser }: { msg: WAMessage; isUser: boolean }) => {
+  const [playing, setPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [dur, setDur] = useState(msg.duration ?? 0);
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const src = msg.mediaId ? apiClient.getWAMediaUrl(msg.mediaId) : "";
+  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
+  const progress = dur > 0 ? currentTime / dur : 0;
+
+  const toggle = () => {
+    const el = audioRef.current;
+    if (!el) return;
+    if (playing) { el.pause(); setPlaying(false); }
+    else { void el.play().catch(() => null); setPlaying(true); }
+  };
+
+  return (
+    <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-2`}>
+      <div
+        className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl ${isUser ? "bg-white shadow-sm rounded-tl-sm border border-gray-100" : "rounded-tr-sm"}`}
+        style={{ minWidth: 200, maxWidth: 280, ...(isUser ? {} : { backgroundColor: "#25D366" }) }}
+      >
+        <audio
+          ref={audioRef}
+          src={src}
+          onTimeUpdate={() => setCurrentTime(audioRef.current?.currentTime ?? 0)}
+          onLoadedMetadata={() => setDur(audioRef.current?.duration ?? 0)}
+          onEnded={() => { setPlaying(false); setCurrentTime(0); }}
+        />
+        <button
+          onClick={toggle}
+          className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${isUser ? "bg-[#25D366]" : "bg-white/20"}`}
+          aria-label={playing ? "Pause" : "Play"}
+        >
+          {playing ? (
+            <svg viewBox="0 0 24 24" className="h-4 w-4 text-white fill-current">
+              <rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/>
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" className="h-4 w-4 text-white fill-current">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+          )}
+        </button>
+
+        <div className="flex items-center gap-[2px] flex-1 h-8">
+          {WAVEFORM_HEIGHTS.map((h, i) => {
+            const filled = i / WAVEFORM_HEIGHTS.length < progress;
+            return (
+              <div
+                key={i}
+                className="rounded-full transition-colors"
+                style={{
+                  width: 2,
+                  height: h,
+                  backgroundColor: isUser
+                    ? (filled ? "#25D366" : "#d1d5db")
+                    : (filled ? "white" : "rgba(255,255,255,0.35)"),
+                }}
+              />
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col items-end shrink-0 gap-0.5">
+          <span className={`text-[11px] font-medium tabular-nums ${isUser ? "text-gray-500" : "text-white/80"}`}>
+            {playing || currentTime > 0 ? fmt(currentTime) : fmt(dur)}
+          </span>
+          {!isUser && (
+            <span className="flex"><Ticks status={msg.status} /></span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Text bubble ───────────────────────────────────────────────────────────────
+
 type BubbleProps = { msg: WAMessage };
 
 const Bubble = ({ msg }: BubbleProps) => {
   const isUser = msg.role === "user";
+  if (msg.mediaType === "audio") return <AudioBubble msg={msg} isUser={isUser} />;
   const label = msg.source === "approved_ai" ? "Sofia ✓" : msg.source === "manual" ? "You" : "Sofia";
   return (
     <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-2`}>
