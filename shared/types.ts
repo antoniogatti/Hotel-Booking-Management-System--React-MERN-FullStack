@@ -318,3 +318,9 @@ export type WAThread = {
   messages: WAMessage[];
   updated_at: string;
 };
+
+export type WAContact = {
+  phone: string;
+  name: string;
+  notes?: string;
+};

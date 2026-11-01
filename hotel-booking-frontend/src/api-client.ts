@@ -9,6 +9,7 @@ import {
   BookingCalendarResponseType,
   WAConversation,
   WAThread,
+  WAContact,
 } from "../../shared/types";
 import { queryClient } from "./lib/query-client";
 
@@ -173,6 +174,15 @@ export const getWAThread = async (phone: string): Promise<WAThread> => {
 
 export const sendWAReply = async (phone: string, message: string): Promise<void> => {
   await axiosInstance.post(`/api/wa-inbox/${phone}/reply`, { message });
+};
+
+export const getWAContacts = async (): Promise<WAContact[]> => {
+  const response = await axiosInstance.get("/api/wa-inbox/contacts");
+  return response.data;
+};
+
+export const saveWAContact = async (phone: string, name: string, notes?: string): Promise<void> => {
+  await axiosInstance.post("/api/wa-inbox/contacts", { phone, name, notes });
 };
 
 export const fetchMyHotelById = async (hotelId: string): Promise<HotelType> => {

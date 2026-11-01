@@ -2,11 +2,36 @@ import express, { Request, Response } from "express";
 import axios from "axios";
 import verifyToken from "../middleware/auth";
 import WAConversation from "../models/wa-conversation";
+import WAContact from "../models/wa-contact";
 
 const router = express.Router();
 
 const WA_ACCESS_TOKEN = process.env.WA_ACCESS_TOKEN || "";
 const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "1373088652564505";
+
+// ─── Contacts (registered BEFORE /:phone to avoid routing conflicts) ──────────
+
+// GET /api/wa-inbox/contacts
+router.get("/contacts", verifyToken, async (_req: Request, res: Response) => {
+  const contacts = await WAContact.find({}).sort({ name: 1 }).lean();
+  return res.json(contacts.map((c) => ({ phone: c.phone, name: c.name, notes: c.notes })));
+});
+
+// POST /api/wa-inbox/contacts — upsert by phone
+router.post("/contacts", verifyToken, async (req: Request, res: Response) => {
+  const { phone, name, notes } = req.body as { phone: string; name: string; notes?: string };
+  if (!phone?.trim() || !name?.trim()) {
+    return res.status(400).json({ message: "phone and name are required" });
+  }
+  await WAContact.findOneAndUpdate(
+    { phone },
+    { name, notes: notes ?? "" },
+    { upsert: true, new: true }
+  );
+  return res.json({ ok: true });
+});
+
+// ─── Conversations ─────────────────────────────────────────────────────────────
 
 // GET /api/wa-inbox — list all conversations, sorted by most recent
 router.get("/", verifyToken, async (_req: Request, res: Response) => {
@@ -54,7 +79,6 @@ router.post("/:phone/reply", verifyToken, async (req: Request, res: Response) =>
     return res.status(503).json({ message: "WA_ACCESS_TOKEN not configured" });
   }
 
-  // Send via Meta Cloud API
   await axios.post(
     `https://graph.facebook.com/v19.0/${WA_PHONE_NUMBER_ID}/messages`,
     {
@@ -72,7 +96,6 @@ router.post("/:phone/reply", verifyToken, async (req: Request, res: Response) =>
     }
   );
 
-  // Persist to conversation history
   await WAConversation.findOneAndUpdate(
     { phone },
     {
