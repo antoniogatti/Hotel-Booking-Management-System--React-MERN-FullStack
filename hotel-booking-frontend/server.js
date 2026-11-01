@@ -2,6 +2,7 @@
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const zlib = require("zlib");
 
 const PORT = process.env.PORT || 8080;
 const DIST_DIR = __dirname;
@@ -46,7 +47,26 @@ const server = http.createServer((req, res) => {
       filePath = path.join(DIST_DIR, "index.html");
     }
     const ext = path.extname(filePath);
-    res.writeHead(200, { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" });
+    const headers = { "Content-Type": MIME_TYPES[ext] || "application/octet-stream" };
+
+    // Hashed build assets never change; photos change rarely; HTML must always revalidate.
+    if (filePath.startsWith(path.join(DIST_DIR, "assets"))) {
+      headers["Cache-Control"] = "public, max-age=31536000, immutable";
+    } else if (ext === ".html") {
+      headers["Cache-Control"] = "no-cache";
+    } else if ([".jpg", ".jpeg", ".png", ".svg", ".webp", ".ico", ".woff", ".woff2"].includes(ext)) {
+      headers["Cache-Control"] = "public, max-age=604800";
+    }
+
+    const compressible = [".html", ".js", ".css", ".json", ".svg", ".txt"].includes(ext);
+    if (compressible && /\bgzip\b/.test(req.headers["accept-encoding"] || "")) {
+      headers["Content-Encoding"] = "gzip";
+      headers["Vary"] = "Accept-Encoding";
+      res.writeHead(200, headers);
+      return fs.createReadStream(filePath).pipe(zlib.createGzip()).pipe(res);
+    }
+
+    res.writeHead(200, headers);
     fs.createReadStream(filePath).pipe(res);
   });
 });
