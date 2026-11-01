@@ -162,6 +162,22 @@ router.post("/", async (req: Request, res: Response) => {
 
   try {
     const value = req.body?.entry?.[0]?.changes?.[0]?.value;
+
+    // Handle delivery/read status updates
+    const statuses = value?.statuses;
+    if (statuses?.length) {
+      for (const s of statuses) {
+        const msgId: string = s.id;
+        const newStatus: string = s.status;
+        if (!["sent", "delivered", "read"].includes(newStatus)) continue;
+        await WAConversation.updateOne(
+          { "messages.messageId": msgId },
+          { $set: { "messages.$.status": newStatus } }
+        );
+      }
+      if (!value?.messages?.length) return;
+    }
+
     if (!value?.messages?.length) return;
 
     const msg = value.messages[0];
@@ -263,7 +279,9 @@ ${knowledge}
       return; // Don't send — awaiting admin approval
     }
 
-    // Auto mode: persist both messages and send immediately
+    // Auto mode: send first to capture message ID, then persist
+    const messageId = await sendWhatsApp(phoneNumberId, from, reply);
+
     await WAConversation.findOneAndUpdate(
       { phone: from },
       {
@@ -271,7 +289,13 @@ ${knowledge}
           messages: {
             $each: [
               { role: "user", content: text, ts: new Date() },
-              { role: "assistant", content: reply, ts: new Date(), source: "auto" },
+              {
+                role: "assistant",
+                content: reply,
+                ts: new Date(),
+                source: "auto",
+                ...(messageId ? { messageId, status: "sent" } : {}),
+              },
             ],
           },
         },
@@ -279,8 +303,6 @@ ${knowledge}
       },
       { upsert: true }
     );
-
-    await sendWhatsApp(phoneNumberId, from, reply);
   } catch (err) {
     const e = err as any;
     console.error("[Sofia] error:", e?.message || err, "status:", e?.status, "code:", e?.code);
@@ -288,16 +310,17 @@ ${knowledge}
 });
 
 // ─── Send WhatsApp message ────────────────────────────────────────────────────
-async function sendWhatsApp(phoneNumberId: string, to: string, body: string): Promise<void> {
+async function sendWhatsApp(phoneNumberId: string, to: string, body: string): Promise<string | null> {
   if (!WA_ACCESS_TOKEN) {
     console.warn("[Sofia] WA_ACCESS_TOKEN not set — skipping send");
-    return;
+    return null;
   }
-  await axios.post(
+  const res = await axios.post(
     `https://graph.facebook.com/v19.0/${phoneNumberId}/messages`,
     { messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body } },
     { headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}`, "Content-Type": "application/json" } }
   );
+  return (res.data?.messages?.[0]?.id as string) ?? null;
 }
 
 export default router;

@@ -28,13 +28,14 @@ const intParam = (value: unknown, fallback: number, min: number, max: number) =>
   return Number.isFinite(n) ? Math.min(Math.max(n, min), max) : fallback;
 };
 
-async function sendWhatsAppMsg(to: string, body: string): Promise<void> {
+async function sendWhatsAppMsg(to: string, body: string): Promise<string | null> {
   if (!WA_ACCESS_TOKEN) throw new Error("WA_ACCESS_TOKEN not configured");
-  await axios.post(
+  const res = await axios.post(
     `https://graph.facebook.com/v19.0/${WA_PHONE_NUMBER_ID}/messages`,
     { messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body } },
     { headers: { Authorization: `Bearer ${WA_ACCESS_TOKEN}`, "Content-Type": "application/json" } }
   );
+  return (res.data?.messages?.[0]?.id as string) ?? null;
 }
 
 // ─── Contacts (registered BEFORE /:phone to avoid routing conflicts) ──────────
@@ -165,7 +166,7 @@ router.get(
       count = end - start;
     }
 
-    let messages: Array<{ role: string; content: string; ts: Date; source?: string }> = [];
+    let messages: Array<{ role: string; content: string; ts: Date; source?: string; messageId?: string; status?: string }> = [];
     if (count > 0) {
       const doc = await WAConversation.findOne({ phone }, { messages: { $slice: [start, count] } }).lean();
       messages = (doc?.messages ?? []).map((m) => ({
@@ -173,6 +174,8 @@ router.get(
         content: m.content,
         ts: m.ts,
         ...(m.source ? { source: m.source } : {}),
+        ...(m.messageId ? { messageId: m.messageId } : {}),
+        ...(m.status ? { status: m.status } : {}),
       }));
     }
 
@@ -214,12 +217,20 @@ router.post(
     const { text } = req.body as { text: string };
     if (!text?.trim()) return res.status(400).json({ message: "text is required" });
 
-    await sendWhatsAppMsg(phone, text.trim());
+    const approveId = await sendWhatsAppMsg(phone, text.trim());
 
     await WAConversation.findOneAndUpdate(
       { phone },
       {
-        $push: { messages: { role: "assistant", content: text.trim(), ts: new Date(), source: "approved_ai" } },
+        $push: {
+          messages: {
+            role: "assistant",
+            content: text.trim(),
+            ts: new Date(),
+            source: "approved_ai",
+            ...(approveId ? { messageId: approveId, status: "sent" } : {}),
+          },
+        },
         $unset: { pendingReply: 1 },
         $set: { updated_at: new Date() },
       },
@@ -253,12 +264,20 @@ router.post(
 
     if (!message?.trim()) return res.status(400).json({ message: "message is required" });
 
-    await sendWhatsAppMsg(phone, message.trim());
+    const replyId = await sendWhatsAppMsg(phone, message.trim());
 
     await WAConversation.findOneAndUpdate(
       { phone },
       {
-        $push: { messages: { role: "assistant", content: message.trim(), ts: new Date(), source: "manual" } },
+        $push: {
+          messages: {
+            role: "assistant",
+            content: message.trim(),
+            ts: new Date(),
+            source: "manual",
+            ...(replyId ? { messageId: replyId, status: "sent" } : {}),
+          },
+        },
         $unset: { pendingReply: 1 },
         $set: { updated_at: new Date() },
       },

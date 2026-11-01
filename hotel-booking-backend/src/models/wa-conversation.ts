@@ -5,6 +5,8 @@ export interface IWAMessage {
   content: string;
   ts: Date;
   source?: "auto" | "approved_ai" | "manual";
+  messageId?: string;
+  status?: "sent" | "delivered" | "read";
 }
 
 export interface IWAConversation extends Document {
@@ -27,6 +29,8 @@ const WAConversationSchema = new Schema<IWAConversation>({
       content: String,
       ts: Date,
       source: { type: String, enum: ["auto", "approved_ai", "manual"], required: false },
+      messageId: { type: String, required: false },
+      status: { type: String, enum: ["sent", "delivered", "read"], required: false },
     },
   ],
   updated_at: { type: Date, default: Date.now, expires: 86400 },

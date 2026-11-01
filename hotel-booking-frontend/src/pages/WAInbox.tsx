@@ -98,6 +98,24 @@ const ConvoItem = ({ convo, active, disabled, contacts, onClick }: ConvoItemProp
   );
 };
 
+// ─── Message status ticks ─────────────────────────────────────────────────────
+
+const Ticks = ({ status }: { status?: "sent" | "delivered" | "read" }) => {
+  if (!status) return null;
+  if (status === "sent") return (
+    <svg viewBox="0 0 16 11" className="inline h-3 w-3 ml-1 align-middle" fill="none">
+      <path d="M1 5.5L5 9.5L15 1" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+  const color = status === "read" ? "#53bdeb" : "rgba(255,255,255,0.7)";
+  return (
+    <svg viewBox="0 0 20 11" className="inline h-3 w-4 ml-1 align-middle" fill="none">
+      <path d="M1 5.5L5 9.5L13 1" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M7 5.5L11 9.5L19 1" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+};
+
 type BubbleProps = { msg: WAMessage };
 
 const Bubble = ({ msg }: BubbleProps) => {
@@ -119,8 +137,9 @@ const Bubble = ({ msg }: BubbleProps) => {
         >
           {msg.content}
         </div>
-        <p className={`text-[10px] text-gray-400 mt-0.5 ${isUser ? "text-left ml-1" : "text-right mr-1"}`}>
-          {formatDate(msg.ts)} {formatTime(msg.ts)}
+        <p className={`text-[10px] text-gray-400 mt-0.5 flex items-center gap-0.5 ${isUser ? "justify-start ml-1" : "justify-end mr-1"}`}>
+          <span>{formatDate(msg.ts)} {formatTime(msg.ts)}</span>
+          {!isUser && <Ticks status={msg.status} />}
         </p>
       </div>
     </div>

@@ -305,6 +305,8 @@ export type WAMessage = {
   content: string;
   ts: string;
   source?: "auto" | "approved_ai" | "manual";
+  messageId?: string;
+  status?: "sent" | "delivered" | "read";
 };
 
 export type PendingReply = {
