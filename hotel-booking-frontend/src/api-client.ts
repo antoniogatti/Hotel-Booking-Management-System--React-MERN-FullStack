@@ -162,13 +162,13 @@ export const fetchMyHotels = async (): Promise<HotelType[]> => {
 
 // ─── WhatsApp inbox ────────────────────────────────────────────────────────────
 
-export const getWAConversations = async (): Promise<WAConversation[]> => {
-  const response = await axiosInstance.get("/api/wa-inbox");
+export const getWAConversations = async (signal?: AbortSignal): Promise<WAConversation[]> => {
+  const response = await axiosInstance.get("/api/wa-inbox", { signal });
   return response.data;
 };
 
-export const getWAThread = async (phone: string): Promise<WAThread> => {
-  const response = await axiosInstance.get(`/api/wa-inbox/${phone}`);
+export const getWAThread = async (phone: string, signal?: AbortSignal): Promise<WAThread> => {
+  const response = await axiosInstance.get(`/api/wa-inbox/${phone}`, { signal });
   return response.data;
 };
 

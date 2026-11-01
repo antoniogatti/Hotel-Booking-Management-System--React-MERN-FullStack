@@ -15,6 +15,7 @@ import {
   MapPin,
   Sparkles,
   Shield,
+  MessageCircle,
 } from "lucide-react";
 import useAppContext from "../hooks/useAppContext";
 import { getHotelsSearchUrl } from "../lib/nav-utils";
@@ -51,6 +52,7 @@ const MobileNavLinks = ({ onNavigate }: MobileNavLinksProps) => {
       { to: "/admin-portal/check-in", label: "Check-In Desk", icon: CalendarClock },
       { to: "/manage-bookings", label: "Room Calendar", icon: CalendarDays },
       { to: "/booking-com-sync", label: "Sync Center", icon: Activity },
+      { to: "/wa-inbox", label: "Sofia Inbox", icon: MessageCircle },
       ...(!siteConfig.singlePropertyMode
         ? [{ to: "/business-insights", label: "Business Insights", icon: BarChart3 }]
         : []),

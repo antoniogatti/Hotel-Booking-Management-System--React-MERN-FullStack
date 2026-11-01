@@ -1,18 +1,27 @@
 import Footer from "../components/Footer";
 import Header from "../components/Header";
 import { useLocation } from "react-router-dom";
-// import Hero from "../components/Hero";
-// import SearchBar from "../components/SearchBar";
 
 interface Props {
   children: React.ReactNode;
 }
 
+const ADMIN_PATHS = [
+  "/admin-portal",
+  "/wa-inbox",
+  "/manage-bookings",
+  "/booking-com-sync",
+  "/my-hotels",
+  "/add-hotel",
+  "/business-insights",
+  "/api-docs",
+  "/api-status",
+];
+
 const Layout = ({ children }: Props) => {
   const location = useLocation();
-  // const isBusinessInsightsPage = location.pathname === "/business-insights";
-  // const isSearchPage = location.pathname === "/search";
   const isHomePage = location.pathname === "/";
+  const isAdminPage = ADMIN_PATHS.some((p) => location.pathname.startsWith(p));
 
   return (
     <div className="flex flex-col min-h-screen overflow-x-hidden">
@@ -23,18 +32,16 @@ const Layout = ({ children }: Props) => {
         Skip to main content
       </a>
       <Header />
-      {/* <Hero /> */}
-      {/* <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
-        <SearchBar />
-      </div> */}
       <main id="main-content" className="flex-1">
         {isHomePage ? (
           <div>{children}</div>
+        ) : isAdminPage ? (
+          <div className="w-full">{children}</div>
         ) : (
           <div className="w-full px-3 sm:px-5 lg:px-8 py-6 sm:py-10">{children}</div>
         )}
       </main>
-      <Footer />
+      {!isAdminPage && <Footer />}
     </div>
   );
 };

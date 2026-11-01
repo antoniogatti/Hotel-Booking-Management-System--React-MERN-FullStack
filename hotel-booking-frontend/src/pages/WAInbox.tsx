@@ -2,15 +2,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FaWhatsapp } from "react-icons/fa";
 import { WAContact, WAConversation, WAMessage } from "../../../shared/types";
 import * as apiClient from "../api-client";
+import axios from "axios";
+
+const isCancelled = (e: unknown) =>
+  axios.isCancel(e) || (e instanceof Error && (e.name === "AbortError" || e.name === "CanceledError"));
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatPhone(phone: string): string {
   if (phone.startsWith("39") && phone.length >= 11) {
     const rest = phone.slice(2);
-    if (rest.startsWith("3") && rest.length === 10) {
+    if (rest.startsWith("3") && rest.length === 10)
       return `+39 ${rest.slice(0, 3)} ${rest.slice(3, 6)} ${rest.slice(6)}`;
-    }
     return `+39 ${rest}`;
   }
   return `+${phone}`;
@@ -43,21 +46,23 @@ function displayName(phone: string, contacts: Map<string, WAContact>): string {
 type ConvoItemProps = {
   convo: WAConversation;
   active: boolean;
+  disabled: boolean;
   contacts: Map<string, WAContact>;
   onClick: () => void;
 };
 
-const ConvoItem = ({ convo, active, contacts, onClick }: ConvoItemProps) => {
+const ConvoItem = ({ convo, active, disabled, contacts, onClick }: ConvoItemProps) => {
   const preview = convo.lastMessage
     ? convo.lastMessage.content.slice(0, 60) + (convo.lastMessage.content.length > 60 ? "…" : "")
     : "No messages";
-
   return (
     <button
       onClick={onClick}
-      className={`w-full text-left px-4 py-3 border-b border-gray-100 hover:bg-[#f0fdf4] transition-colors ${
-        active ? "bg-[#dcfce7] border-l-4 border-l-[#25D366]" : ""
-      }`}
+      disabled={disabled}
+      className={`w-full text-left px-4 py-3 border-b border-gray-100 transition-colors
+        ${active ? "bg-[#dcfce7] border-l-4 border-l-[#25D366]" : "hover:bg-[#f0fdf4]"}
+        ${disabled && !active ? "opacity-60 cursor-default" : ""}
+      `}
     >
       <div className="flex items-center justify-between mb-0.5">
         <span className="font-semibold text-sm text-gray-900">{displayName(convo.phone, contacts)}</span>
@@ -101,6 +106,86 @@ const Bubble = ({ msg }: BubbleProps) => {
   );
 };
 
+const BubbleSkeleton = ({ right }: { right?: boolean }) => (
+  <div className={`flex ${right ? "justify-end" : "justify-start"} mb-2`}>
+    <div className={`h-8 rounded-2xl animate-pulse ${right ? "bg-[#25D366]/30 w-48" : "bg-gray-200 w-40"}`} />
+  </div>
+);
+
+// ─── New chat modal ────────────────────────────────────────────────────────────
+
+type NewChatModalProps = {
+  onClose: () => void;
+  onStart: (phone: string, name?: string) => void;
+  contacts: Map<string, WAContact>;
+};
+
+const NewChatModal = ({ onClose, onStart, contacts }: NewChatModalProps) => {
+  const [rawPhone, setRawPhone] = useState("");
+  const [name, setName] = useState("");
+
+  const normalise = (raw: string) => raw.replace(/\D/g, "");
+
+  const handleStart = () => {
+    const phone = normalise(rawPhone);
+    if (phone.length < 8) return;
+    const existing = contacts.get(phone);
+    onStart(phone, name.trim() || existing?.name);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2 className="text-lg font-bold text-[#2b4463]">New conversation</h2>
+        <div className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Phone number (with country code)</label>
+            <input
+              type="tel"
+              value={rawPhone}
+              onChange={(e) => setRawPhone(e.target.value)}
+              placeholder="e.g. 393358246145 or +39 335 824 6145"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+              autoFocus
+              onKeyDown={(e) => e.key === "Enter" && handleStart()}
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-500 mb-1 block">Contact name (optional — saved to DB)</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Guest name"
+              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+              onKeyDown={(e) => e.key === "Enter" && handleStart()}
+            />
+          </div>
+        </div>
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-xl border border-gray-200 py-2 text-sm text-gray-500 hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleStart}
+            disabled={normalise(rawPhone).length < 8}
+            className="flex-1 rounded-xl py-2 text-sm text-white font-semibold disabled:opacity-40"
+            style={{ backgroundColor: "#25D366" }}
+          >
+            Open chat
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Main page ─────────────────────────────────────────────────────────────────
 
 const WAInbox = () => {
@@ -114,42 +199,51 @@ const WAInbox = () => {
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactName, setContactName] = useState("");
   const [savingContact, setSavingContact] = useState(false);
-
-  // Mobile: true = list visible, false = thread visible
   const [mobileShowList, setMobileShowList] = useState(true);
+  const [showNewChat, setShowNewChat] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Scroll to bottom only if already near bottom
+  // AbortController refs — cancel in-flight requests before starting new ones
+  const listAbortRef = useRef<AbortController | null>(null);
+  const threadAbortRef = useRef<AbortController | null>(null);
+
+  // Scroll helpers
   const maybeScrollToBottom = useCallback(() => {
     const el = messagesContainerRef.current;
     if (!el) return;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
-    if (nearBottom) {
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 100)
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }
   }, []);
 
-  // Force scroll on initial thread load
   const forceScrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "auto" });
   }, []);
 
-  // Load conversations
+  // Load conversations — cancels any in-flight list request first
   const loadConversations = useCallback(async () => {
+    listAbortRef.current?.abort();
+    listAbortRef.current = new AbortController();
     try {
-      const data = await apiClient.getWAConversations();
+      const data = await apiClient.getWAConversations(listAbortRef.current.signal);
       setConversations(data);
-    } catch {
-      // silently ignore
+    } catch (e: unknown) {
+      if (!isCancelled(e)) console.warn("[inbox] list error:", e);
     }
   }, []);
 
-  // Load thread for active phone (returns messages)
-  const loadThread = useCallback(async (phone: string): Promise<WAMessage[]> => {
-    const thread = await apiClient.getWAThread(phone);
-    return thread.messages;
+  // Load thread — cancels any in-flight thread request first
+  const loadThread = useCallback(async (phone: string, force = false): Promise<WAMessage[] | null> => {
+    threadAbortRef.current?.abort();
+    threadAbortRef.current = new AbortController();
+    try {
+      const thread = await apiClient.getWAThread(phone, threadAbortRef.current.signal);
+      return thread.messages;
+    } catch (e: unknown) {
+      if (!isCancelled(e)) console.warn("[inbox] thread error:", e);
+      return force ? [] : null; // null = aborted/ignored; [] = real empty
+    }
   }, []);
 
   // Load contacts
@@ -157,9 +251,7 @@ const WAInbox = () => {
     try {
       const data = await apiClient.getWAContacts();
       setContacts(new Map(data.map((c) => [c.phone, c])));
-    } catch {
-      // silently ignore
-    }
+    } catch { /* ignore */ }
   }, []);
 
   // Initial load
@@ -168,56 +260,67 @@ const WAInbox = () => {
     void loadContacts();
   }, [loadConversations, loadContacts]);
 
-  // Poll conversations every 5s
+  // Poll conversations every 8s (aborts previous before firing)
   useEffect(() => {
-    const interval = setInterval(() => void loadConversations(), 5_000);
-    return () => clearInterval(interval);
+    const id = setInterval(() => void loadConversations(), 8_000);
+    return () => clearInterval(id);
   }, [loadConversations]);
 
   // Load thread when active phone changes
   useEffect(() => {
     if (!activePhone) return;
     setLoadingThread(true);
-    loadThread(activePhone)
-      .then((msgs) => {
+    loadThread(activePhone, true).then((msgs) => {
+      if (msgs !== null) {
         setMessages(msgs);
         setLoadingThread(false);
         setTimeout(forceScrollToBottom, 50);
-      })
-      .catch(() => setLoadingThread(false));
+      }
+    });
   }, [activePhone, loadThread, forceScrollToBottom]);
 
-  // Poll thread every 5s when a conversation is open
+  // Poll thread every 8s when a conversation is open
   useEffect(() => {
     if (!activePhone) return;
-    const interval = setInterval(async () => {
-      try {
-        const msgs = await loadThread(activePhone);
-        setMessages((prev) => {
-          // Only update if something changed
-          if (JSON.stringify(prev) === JSON.stringify(msgs)) return prev;
-          return msgs;
-        });
-        maybeScrollToBottom();
-      } catch {
-        // silently ignore
-      }
-    }, 5_000);
-    return () => clearInterval(interval);
+    const id = setInterval(async () => {
+      const msgs = await loadThread(activePhone);
+      if (msgs === null) return; // aborted — ignore
+      setMessages((prev) => {
+        if (JSON.stringify(prev) === JSON.stringify(msgs)) return prev;
+        setTimeout(maybeScrollToBottom, 50);
+        return msgs;
+      });
+    }, 8_000);
+    return () => clearInterval(id);
   }, [activePhone, loadThread, maybeScrollToBottom]);
 
   const handleSelectConvo = (phone: string) => {
+    if (loadingThread && phone !== activePhone) return; // debounce rapid clicks
     setActivePhone(phone);
     setMessages([]);
     setReply("");
     setShowContactForm(false);
     setContactName("");
-    setMobileShowList(false); // on mobile, switch to thread view
+    setMobileShowList(false);
+  };
+
+  const handleNewChat = async (phone: string, name?: string) => {
+    setShowNewChat(false);
+    // Save contact name if provided
+    if (name) {
+      try {
+        await apiClient.saveWAContact(phone, name);
+        setContacts((prev) => new Map(prev).set(phone, { phone, name }));
+      } catch { /* ignore */ }
+    }
+    handleSelectConvo(phone);
   };
 
   const handleBack = () => {
+    threadAbortRef.current?.abort();
     setMobileShowList(true);
     setActivePhone(null);
+    setLoadingThread(false);
   };
 
   const handleSend = async () => {
@@ -225,23 +328,17 @@ const WAInbox = () => {
     setSending(true);
     try {
       await apiClient.sendWAReply(activePhone, reply.trim());
-      const newMsg: WAMessage = { role: "assistant", content: reply.trim(), ts: new Date().toISOString() };
-      setMessages((prev) => [...prev, newMsg]);
+      setMessages((prev) => [...prev, { role: "assistant", content: reply.trim(), ts: new Date().toISOString() }]);
       setReply("");
       void loadConversations();
       setTimeout(forceScrollToBottom, 50);
-    } catch {
-      // silently ignore
-    } finally {
+    } catch { /* ignore */ } finally {
       setSending(false);
     }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      void handleSend();
-    }
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void handleSend(); }
   };
 
   const handleSaveContact = async () => {
@@ -249,29 +346,29 @@ const WAInbox = () => {
     setSavingContact(true);
     try {
       await apiClient.saveWAContact(activePhone, contactName.trim());
-      const updated: WAContact = { phone: activePhone, name: contactName.trim() };
-      setContacts((prev) => new Map(prev).set(activePhone, updated));
+      setContacts((prev) => new Map(prev).set(activePhone, { phone: activePhone, name: contactName.trim() }));
       setShowContactForm(false);
       setContactName("");
-    } catch {
-      // silently ignore
-    } finally {
+    } catch { /* ignore */ } finally {
       setSavingContact(false);
     }
   };
 
   // ── Conversation list panel ──────────────────────────────────────────────────
   const listPanel = (
-    <div
-      className={`
-        bg-white flex flex-col overflow-hidden border-r border-gray-200
-        md:w-1/3 md:flex
-        ${mobileShowList ? "flex w-full" : "hidden md:flex"}
-      `}
-    >
+    <div className={`bg-white flex flex-col overflow-hidden border-r border-gray-200 md:w-1/3 md:flex ${mobileShowList ? "flex w-full" : "hidden md:flex"}`}>
       <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
         <span>Active conversations</span>
         <span className="ml-auto h-2 w-2 rounded-full bg-[#25D366] animate-pulse" title="Live" />
+        <button
+          onClick={() => setShowNewChat(true)}
+          className="ml-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-base leading-none hover:opacity-90 transition-opacity"
+          style={{ backgroundColor: "#25D366" }}
+          title="New conversation"
+          aria-label="New conversation"
+        >
+          +
+        </button>
       </div>
       <div className="flex-1 overflow-y-auto">
         {conversations.length === 0 ? (
@@ -285,6 +382,7 @@ const WAInbox = () => {
               key={c.phone}
               convo={c}
               active={activePhone === c.phone}
+              disabled={loadingThread && activePhone !== c.phone}
               contacts={contacts}
               onClick={() => handleSelectConvo(c.phone)}
             />
@@ -298,58 +396,37 @@ const WAInbox = () => {
   const contactForActive = activePhone ? contacts.get(activePhone) : undefined;
 
   const threadPanel = (
-    <div
-      className={`
-        flex-1 flex flex-col bg-[#f0ece4] overflow-hidden
-        md:flex
-        ${!mobileShowList ? "flex w-full" : "hidden md:flex"}
-      `}
-    >
+    <div className={`flex-1 flex flex-col bg-[#f0ece4] overflow-hidden md:flex ${!mobileShowList ? "flex w-full" : "hidden md:flex"}`}>
       {activePhone ? (
         <>
-          {/* Thread header */}
+          {/* Header */}
           <div className="shrink-0">
             <div className="px-4 py-3 bg-[#25D366] text-white flex items-center gap-3">
-              {/* Back arrow — mobile only */}
-              <button
-                onClick={handleBack}
-                className="md:hidden mr-1 text-white/90 hover:text-white"
-                aria-label="Back"
-              >
+              <button onClick={handleBack} className="md:hidden mr-1 text-white/90 hover:text-white" aria-label="Back">
                 <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
                   <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
                 </svg>
               </button>
-
               <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold shrink-0">
                 {(contactForActive?.name ?? formatPhone(activePhone)).slice(0, 2).toUpperCase()}
               </div>
-
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm truncate">
                   {contactForActive?.name ?? formatPhone(activePhone)}
                 </p>
                 <p className="text-xs text-white/80">
-                  {contactForActive ? formatPhone(activePhone) : "Active · Sofia is monitoring"}
+                  {loadingThread ? "Loading…" : contactForActive ? formatPhone(activePhone) : "Active · Sofia is monitoring"}
                 </p>
               </div>
-
-              {/* Live dot */}
               <span className="h-2 w-2 rounded-full bg-white/60 animate-pulse shrink-0" title="Live polling" />
-
-              {/* Save contact button */}
               <button
-                onClick={() => {
-                  setShowContactForm((v) => !v);
-                  setContactName(contactForActive?.name ?? "");
-                }}
+                onClick={() => { setShowContactForm((v) => !v); setContactName(contactForActive?.name ?? ""); }}
                 className="shrink-0 text-xs text-white/80 hover:text-white border border-white/30 rounded px-2 py-1 transition-colors"
               >
-                {contactForActive ? "Edit contact" : "+ Save contact"}
+                {contactForActive ? "Edit" : "+ Save contact"}
               </button>
             </div>
 
-            {/* Inline contact form */}
             {showContactForm && (
               <div className="bg-white border-b border-gray-200 px-4 py-2 flex items-center gap-2">
                 <input
@@ -359,6 +436,7 @@ const WAInbox = () => {
                   placeholder="Contact name"
                   className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
                   onKeyDown={(e) => e.key === "Enter" && void handleSaveContact()}
+                  autoFocus
                 />
                 <button
                   onClick={() => void handleSaveContact()}
@@ -368,12 +446,7 @@ const WAInbox = () => {
                 >
                   {savingContact ? "Saving…" : "Save"}
                 </button>
-                <button
-                  onClick={() => setShowContactForm(false)}
-                  className="text-sm text-gray-400 hover:text-gray-600 px-1"
-                >
-                  ✕
-                </button>
+                <button onClick={() => setShowContactForm(false)} className="text-sm text-gray-400 hover:text-gray-600 px-1">✕</button>
               </div>
             )}
           </div>
@@ -381,7 +454,12 @@ const WAInbox = () => {
           {/* Messages */}
           <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-4">
             {loadingThread ? (
-              <div className="flex justify-center items-center h-full text-gray-400 text-sm">Loading…</div>
+              <>
+                <BubbleSkeleton />
+                <BubbleSkeleton right />
+                <BubbleSkeleton />
+                <BubbleSkeleton right />
+              </>
             ) : messages.length === 0 ? (
               <div className="flex justify-center items-center h-full text-gray-400 text-sm">No messages</div>
             ) : (
@@ -407,9 +485,13 @@ const WAInbox = () => {
               style={{ backgroundColor: reply.trim() && !sending ? "#25D366" : "#9ca3af" }}
               aria-label="Send"
             >
-              <svg viewBox="0 0 24 24" className="h-5 w-5 text-white fill-current">
-                <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
-              </svg>
+              {sending ? (
+                <span className="h-4 w-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              ) : (
+                <svg viewBox="0 0 24 24" className="h-5 w-5 text-white fill-current">
+                  <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" />
+                </svg>
+              )}
             </button>
           </div>
         </>
@@ -424,8 +506,15 @@ const WAInbox = () => {
   );
 
   return (
-    <div className="flex flex-col h-[calc(100vh-130px)] md:h-[calc(100vh-130px)]">
-      {/* Page header — hidden on mobile when in thread view */}
+    <>
+    {showNewChat && (
+      <NewChatModal
+        onClose={() => setShowNewChat(false)}
+        onStart={handleNewChat}
+        contacts={contacts}
+      />
+    )}
+    <div className="flex flex-col h-[calc(100vh-130px)]">
       <div className={`px-6 py-4 border-b border-gray-200 bg-white shrink-0 ${!mobileShowList ? "hidden md:block" : ""}`}>
         <div className="flex items-center gap-2">
           <FaWhatsapp className="h-6 w-6 text-[#25D366]" />
@@ -440,13 +529,12 @@ const WAInbox = () => {
         </div>
         <p className="text-sm text-gray-500 mt-0.5">WhatsApp messages handled by Sofia AI</p>
       </div>
-
-      {/* Two-panel layout */}
       <div className="flex flex-1 overflow-hidden">
         {listPanel}
         {threadPanel}
       </div>
     </div>
+    </>
   );
 };
 
