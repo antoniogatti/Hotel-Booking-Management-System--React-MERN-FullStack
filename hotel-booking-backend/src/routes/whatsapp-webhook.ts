@@ -16,7 +16,7 @@ const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || "palazzopinto2024";
 const aoai = new AzureOpenAI({
   endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://prd-open-ai-pp-01-pro.openai.azure.com/",
   apiKey: process.env.AZURE_OPENAI_API_KEY || "",
-  apiVersion: "2025-01-01-preview",
+  apiVersion: "2025-04-01-preview",
   deployment: "gpt-5-mini",
 });
 
@@ -246,7 +246,8 @@ ${knowledge}
 
     await sendWhatsApp(phoneNumberId, from, reply);
   } catch (err) {
-    console.error("[Sofia] error:", err);
+    const e = err as any;
+    console.error("[Sofia] error:", e?.message || err, "status:", e?.status, "code:", e?.code);
   }
 });
 
