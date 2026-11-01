@@ -216,7 +216,7 @@ ${knowledge}
     for (let i = 0; i < 3; i++) {
       const response = await aoai.chat.completions.create({
         model: "gpt-5-mini",
-        max_tokens: 600,
+        max_completion_tokens: 600,
         tools: SOFIA_TOOLS,
         messages,
       });
