@@ -1,0 +1,44 @@
+name: WhatsApp status monitor
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: whatsapp-status
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Was the previous run failing?
+        id: prev
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          prev=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow whatsapp-status.yml --status completed --limit 1 --json conclusion -q '.[0].conclusion' || true)
+          if [ "$prev" = "failure" ]; then echo "failed=1" >> "$GITHUB_OUTPUT"; else echo "failed=0" >> "$GITHUB_OUTPUT"; fi
+      - name: Run checks (emails info@ on a new incident and on recovery)
+        env:
+          SEND_MAIL: "1"
+          PREV_FAILED: ${{ steps.prev.outputs.failed }}
+          WA_ACCESS_TOKEN: ${{ secrets.WA_ACCESS_TOKEN }}
+          WA_PHONE_NUMBER_ID: ${{ secrets.WA_PHONE_NUMBER_ID }}
+          WA_VERIFY_TOKEN: ${{ secrets.WA_VERIFY_TOKEN }}
+          MS_ENTRA_TENANT_ID: ${{ secrets.MS_ENTRA_TENANT_ID }}
+          MS_ENTRA_CLIENT_ID: ${{ secrets.MS_ENTRA_CLIENT_ID }}
+          MS_ENTRA_CLIENT_SECRET: ${{ secrets.MS_ENTRA_CLIENT_SECRET }}
+        run: node scripts/whatsapp-status.mjs
