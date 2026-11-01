@@ -122,6 +122,12 @@ jobs:
         working-directory: hotel-booking-backend
         run: npm prune --omit=dev
 
+      - name: Trim non-runtime files from node_modules
+        working-directory: hotel-booking-backend
+        run: |
+          find node_modules -type f \( -name '*.md' -o -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' -o -name '*.markdown' \) -delete
+          du -sh node_modules
+
       - name: Create backend deployment package
         run: |
           rm -rf backend-release
