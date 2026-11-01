@@ -81,6 +81,18 @@ const hotelSchema = new mongoose.Schema<HotelType>(
         },
       ],
     },
+    bookingComApi: {
+      enabled: { type: Boolean, default: false },
+      propertyId: { type: String, default: "" },
+      roomId: { type: String, default: "" },
+      rateId: { type: String, default: "" },
+      pushAvailability: { type: Boolean, default: true },
+      pushPrices: { type: Boolean, default: false },
+      lastReservationsSyncAt: { type: Date },
+      lastAriPushAt: { type: Date },
+      lastSyncStatus: { type: String, default: "idle" },
+      lastSyncError: { type: String, default: "" },
+    },
     // Audit fields
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },

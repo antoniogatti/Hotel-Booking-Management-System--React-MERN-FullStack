@@ -340,7 +340,9 @@ router.get(
       const hotelQuery = req.userRole === "admin" ? {} : { userId: req.userId };
 
       const hotels = sortManagedHotels(
-        await Hotel.find(hotelQuery).select("_id name city country userId bookingComIcal slug")
+        await Hotel.find(hotelQuery).select(
+          "_id name city country userId bookingComIcal bookingComApi slug"
+        )
       );
 
       res.status(200).json(
@@ -350,6 +352,7 @@ router.get(
           city: hotel.city,
           country: hotel.country,
           bookingComIcal: hotel.bookingComIcal,
+          bookingComApi: hotel.bookingComApi,
         }))
       );
     } catch (error) {

@@ -12,6 +12,7 @@ type SyncableHotel = {
   _id: string;
   name: string;
   slug?: string;
+  bookingComApi?: { enabled?: boolean };
   bookingComIcal?: {
     importUrl?: string;
     syncEnabled?: boolean;
@@ -204,6 +205,19 @@ export const getImportedCalendarEvents = async (params: {
 export const syncBookingComRoom = async (hotel: SyncableHotel): Promise<SyncResult> => {
   const importUrl = hotel.bookingComIcal?.importUrl?.trim();
 
+  // API wins: rooms connected through the Booking.com API must not also be blocked by iCal.
+  if (hotel.bookingComApi?.enabled) {
+    return {
+      hotelId: hotel._id,
+      hotelName: hotel.name,
+      fetched: 0,
+      activated: 0,
+      deactivated: 0,
+      skipped: true,
+      reason: "Room is managed by the Booking.com API",
+    };
+  }
+
   if (!hotel.bookingComIcal?.syncEnabled || !importUrl) {
     await updateHotelSyncStatus(hotel._id, "skipped");
 
@@ -304,7 +318,8 @@ export const syncAllBookingComRooms = async () => {
   const hotels = (await Hotel.find({
     "bookingComIcal.syncEnabled": true,
     "bookingComIcal.importUrl": { $exists: true, $ne: "" },
-  }).select("_id name slug bookingComIcal")) as unknown as SyncableHotel[];
+    "bookingComApi.enabled": { $ne: true },
+  }).select("_id name slug bookingComIcal bookingComApi")) as unknown as SyncableHotel[];
 
   const results: SyncResult[] = [];
 

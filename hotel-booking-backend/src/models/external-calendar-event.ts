@@ -7,6 +7,8 @@ export interface IExternalCalendarEvent extends Document {
   hotelId: string;
   source: ExternalCalendarEventSource;
   externalUid: string;
+  origin?: "ical" | "api";
+  currency?: string;
   summary: string;
   startDate: Date;
   endDate: Date;
@@ -95,6 +97,8 @@ const externalCalendarEventSchema = new mongoose.Schema(
       index: true,
     },
     externalUid: { type: String, required: true },
+    origin: { type: String, enum: ["ical", "api"], default: "ical" },
+    currency: { type: String, default: "" },
     summary: { type: String, default: "" },
     startDate: { type: Date, required: true, index: true },
     endDate: { type: Date, required: true, index: true },

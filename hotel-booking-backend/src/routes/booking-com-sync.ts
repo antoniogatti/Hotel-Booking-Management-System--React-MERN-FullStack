@@ -10,6 +10,12 @@ import {
   syncAllBookingComRooms,
   syncBookingComRoom,
 } from "../lib/booking-com-ical";
+import {
+  deactivateIcalEventsForRoom,
+  syncAllBookingComApiRooms,
+  syncBookingComApiRoom,
+} from "../lib/booking-com-api";
+import { getBookingComApiMode } from "../lib/booking-com-api-client";
 import { validateBookingComImportUrl } from "../lib/booking-com-url";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
@@ -166,7 +172,7 @@ router.get("/export/:hotelId/:token.ics", async (req: Request, res: Response) =>
 
 const getAccessibleHotel = async (hotelId: string, req: Request) => {
   const hotel = await Hotel.findById(hotelId).select(
-    "_id userId name city country bookingComIcal slug"
+    "_id userId name city country pricePerNight bookingComIcal bookingComApi slug"
   );
 
   if (!hotel) {
@@ -320,6 +326,135 @@ router.post(
         hotelId: req.params.hotelId,
       });
       return res.status(500).json({ message: "Unable to regenerate Booking.com export token" });
+    }
+  }
+);
+
+router.put(
+  "/rooms/:hotelId/api-config",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  [
+    param("hotelId").notEmpty().withMessage("Hotel ID is required"),
+    body("enabled").isBoolean().withMessage("enabled must be a boolean"),
+    body("propertyId").optional({ nullable: true }).isString().trim(),
+    body("roomId").optional({ nullable: true }).isString().trim(),
+    body("rateId").optional({ nullable: true }).isString().trim(),
+    body("pushAvailability").optional().isBoolean().withMessage("pushAvailability must be a boolean"),
+    body("pushPrices").optional().isBoolean().withMessage("pushPrices must be a boolean"),
+  ],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const accessCheck = await getAccessibleHotel(req.params.hotelId, req);
+      if (accessCheck.error) {
+        return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+      }
+
+      const enabled = Boolean(req.body.enabled);
+      const propertyId = String(req.body.propertyId ?? "").trim();
+      const roomId = String(req.body.roomId ?? "").trim();
+      const rateId = String(req.body.rateId ?? "").trim();
+      const pushAvailability = req.body.pushAvailability !== false;
+      const pushPrices = req.body.pushPrices === true;
+
+      if (enabled && (!propertyId || !roomId)) {
+        return res.status(400).json({
+          message: "Beds24 property ID and room ID are required to enable the API",
+        });
+      }
+
+      const wasEnabled = Boolean(accessCheck.hotel?.bookingComApi?.enabled);
+      const hotel = await Hotel.findByIdAndUpdate(
+        req.params.hotelId,
+        {
+          $set: {
+            "bookingComApi.enabled": enabled,
+            "bookingComApi.propertyId": propertyId,
+            "bookingComApi.roomId": roomId,
+            "bookingComApi.rateId": rateId,
+            "bookingComApi.pushAvailability": pushAvailability,
+            "bookingComApi.pushPrices": pushPrices,
+            "bookingComApi.lastSyncError": "",
+          },
+        },
+        { new: true }
+      ).select("_id name slug bookingComIcal bookingComApi");
+
+      // API wins: retire this room's iCal-imported events so stays are not blocked twice.
+      const icalEventsDeactivated =
+        enabled && !wasEnabled ? await deactivateIcalEventsForRoom(req.params.hotelId) : 0;
+
+      await recordAuditEvent({
+        action: "integration.booking-com-api.config-updated",
+        entityType: "integration",
+        entityId: String(hotel?._id || req.params.hotelId),
+        hotelId: String(req.params.hotelId),
+        actorId: req.userId,
+        actorRole: req.userRole,
+        req,
+        metadata: { enabled, pushAvailability, pushPrices, icalEventsDeactivated },
+      });
+
+      return res.status(200).json({ hotel, icalEventsDeactivated, mode: getBookingComApiMode() });
+    } catch (error) {
+      logError("Unable to save Booking.com API configuration", error, {
+        route: "booking-com-sync.api-config",
+        hotelId: req.params.hotelId,
+      });
+      return res.status(500).json({ message: "Unable to save Booking.com API configuration" });
+    }
+  }
+);
+
+router.post(
+  "/api/sync",
+  verifyToken,
+  requireRole("hotel_owner", "admin"),
+  [
+    body("hotelId").optional().isString().withMessage("Hotel ID must be a string"),
+    body("pull").optional().isBoolean(),
+    body("push").optional().isBoolean(),
+  ],
+  async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    try {
+      const hotelId = typeof req.body.hotelId === "string" ? req.body.hotelId : "";
+
+      if (hotelId) {
+        const accessCheck = await getAccessibleHotel(hotelId, req);
+        if (accessCheck.error) {
+          return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+        }
+
+        const result = await syncBookingComApiRoom(accessCheck.hotel as any, {
+          pull: req.body.pull,
+          push: req.body.push,
+        });
+        return res.status(200).json({ results: [result] });
+      }
+
+      if (req.userRole !== "admin") {
+        return res.status(400).json({ message: "hotelId is required for hotel owners" });
+      }
+
+      return res.status(200).json({ results: await syncAllBookingComApiRooms() });
+    } catch (error: any) {
+      logError("Booking.com API sync request failed", error, {
+        route: "booking-com-sync.api-sync",
+        hotelId: typeof req.body.hotelId === "string" ? req.body.hotelId : undefined,
+      });
+      return res.status(500).json({
+        message: error instanceof Error ? error.message : "Unable to sync with the Booking.com API",
+      });
     }
   }
 );

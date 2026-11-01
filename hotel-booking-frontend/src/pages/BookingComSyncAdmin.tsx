@@ -30,6 +30,18 @@ type RoomDraftState = Record<
   }
 >;
 
+type ApiDraftState = Record<
+  string,
+  {
+    enabled: boolean;
+    propertyId: string;
+    roomId: string;
+    rateId: string;
+    pushAvailability: boolean;
+    pushPrices: boolean;
+  }
+>;
+
 const statusClassName = (status?: string) => {
   switch (status) {
     case "success":
@@ -94,6 +106,75 @@ const BookingComSyncAdmin = () => {
 
     return nextDrafts;
   }, [drafts, rooms]);
+
+  const [apiDrafts, setApiDrafts] = useState<ApiDraftState>({});
+
+  const apiRoomDrafts = useMemo(() => {
+    const next: ApiDraftState = {};
+
+    (rooms || []).forEach((room) => {
+      const saved = room.bookingComApi;
+      const draft = apiDrafts[room._id];
+      next[room._id] = {
+        enabled: draft?.enabled ?? Boolean(saved?.enabled),
+        propertyId: draft?.propertyId ?? saved?.propertyId ?? "",
+        roomId: draft?.roomId ?? saved?.roomId ?? "",
+        rateId: draft?.rateId ?? saved?.rateId ?? "",
+        pushAvailability: draft?.pushAvailability ?? saved?.pushAvailability !== false,
+        pushPrices: draft?.pushPrices ?? saved?.pushPrices === true,
+      };
+    });
+
+    return next;
+  }, [apiDrafts, rooms]);
+
+  const updateApiDraft = (hotelId: string, changes: Partial<ApiDraftState[string]>) => {
+    setApiDrafts((current) => ({
+      ...current,
+      [hotelId]: { ...apiRoomDrafts[hotelId], ...current[hotelId], ...changes },
+    }));
+  };
+
+  const saveApiConfigMutation = useMutation(apiClient.saveBookingComApiConfig, {
+    onSuccess: async (result: any) => {
+      const retired = Number(result?.icalEventsDeactivated || 0);
+      showToast({
+        title:
+          retired > 0
+            ? `Booking.com API saved. ${retired} iCal event${retired > 1 ? "s" : ""} retired for this room`
+            : "Booking.com API configuration saved",
+        type: "SUCCESS",
+      });
+      await queryClient.invalidateQueries(["bookingManagementRooms"]);
+      await queryClient.invalidateQueries(["bookingRoomCalendar"]);
+    },
+    onError: (error: any) => {
+      showToast({
+        title: error?.response?.data?.message || "Unable to save Booking.com API configuration",
+        type: "ERROR",
+      });
+    },
+  });
+
+  const apiSyncMutation = useMutation(apiClient.syncBookingComApi, {
+    onSuccess: async (result: any) => {
+      const first = result?.results?.[0];
+      showToast({
+        title: first?.skipped
+          ? first.reason || "Booking.com API sync skipped"
+          : `Booking.com API sync done (${first?.mode || "api"}): ${first?.reservationsFetched ?? 0} reservations, ${first?.ariDaysPushed ?? 0} days pushed`,
+        type: first?.skipped ? "ERROR" : "SUCCESS",
+      });
+      await queryClient.invalidateQueries(["bookingManagementRooms"]);
+      await queryClient.invalidateQueries(["bookingRoomCalendar"]);
+    },
+    onError: (error: any) => {
+      showToast({
+        title: error?.response?.data?.message || "Unable to sync with the Booking.com API",
+        type: "ERROR",
+      });
+    },
+  });
 
   const syncErrorRows = useMemo(
     () =>
@@ -350,6 +431,7 @@ const BookingComSyncAdmin = () => {
       <div className="grid gap-4">
         {(rooms || []).map((room) => {
           const draft = roomDrafts[room._id];
+          const apiDraft = apiRoomDrafts[room._id];
           const exportFeedUrl = getExportFeedUrl(room);
 
           return (
@@ -452,6 +534,92 @@ const BookingComSyncAdmin = () => {
                   <div className="grid gap-2 text-sm text-gray-600 md:grid-cols-2">
                     <p>Last sync: {formatDateTime(room.bookingComIcal?.lastSyncAt)}</p>
                     <p>Error: {room.bookingComIcal?.lastSyncError || "None"}</p>
+                  </div>
+                  <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-gray-800">Booking.com via Beds24 (two-way)</p>
+                      <Badge className={statusClassName(room.bookingComApi?.lastSyncStatus)}>
+                        {room.bookingComApi?.lastSyncStatus || "idle"}
+                      </Badge>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(apiDraft?.enabled)}
+                        onChange={(event) => updateApiDraft(room._id, { enabled: event.target.checked })}
+                      />
+                      Use the API for this room (replaces the iCal import)
+                    </label>
+                    <div className="grid gap-2 md:grid-cols-3">
+                      {(
+                        [
+                          ["propertyId", "Beds24 property ID"],
+                          ["roomId", "Beds24 room ID"],
+                          ["rateId", "Booking.com rate plan ID (reference)"],
+                        ] as const
+                      ).map(([field, label]) => (
+                        <div key={field}>
+                          <label className="text-xs font-semibold text-gray-700">{label}</label>
+                          <input
+                            type="text"
+                            className="mt-1 w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                            value={apiDraft?.[field] || ""}
+                            onChange={(event) => updateApiDraft(room._id, { [field]: event.target.value })}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(apiDraft?.pushAvailability)}
+                        onChange={(event) =>
+                          updateApiDraft(room._id, { pushAvailability: event.target.checked })
+                        }
+                      />
+                      Push availability to Booking.com
+                    </label>
+                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={Boolean(apiDraft?.pushPrices)}
+                        onChange={(event) => updateApiDraft(room._id, { pushPrices: event.target.checked })}
+                      />
+                      Also push our price per night (overwrites the Booking.com calendar price)
+                    </label>
+                    <div className="grid gap-2 text-sm text-gray-600 md:grid-cols-2">
+                      <p>Reservations pulled: {formatDateTime(room.bookingComApi?.lastReservationsSyncAt)}</p>
+                      <p>Availability pushed: {formatDateTime(room.bookingComApi?.lastAriPushAt)}</p>
+                      <p className="md:col-span-2">Error: {room.bookingComApi?.lastSyncError || "None"}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        onClick={() =>
+                          apiDraft &&
+                          saveApiConfigMutation.mutate({
+                            hotelId: room._id,
+                            ...apiDraft,
+                            propertyId: apiDraft.propertyId.trim(),
+                            roomId: apiDraft.roomId.trim(),
+                            rateId: apiDraft.rateId.trim(),
+                          })
+                        }
+                        disabled={saveApiConfigMutation.isLoading}
+                      >
+                        <Save className="mr-2 h-4 w-4" />
+                        Save API settings
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => apiSyncMutation.mutate({ hotelId: room._id })}
+                        disabled={apiSyncMutation.isLoading || !room.bookingComApi?.enabled}
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        API Sync Now
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
