@@ -25,7 +25,33 @@ env:
   VITE_ENABLE_DEV_CAPTCHA: "false"
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.frontend == 'true' }}
+      backend: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.backend == 'true' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect changed areas
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            frontend:
+              - 'hotel-booking-frontend/**'
+              - 'shared/**'
+              - '.github/workflows/deploy-production.yml'
+            backend:
+              - 'hotel-booking-backend/**'
+              - 'shared/**'
+              - '.github/workflows/deploy-production.yml'
+
   build-and-deploy-frontend:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -52,7 +78,7 @@ jobs:
           rm -f frontend-release.zip
           cp hotel-booking-frontend/server.js hotel-booking-frontend/dist/server.js
           cd hotel-booking-frontend/dist
-          zip -r ../../frontend-release.zip .
+          zip -qr ../../frontend-release.zip .
 
       - name: Login to Azure (frontend)
         uses: azure/login@v2
@@ -69,7 +95,8 @@ jobs:
           package: frontend-release.zip
 
   build-and-deploy-backend:
-    needs: build-and-deploy-frontend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -105,7 +132,7 @@ jobs:
           cp hotel-booking-backend/package-lock.json backend-release/package-lock.json
           cp hotel-booking-backend/web.config backend-release/web.config
           cd backend-release
-          zip -r ../backend-release.zip .
+          zip -qr ../backend-release.zip .
 
       - name: Login to Azure (backend)
         uses: azure/login@v2

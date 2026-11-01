@@ -174,7 +174,7 @@ router.post("/", async (req: Request, res: Response) => {
     // Load knowledge + conversation history in parallel
     const [knowledge, convoDoc] = await Promise.all([
       getKnowledge(),
-      WAConversation.findOne({ phone: from }).lean() as Promise<IWAConversation | null>,
+      WAConversation.findOne({ phone: from }).lean() as unknown as Promise<IWAConversation | null>,
     ]);
 
     const history: ChatCompletionMessageParam[] = (convoDoc?.messages || [])
