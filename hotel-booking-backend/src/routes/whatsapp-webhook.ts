@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import axios from "axios";
-import Anthropic from "@anthropic-ai/sdk";
+import { AzureOpenAI } from "openai";
 import mongoose, { Schema, Document } from "mongoose";
 import Hotel from "../models/hotel";
 import Booking from "../models/booking";
@@ -11,7 +11,12 @@ const WA_PHONE_NUMBER_ID = process.env.WA_PHONE_NUMBER_ID || "1034926836378800";
 const WA_ACCESS_TOKEN = process.env.WA_ACCESS_TOKEN || "";
 const WA_VERIFY_TOKEN = process.env.WA_VERIFY_TOKEN || "palazzopinto2024";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const aoai = new AzureOpenAI({
+  endpoint: process.env.AZURE_OPENAI_ENDPOINT || "https://prd-open-ai-pp-01-pro.openai.azure.com/",
+  apiKey: process.env.AZURE_OPENAI_API_KEY || "",
+  apiVersion: "2025-01-01-preview",
+  deployment: "gpt-5-mini",
+});
 
 // ─── MongoDB: property knowledge (synced from GitHub by n8n) ──────────────────
 interface IPropertyKnowledge extends Document {
@@ -86,37 +91,36 @@ async function getKnowledge(): Promise<string> {
 }
 
 // ─── Sofia tools ──────────────────────────────────────────────────────────────
-const SOFIA_TOOLS: Anthropic.Tool[] = [
+import type { ChatCompletionTool, ChatCompletionMessageParam, ChatCompletionMessageToolCall } from "openai/resources/chat/completions";
+
+const SOFIA_TOOLS: ChatCompletionTool[] = [
   {
-    name: "lookup_booking",
-    description: "Look up a guest booking by reservation reference (e.g. PP-12345). Returns booking status, dates, and room.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        booking_reference: {
-          type: "string",
-          description: "Reservation reference code, format PP-XXXXX",
+    type: "function",
+    function: {
+      name: "lookup_booking",
+      description: "Look up a guest booking by reservation reference (e.g. PP-12345). Returns booking status, dates, and room.",
+      parameters: {
+        type: "object",
+        properties: {
+          booking_reference: { type: "string", description: "Reservation reference code, format PP-XXXXX" },
         },
+        required: ["booking_reference"],
       },
-      required: ["booking_reference"],
     },
   },
   {
-    name: "check_availability",
-    description: "Check which rooms are available for given dates.",
-    input_schema: {
-      type: "object" as const,
-      properties: {
-        check_in: {
-          type: "string",
-          description: "Check-in date in YYYY-MM-DD format",
+    type: "function",
+    function: {
+      name: "check_availability",
+      description: "Check which rooms are available for given dates.",
+      parameters: {
+        type: "object",
+        properties: {
+          check_in: { type: "string", description: "Check-in date in YYYY-MM-DD format" },
+          check_out: { type: "string", description: "Check-out date in YYYY-MM-DD format" },
         },
-        check_out: {
-          type: "string",
-          description: "Check-out date in YYYY-MM-DD format",
-        },
+        required: ["check_in", "check_out"],
       },
-      required: ["check_in", "check_out"],
     },
   },
 ];
@@ -187,7 +191,7 @@ router.post("/", async (req: Request, res: Response) => {
       WAConversation.findOne({ phone: from }).lean() as Promise<IWAConversation | null>,
     ]);
 
-    const history: Anthropic.MessageParam[] = (convoDoc?.messages || [])
+    const history: ChatCompletionMessageParam[] = (convoDoc?.messages || [])
       .slice(-10)
       .map((m) => ({ role: m.role, content: m.content }));
 
@@ -202,34 +206,36 @@ ${knowledge}
 === END KNOWLEDGE BASE ===`;
 
     // Agentic loop (max 3 iterations)
-    const messages: Anthropic.MessageParam[] = [...history, { role: "user", content: text }];
+    const messages: ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt },
+      ...history,
+      { role: "user", content: text },
+    ];
     let reply = "";
 
     for (let i = 0; i < 3; i++) {
-      const response = await anthropic.messages.create({
-        model: "claude-haiku-5-5",
+      const response = await aoai.chat.completions.create({
+        model: "gpt-5-mini",
         max_tokens: 600,
-        system: systemPrompt,
         tools: SOFIA_TOOLS,
         messages,
       });
 
-      if (response.stop_reason === "tool_use") {
-        const toolUseBlocks = response.content.filter((b) => b.type === "tool_use") as Anthropic.ToolUseBlock[];
-        messages.push({ role: "assistant", content: response.content });
+      const choice = response.choices[0];
+      messages.push({ role: "assistant", content: choice.message.content, tool_calls: choice.message.tool_calls });
 
-        const toolResults: Anthropic.ToolResultBlockParam[] = [];
-        for (const block of toolUseBlocks) {
-          const result = await runTool(block.name, block.input as Record<string, string>);
-          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: result });
+      if (choice.finish_reason === "tool_calls" && choice.message.tool_calls?.length) {
+        for (const tc of choice.message.tool_calls) {
+          if (!("function" in tc)) continue;
+          const fn = tc.function as { name: string; arguments: string };
+          const input = JSON.parse(fn.arguments || "{}") as Record<string, string>;
+          const result = await runTool(fn.name, input);
+          messages.push({ role: "tool", tool_call_id: tc.id, content: result });
         }
-        messages.push({ role: "user", content: toolResults });
         continue;
       }
 
-      // End of loop — extract text reply
-      const textBlock = response.content.find((b) => b.type === "text") as Anthropic.TextBlock | undefined;
-      reply = textBlock?.text || "";
+      reply = choice.message.content || "";
       break;
     }
 
