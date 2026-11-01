@@ -19,6 +19,7 @@ import bookingComSyncRoutes from "./routes/booking-com-sync";
 import oneNoteRoutes from "./routes/onenote";
 import schedulerMonitorRoutes from "./routes/scheduler-monitor";
 import mcpRoutes from "./routes/mcp";
+import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
 import telemetryRoutes from "./routes/telemetry";
 import trafficInsightsRoutes from "./routes/traffic-insights";
 import swaggerUi from "swagger-ui-express";
@@ -363,6 +364,9 @@ if (mcpEnabled) {
 } else {
   logWarn("MCP endpoint disabled by configuration", { MCP_ENABLED: process.env.MCP_ENABLED });
 }
+
+// WhatsApp webhook (Sofia agent) — no auth, Meta-signed POST + verify token GET
+app.use("/webhook/whatsapp", whatsappWebhookRoutes);
 
 // Dynamic Port Configuration (for Coolify/VPS and local development)
 const PORT = process.env.PORT || 5000;
