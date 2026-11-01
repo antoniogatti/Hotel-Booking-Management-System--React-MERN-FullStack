@@ -1,6 +1,5 @@
 import express, { Request, Response } from "express";
 import { body, validationResult } from "express-validator";
-import geoip from "geoip-lite";
 import { logInfo } from "../lib/logger";
 import { trackTelemetryEvent } from "../lib/telemetry";
 
@@ -68,7 +67,6 @@ router.post(
 
     const ip = getClientIp(req);
     const isPublicPage = req.body?.isPublicPage !== false;
-    const geo = !isPrivateOrLocalIp(ip) ? geoip.lookup(ip) : null;
 
     const pageViewContext = {
       path: String(req.body.path || ""),
@@ -80,9 +78,9 @@ router.post(
       ip,
       isPublicPage,
       countryCode:
-        String(req.headers["cf-ipcountry"] || "") || geo?.country || "",
-      region: String(req.headers["x-appengine-region"] || "") || geo?.region || "",
-      city: geo?.city || "",
+        String(req.headers["cf-ipcountry"] || "") || "",
+      region: String(req.headers["x-appengine-region"] || "") || "",
+      city: "",
     };
 
     logInfo("public_page_view", pageViewContext);

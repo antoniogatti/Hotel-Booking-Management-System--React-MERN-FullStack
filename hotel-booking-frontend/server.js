@@ -54,7 +54,10 @@ const server = http.createServer((req, res) => {
       headers["Cache-Control"] = "public, max-age=31536000, immutable";
     } else if (ext === ".html") {
       headers["Cache-Control"] = "no-cache";
-    } else if ([".jpg", ".jpeg", ".png", ".svg", ".webp", ".ico", ".woff", ".woff2"].includes(ext)) {
+    } else if ([".jpg", ".jpeg", ".png", ".webp", ".woff", ".woff2"].includes(ext)) {
+      // Photos are never replaced under the same filename, so cache them for a year.
+      headers["Cache-Control"] = "public, max-age=31536000, immutable";
+    } else if ([".svg", ".ico"].includes(ext)) {
       headers["Cache-Control"] = "public, max-age=604800";
     }
 
