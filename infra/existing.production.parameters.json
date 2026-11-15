@@ -1,0 +1,29 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "names": {
+      "value": {
+        "backendPlan": "palazzopinto-api-b1-plan",
+        "backend": "palazzopinto-api-secure-pro",
+        "frontend": "palazzopinto-web-2603151048-pro",
+        "keyVault": "palazzopintokv-pro",
+        "workspace": "palazzopinto-logs",
+        "backendInsights": "palazzopinto-appinsights-pro",
+        "otherInsights": "palazzopinto-appi-pro",
+        "mongoAccount": "palazzopintodb-pro",
+        "vnet": "palazzopinto-backend-vnet",
+        "appServiceSubnet": "palazzopinto-appsvc-snet",
+        "privateEndpointSubnet": "palazzopinto-private-endpoints-snet",
+        "privateEndpoint": "palazzopinto-mongodb-pe",
+        "mongoDnsZone": "privatelink.mongo.cosmos.azure.com",
+        "mongoDnsLink": "palazzopinto-backend-vnet-link",
+        "mongoClusterDnsZone": "privatelink.mongocluster.cosmos.azure.com",
+        "n8nPlan": "palazzopinto-n8n-f1-plan",
+        "n8n": "n8n-palazzopinto",
+        "n8nStorage": "n8npalazzopinto",
+        "openAi": "prd-open-ai-pp-01-pro"
+      }
+    }
+  }
+}

@@ -13,6 +13,7 @@ import { randomBytes } from "crypto";
 import verifyToken, { verifyTokenOrAzureAd } from "../middleware/auth";
 import { sendBookingRequestEmails } from "../lib/contact-mail";
 import { recordAuditEvent } from "../lib/audit-log";
+import { getClientIp, trackTelemetryEvent, withClientIp } from "../lib/telemetry";
 
 const router = express.Router();
 const DUPLICATE_BOOKING_WINDOW_MS = 30 * 60 * 1000;
@@ -364,6 +365,31 @@ router.get("/search", async (req: Request, res: Response) => {
       ? availableHotels
       : availableHotels.slice(skip, skip + pageSize);
     const pages = shouldReturnAllRooms ? 1 : Math.ceil(total / pageSize);
+
+    const q = req.query;
+    const asText = (value: unknown) =>
+      (Array.isArray(value) ? value.join(",") : String(value ?? "")).slice(0, 100);
+    trackTelemetryEvent(
+      "room_search",
+      withClientIp(
+        {
+          checkIn: asText(q.checkIn),
+          checkOut: asText(q.checkOut),
+          adultCount: asText(q.adultCount),
+          childCount: asText(q.childCount),
+          destination: asText(q.destination),
+          facilities: asText(q.facilities),
+          types: asText(q.types),
+          stars: asText(q.stars),
+          maxPrice: asText(q.maxPrice),
+          sortOption: asText(q.sortOption),
+          page: String(pageNumber),
+          hasFilters: String(!shouldReturnAllRooms),
+        },
+        getClientIp(req)
+      ),
+      { resultCount: total }
+    );
 
     const response: HotelSearchResponse = {
       data: hotels,

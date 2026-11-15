@@ -1,9 +1,4 @@
-import appInsightsModule from "applicationinsights";
-
-const appInsights =
-  (appInsightsModule as any)?.setup
-    ? (appInsightsModule as any)
-    : (appInsightsModule as any)?.default;
+import * as appInsights from "applicationinsights";
 
 let initialized = false;
 
@@ -115,16 +110,41 @@ export const initializeTelemetry = () => {
   initialized = true;
 };
 
+export const getClientIp = (req: {
+  headers: Record<string, unknown>;
+  ip?: string;
+}): string => {
+  const xForwardedFor = req.headers["x-forwarded-for"];
+  if (typeof xForwardedFor === "string" && xForwardedFor.length > 0) {
+    return xForwardedFor.split(",")[0].trim().replace(/^::ffff:/, "");
+  }
+
+  return String(req.ip || "").replace(/^::ffff:/, "");
+};
+
+const isPrivateOrLocalIp = (ip: string): boolean =>
+  !ip ||
+  ip === "::1" ||
+  ip === "127.0.0.1" ||
+  ip.startsWith("10.") ||
+  ip.startsWith("192.168.") ||
+  /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip);
+
+// Application Insights resolves country/state/city from this attribute at ingestion.
+export const withClientIp = (
+  properties: Record<string, string>,
+  ip: string
+): Record<string, string> =>
+  ip && !isPrivateOrLocalIp(ip)
+    ? { ...properties, "microsoft.client.ip": ip }
+    : properties;
+
 export const trackTelemetryEvent = (
   name: string,
   properties?: Record<string, string>,
   measurements?: Record<string, number>
 ) => {
   if (!appInsights?.defaultClient) {
-    return;
-  }
-
-  if (!appInsights.defaultClient) {
     return;
   }
 

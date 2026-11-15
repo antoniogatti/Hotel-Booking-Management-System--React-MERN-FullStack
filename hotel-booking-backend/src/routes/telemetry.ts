@@ -1,28 +1,57 @@
 import express, { Request, Response } from "express";
+import rateLimit from "express-rate-limit";
 import { body, validationResult } from "express-validator";
 import { logInfo } from "../lib/logger";
-import { trackTelemetryEvent } from "../lib/telemetry";
+import {
+  getClientIp,
+  trackTelemetryEvent,
+  trackTelemetryException,
+  withClientIp,
+} from "../lib/telemetry";
 
 const router = express.Router();
 
-const getClientIp = (req: Request): string => {
-  const xForwardedFor = req.headers["x-forwarded-for"];
-  if (typeof xForwardedFor === "string" && xForwardedFor.length > 0) {
-    return xForwardedFor.split(",")[0].trim();
+const clientErrorLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+router.post(
+  "/client-error",
+  clientErrorLimiter,
+  [
+    body("message").trim().isLength({ min: 1, max: 500 }),
+    body("source").optional({ nullable: true }).trim().isLength({ max: 300 }),
+    body("stack").optional({ nullable: true }).trim().isLength({ max: 4000 }),
+    body("path").optional({ nullable: true }).trim().isLength({ max: 300 }),
+  ],
+  (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ message: "Validation failed" });
+    }
+
+    const error = new Error(String(req.body.message));
+    error.stack = String(req.body.stack || "") || error.stack;
+
+    trackTelemetryException(
+      error,
+      withClientIp(
+        {
+          origin: "frontend",
+          source: String(req.body.source || ""),
+          path: String(req.body.path || ""),
+          userAgent: String(req.headers["user-agent"] || ""),
+        },
+        getClientIp(req)
+      )
+    );
+
+    return res.status(204).send();
   }
-
-  return String(req.ip || "").replace(/^::ffff:/, "");
-};
-
-const isPrivateOrLocalIp = (ip: string): boolean => {
-  return (
-    ip === "::1" ||
-    ip === "127.0.0.1" ||
-    ip.startsWith("10.") ||
-    ip.startsWith("192.168.") ||
-    /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)
-  );
-};
+);
 
 router.post(
   "/page-view",
@@ -85,19 +114,25 @@ router.post(
 
     logInfo("public_page_view", pageViewContext);
 
-    trackTelemetryEvent("public_page_view", {
-      path: pageViewContext.path,
-      title: pageViewContext.title,
-      referrer: pageViewContext.referrer,
-      language: pageViewContext.language,
-      timeZone: pageViewContext.timeZone,
-      userAgent: pageViewContext.userAgent,
-      ip: pageViewContext.ip,
-      isPublicPage: String(pageViewContext.isPublicPage),
-      countryCode: pageViewContext.countryCode,
-      region: pageViewContext.region,
-      city: pageViewContext.city,
-    });
+    trackTelemetryEvent(
+      "public_page_view",
+      withClientIp(
+        {
+          path: pageViewContext.path,
+          title: pageViewContext.title,
+          referrer: pageViewContext.referrer,
+          language: pageViewContext.language,
+          timeZone: pageViewContext.timeZone,
+          userAgent: pageViewContext.userAgent,
+          ip: pageViewContext.ip,
+          isPublicPage: String(pageViewContext.isPublicPage),
+          countryCode: pageViewContext.countryCode,
+          region: pageViewContext.region,
+          city: pageViewContext.city,
+        },
+        ip
+      )
+    );
 
     return res.status(204).send();
   }

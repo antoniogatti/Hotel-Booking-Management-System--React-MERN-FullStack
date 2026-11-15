@@ -1,5 +1,7 @@
 $ErrorActionPreference = "Stop"
 
+throw "This legacy provisioning script is disabled. Production infrastructure already exists; see infra\README.md."
+
 function Get-RequiredValue {
   param(
     [string]$Value,

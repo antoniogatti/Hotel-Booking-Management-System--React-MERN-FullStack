@@ -44,6 +44,12 @@ This backend serves as the **core API engine** for a comprehensive hotel booking
 
 ### Traffic Insights
 
+Set `APPLICATIONINSIGHTS_CONNECTION_STRING` to the backend's Application
+Insights resource connection string to enable telemetry ingestion. The
+`public_page_view` and `room_search` custom events include the fields used for
+traffic and search analysis. Application Insights can derive approximate country,
+region and city from a public client IP; location may be unavailable or inaccurate.
+
 Set `APPLICATIONINSIGHTS_APP_ID` to the Application Insights application ID (or
 include `ApplicationId` in `APPLICATIONINSIGHTS_CONNECTION_STRING`). For query
 authentication, either set `APPLICATIONINSIGHTS_API_KEY` with read access or
