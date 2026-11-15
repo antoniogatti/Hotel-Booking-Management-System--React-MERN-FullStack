@@ -1,4 +1,4 @@
-// WhatsApp (Sofia) status monitor. Run by .github/workflows/whatsapp-status.yml every 30 min.
+// WhatsApp (Sofia) status monitor. Runs daily at 08:00 Europe/Rome via GitHub Actions.
 // Exit code 1 if any check fails. Emails info@ on a new incident (and on recovery) when SEND_MAIL=1.
 const env = (k, d) => process.env[k] ?? d;
 

@@ -2,7 +2,8 @@ name: WhatsApp status monitor
 
 on:
   schedule:
-    - cron: "*/30 * * * *"
+    - cron: "0 8 * * *"
+      timezone: "Europe/Rome"
   workflow_dispatch:
 
 permissions:
