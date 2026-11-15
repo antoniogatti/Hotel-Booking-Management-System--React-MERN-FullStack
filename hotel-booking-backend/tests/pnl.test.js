@@ -30,7 +30,7 @@ const gridViews = new Map();
 User.findById = (id) => ({
   select: async () => id === adminId || id === secondAdminId ? { role: "admin" } : id === ownerId ? { role: "hotel_owner" } : null,
 });
-PnlGridView.find = ({ userId }) => ({ sort: () => ({ lean: async () => [...gridViews.values()].filter((view) => view.userId === userId) }) });
+PnlGridView.find = ({ userId }) => ({ lean: async () => [...gridViews.values()].filter((view) => view.userId === userId) });
 PnlGridView.create = async (value) => {
   const view = { ...value, _id: new mongoose.Types.ObjectId() };
   gridViews.set(String(view._id), view);
@@ -177,6 +177,20 @@ test("grid views validate and persist layouts per admin", async () => {
   assert.deepEqual((await (await request("/views")).json()).views[0], { id: created.id, ...changed });
   assert.equal((await request(`/views/${created.id}`, { method: "DELETE" })).status, 204);
   assert.equal((await request(`/views/${created.id}`, { method: "DELETE" })).status, 404);
+});
+
+test("grid views are sorted by name without requiring a database sort index", async () => {
+  const layout = { columns: ["roomId"], hiddenGroups: [], frozenColumns: 1, widths: {} };
+  try {
+    await PnlGridView.create({ ...layout, name: "Zebra", userId: adminId });
+    await PnlGridView.create({ ...layout, name: "Alpha", userId: adminId });
+    await PnlGridView.create({ ...layout, name: "Other", userId: secondAdminId });
+    const response = await request("/views");
+    assert.equal(response.status, 200);
+    assert.deepEqual((await response.json()).views.map((view) => view.name), ["Alpha", "Zebra"]);
+  } finally {
+    gridViews.clear();
+  }
 });
 
 test("manual ledger validates and persists create, update and delete", async () => {

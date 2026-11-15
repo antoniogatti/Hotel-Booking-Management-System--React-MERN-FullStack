@@ -72,7 +72,8 @@ const gridViewResponse = (view: { _id: unknown; name: string; columns: string[];
 
 router.get("/views", async (req, res) => {
   try {
-    const views = await PnlGridView.find({ userId: req.userId }).sort({ name: 1 }).lean();
+    const views = await PnlGridView.find({ userId: req.userId }).lean();
+    views.sort((a, b) => a.name.localeCompare(b.name));
     return res.json({ views: views.map(gridViewResponse) });
   } catch (error) {
     logError("Failed to load P&L grid views", error);
