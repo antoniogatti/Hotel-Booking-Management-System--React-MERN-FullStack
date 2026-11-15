@@ -1,4 +1,5 @@
 import * as appInsights from "applicationinsights";
+import { isIP } from "node:net";
 
 let initialized = false;
 
@@ -115,11 +116,12 @@ export const getClientIp = (req: {
   ip?: string;
 }): string => {
   const xForwardedFor = req.headers["x-forwarded-for"];
-  if (typeof xForwardedFor === "string" && xForwardedFor.length > 0) {
-    return xForwardedFor.split(",")[0].trim().replace(/^::ffff:/, "");
-  }
-
-  return String(req.ip || "").replace(/^::ffff:/, "");
+  const ip = (typeof xForwardedFor === "string" && xForwardedFor.length > 0
+    ? xForwardedFor.split(",")[0].trim()
+    : String(req.ip || "")).replace(/^::ffff:/, "");
+  const ipv4WithPort = ip.match(/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/);
+  const ipv6WithPort = ip.match(/^\[([^\]]+)\]:\d+$/);
+  return ipv4WithPort?.[1] || ipv6WithPort?.[1] || ip;
 };
 
 const isPrivateOrLocalIp = (ip: string): boolean =>
@@ -135,7 +137,7 @@ export const withClientIp = (
   properties: Record<string, string>,
   ip: string
 ): Record<string, string> =>
-  ip && !isPrivateOrLocalIp(ip)
+  isIP(ip) && !isPrivateOrLocalIp(ip)
     ? { ...properties, "microsoft.client.ip": ip }
     : properties;
 

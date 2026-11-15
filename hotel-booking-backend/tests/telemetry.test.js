@@ -19,3 +19,12 @@ test("initializes the Application Insights SDK when configured", () => {
     }
   }
 });
+
+test("normalizes forwarded addresses for geographic enrichment", () => {
+  const ip = telemetry.getClientIp({ headers: { "x-forwarded-for": "8.8.8.8:12345, 10.0.0.1" } });
+  assert.equal(ip, "8.8.8.8");
+  assert.deepEqual(telemetry.withClientIp({}, ip), { "microsoft.client.ip": "8.8.8.8" });
+  assert.equal(telemetry.getClientIp({ headers: {}, ip: "[2001:4860:4860::8888]:443" }), "2001:4860:4860::8888");
+  assert.deepEqual(telemetry.withClientIp({}, "not-an-ip"), {});
+  assert.deepEqual(telemetry.withClientIp({}, "127.0.0.1"), {});
+});
