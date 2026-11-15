@@ -706,11 +706,13 @@ export const fetchUpcomingCheckIns = async (filters?: {
   days?: number;
   hotelId?: string;
   horizon?: "upcoming" | "past";
+  deskOnly?: boolean;
 }): Promise<UpcomingCheckInsResponse> => {
   const params = new URLSearchParams();
   if (filters?.days) params.append("days", String(filters.days));
   if (filters?.hotelId) params.append("hotelId", filters.hotelId);
   if (filters?.horizon) params.append("horizon", filters.horizon);
+  if (filters?.deskOnly) params.append("deskOnly", "true");
 
   const response = await axiosInstance.get(
     `/api/bookings/dashboard/upcoming-check-ins?${params.toString()}`

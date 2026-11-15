@@ -35,7 +35,7 @@ you leave a cell; Save all retries unsaved rows. Errors keep the edited values
 visible until corrected or discarded. Tab moves across editable cells, Enter
 moves down, and Shift+Enter adds a line in text cells. Use search, sorting,
 pagination and column resizing to navigate large ledgers. In the booking
-income sheet, Notes, Room, Check-in, Check-out and Guest are frozen by default.
+income sheet, the check-in markers, Notes, Room and Check-in are frozen by default.
 The numbered Stay, Registration, Invoicing and Payment & review groups organize
 the columns. Nights are calculated from check-in and check-out; for recorded
 income, edit those dates to change the calculation. Pax is the guest count.
@@ -66,9 +66,17 @@ and guest details before deciding how to reconcile. These are suggestions only:
 they do not link records or alter totals.
 
 The Registration group includes independent Check-in desk and Self check-in
-checkboxes. They save immediately as P&L booking details, including on recorded
-income, and can be filtered like other columns. They are manual markers only:
+checkboxes at the start of the default grid, after row selection. Older views
+that lack these columns also receive them at the start; saved views with their
+own column order retain it. Use **Show check-in columns first** to move them to
+the start of any view; this also shows Registration and clears the color filter.
+They save immediately as P&L booking details, including on recorded income, and
+can be filtered like other columns. They are manual markers only:
 checking them does not send an email or mark a guest checked in.
+The Check-in Desk shows only site and Booking.com bookings marked **Check-in
+desk**, subject to its room, date and status filters; recorded income is not
+linked to a booking. Its counts also include only marked bookings. The admin
+overview still shows all arrivals.
 
 Select site or Booking.com rows and open Check-in actions to access each
 staff check-in procedure or email guests individually. Desk emails invite

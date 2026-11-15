@@ -148,6 +148,20 @@ test("check-in markers autosave independently, retry failures, and survive reloa
   await page.goto(`${uiUrl}/pnl/income`);
   await page.getByRole("button", { name: "Open full-screen editor" }).click();
   const editor = page.getByRole("dialog", { name: "Income full-screen editor" });
+  const firstHeaders = await editor.getByRole("table", { name: "Booking income grid" }).locator("thead th > button").allTextContents();
+  expect(firstHeaders.slice(0, 3)).toEqual(["Check-in desk", "Self check-in", "Notes"]);
+  const region = editor.getByRole("region", { name: "Editable grid" });
+  const viewport = await region.boundingBox();
+  for (const label of ["Check-in desk for First Guest", "Self check-in for First Guest"]) {
+    const checkbox = editor.getByLabel(label);
+    const box = await checkbox.boundingBox();
+    const cell = await checkbox.locator("xpath=ancestor::td").boundingBox();
+    expect(box!.x).toBeGreaterThanOrEqual(viewport!.x);
+    expect(box!.x + box!.width).toBeLessThanOrEqual(viewport!.x + viewport!.width);
+    expect(Math.abs(box!.x + box!.width / 2 - (cell!.x + cell!.width / 2))).toBeLessThanOrEqual(1);
+    expect(Math.abs(box!.y + box!.height / 2 - (cell!.y + cell!.height / 2))).toBeLessThanOrEqual(1);
+  }
+  expect(await region.evaluate((element) => element.scrollLeft)).toBe(0);
   await editor.getByLabel("Check-in desk for First Guest").check();
   await editor.getByLabel("Self check-in for First Guest").check();
   await expect.poll(() => saved[local.id]).toMatchObject({ checkInDesk: true, selfCheckIn: true });
@@ -169,6 +183,34 @@ test("check-in markers autosave independently, retry failures, and survive reloa
   await editor.getByRole("button", { name: "Show value filters" }).click();
   await editor.getByLabel("Filter Self check-in by value").selectOption(JSON.stringify("Yes"));
   await expect(editor.getByText("2 rows", { exact: true })).toBeVisible();
+});
+
+test("income editor controls wrap inside the viewport", async ({ page }) => {
+  await page.route(/\/api\/pnl\/entries(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { entries: [] } }));
+  await page.route(/\/api\/pnl\/bookings(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { bookings: [] } }));
+  await page.goto(`${uiUrl}/pnl/income`);
+  await page.getByRole("button", { name: "Open full-screen editor" }).click();
+  const editor = page.getByRole("dialog", { name: "Income full-screen editor" });
+  const header = editor.locator("header");
+  for (const width of [940, 390]) {
+    await page.setViewportSize({ width, height: 800 });
+    const editorBox = await editor.boundingBox();
+    expect(editorBox!.y).toBe(0);
+    expect(editorBox!.height).toBe(800);
+    expect(await header.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    for (const control of [
+      editor.getByRole("button", { name: "Close editor" }),
+      editor.getByLabel("Income grid view"),
+      editor.getByRole("button", { name: "Configure columns and groups" }),
+      editor.getByRole("button", { name: "Show check-in columns first" }),
+      editor.getByRole("button", { name: "04 Payment & review" }),
+      editor.getByLabel("Filter columns by color"),
+    ]) {
+      const box = await control.boundingBox();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
+    }
+  }
 });
 
 test("expense grid autosaves, preserves unsaved values on failure, and retries", async ({ page }) => {
@@ -405,7 +447,7 @@ test("recorded checkout calculates nights and preserves details across saves and
   await page.getByRole("button", { name: "Open full-screen editor" }).click();
   const editor = page.getByRole("dialog", { name: "Income full-screen editor" });
   const row = editor.getByLabel("Guest for Date guest").locator("xpath=ancestor::tr");
-  await expect(editor.getByRole("columnheader").filter({ hasText: "Check-in" })).toContainText("01 Stay");
+  await expect(editor.getByRole("button", { name: "Check-in", exact: true }).locator("..")).toContainText("01 Stay");
   await expect(editor.getByRole("columnheader").filter({ hasText: "Country" })).toContainText("02 Registration");
   await expect(editor.getByRole("columnheader").filter({ hasText: "Invoice date" })).toContainText("03 Invoicing");
   await expect(editor.getByRole("columnheader").filter({ hasText: "Payment status" })).toContainText("04 Payment & review");
@@ -500,7 +542,7 @@ test("grid sorts and searches numeric values across pages", async ({ page }) => 
   await expect(editor.getByLabel("Description for Cost 50")).toBeVisible();
 });
 
-test("income starts with stay keys and proposes site and booking.com matches without linking", async ({ page }) => {
+test("income starts with check-in markers and proposes site and booking.com matches without linking", async ({ page }) => {
   const record = {
     id: "a".repeat(64), source: "recorded", reference: "", roomId, roomName: "Test room",
     checkIn: `${year}-01-02`, checkOut: `${year}-01-05`, nights: 3, status: "recorded", guestName: "Recorded guest",
@@ -536,7 +578,7 @@ test("income starts with stay keys and proposes site and booking.com matches wit
   await expect(referenceRow).not.toContainText("B-123");
   await page.getByRole("button", { name: "Open full-screen editor" }).click();
   const editor = page.getByRole("dialog");
-  expect((await editor.locator("thead th > button").allTextContents()).slice(0, 5)).toEqual(["Notes", "Room", "Check-in", "Check-out", "Guest"]);
+  expect((await editor.locator("thead th > button").allTextContents()).slice(0, 7)).toEqual(["Check-in desk", "Self check-in", "Notes", "Room", "Check-in", "Check-out", "Guest"]);
   const gridRow = editor.getByLabel("Guest for Recorded guest").locator("xpath=ancestor::tr");
   const region = editor.getByRole("region", { name: "Editable grid" });
   const grid = editor.getByRole("table", { name: "Booking income grid" });
@@ -557,15 +599,15 @@ test("income starts with stay keys and proposes site and booking.com matches wit
     }
   };
   await region.evaluate((element) => { element.scrollLeft = 1000; });
-  await checkPinnedColumns([0, 48, 268, 448, 593, 738]);
+  await checkPinnedColumns([0, 48, 168, 288, 508, 688]);
   await editor.getByRole("separator", { name: "Resize Room column" }).focus();
   await page.keyboard.press("ArrowRight");
   await region.evaluate((element) => { element.scrollLeft = 1000; });
-  await checkPinnedColumns([0, 48, 268, 464, 609, 754]);
+  await checkPinnedColumns([0, 48, 168, 288, 508, 704]);
   await editor.getByRole("separator", { name: "Resize Check-in column" }).focus();
   await page.keyboard.press("ArrowRight");
   await region.evaluate((element) => { element.scrollLeft = 1000; });
-  await checkPinnedColumns([0, 48, 268, 464, 625, 770]);
+  await checkPinnedColumns([0, 48, 168, 288, 508, 704]);
   await expect(gridRow).toContainText("Check-out matches");
   await expect(gridRow).toContainText("Check-out differs");
   await editor.getByLabel("Check-out for Recorded guest").fill(`${year}-01-06`);
@@ -608,7 +650,7 @@ test("income views save and restore column order, groups, widths and freeze sett
   const editor = page.getByRole("dialog", { name: "Income full-screen editor" });
   const table = editor.getByRole("table", { name: "Booking income grid" });
   await editor.getByLabel("Drag Guest column").dragTo(editor.getByRole("button", { name: "Reference", exact: true }));
-  expect((await table.locator("thead th > button").allTextContents()).slice(0, 6)).toEqual(["Notes", "Room", "Check-in", "Check-out", "Reference", "Guest"]);
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 8)).toEqual(["Check-in desk", "Self check-in", "Notes", "Room", "Check-in", "Check-out", "Reference", "Guest"]);
   await editor.getByRole("separator", { name: "Resize Room column" }).focus();
   await page.keyboard.press("ArrowRight");
   await editor.getByRole("button", { name: "Configure columns and groups" }).click();
@@ -624,7 +666,7 @@ test("income views save and restore column order, groups, widths and freeze sett
   failSave = false;
   await panel.getByRole("button", { name: "Save as new view" }).click();
   await expect.poll(() => views.length).toBe(1);
-  expect(views[0].columns.slice(0, 6)).toEqual(["notes", "roomId", "date", "checkOut", "reference", "guestName"]);
+  expect(views[0].columns.slice(0, 8)).toEqual(["checkInDesk", "selfCheckIn", "notes", "roomId", "date", "checkOut", "reference", "guestName"]);
   expect(views[0].hiddenGroups).toEqual(["registrationV2"]);
   expect(views[0].hiddenColumns).toEqual(["invoiceNumber"]);
   expect(views[0].frozenColumns).toBe(2);
@@ -641,7 +683,7 @@ test("income views save and restore column order, groups, widths and freeze sett
   await expect(panel.getByLabel("02 Registration", { exact: true })).not.toBeChecked();
   await panel.getByRole("button", { name: "Close", exact: true }).click();
   await editor.getByLabel("Income grid view").selectOption("");
-  expect((await table.locator("thead th > button").allTextContents()).slice(0, 5)).toEqual(["Notes", "Room", "Check-in", "Check-out", "Guest"]);
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 7)).toEqual(["Check-in desk", "Self check-in", "Notes", "Room", "Check-in", "Check-out", "Guest"]);
   await expect(editor.getByRole("button", { name: "Invoice number", exact: true })).toBeVisible();
   await editor.getByRole("button", { name: "Close editor" }).click();
   await page.getByRole("button", { name: "Open full-screen editor" }).click();
@@ -980,6 +1022,55 @@ test("quick Stay view and group colors preserve saved column settings", async ({
   await expect(panel.getByLabel("Show Room column")).not.toBeChecked();
 });
 
+test("legacy and customized views retain settings and can show check-in columns first", async ({ page }) => {
+  const defaultView = {
+    columns: ["notes", "roomId", "date"], hiddenGroups: ["registrationV2"],
+    hiddenColumns: [], frozenColumns: 2, widths: { roomId: 196 },
+  };
+  const views = [{
+    id: "custom", name: "Custom", columns: ["roomId", "selfCheckIn", "checkInDesk", "notes"],
+    hiddenGroups: [], hiddenColumns: [], frozenColumns: 1, widths: {},
+  }, {
+    id: "filtered", name: "Filtered legacy", columns: ["notes", "roomId"],
+    hiddenGroups: [], hiddenColumns: ["checkInDesk"], frozenColumns: 1, widths: {},
+    colorTags: [{ id: "stay", name: "Stay", color: "#ff0000" }],
+    columnColors: { roomId: "stay" }, colorFilter: "stay",
+  }];
+  await page.route(/\/api\/pnl\/entries(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { entries: [] } }));
+  await page.route(/\/api\/pnl\/bookings(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { bookings: [] } }));
+  await page.route(/\/api\/pnl\/views(?:\/|$)/, (route) => route.fulfill({ headers, json: { views, defaultView } }));
+  await page.goto(`${uiUrl}/pnl/income`);
+  await page.getByRole("button", { name: "Open full-screen editor" }).click();
+  const editor = page.getByRole("dialog", { name: "Income full-screen editor" });
+  const table = editor.getByRole("table", { name: "Booking income grid" });
+  await expect(editor.getByRole("button", { name: "Check-in desk", exact: true })).toHaveCount(0);
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 3)).toEqual(["Notes", "Room", "Check-in"]);
+  await editor.getByRole("button", { name: "Configure columns and groups" }).click();
+  const panel = page.getByRole("dialog", { name: "Configure income view" });
+  await expect(panel.getByLabel("Freeze first visible columns")).toHaveValue("2");
+  await expect(panel.getByLabel("02 Registration", { exact: true })).not.toBeChecked();
+  await panel.getByRole("button", { name: "Close", exact: true }).click();
+  await editor.getByRole("button", { name: "Show check-in columns first" }).click();
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 4))
+    .toEqual(["Check-in desk", "Self check-in", "Notes", "Room"]);
+  page.once("dialog", (dialog) => dialog.accept());
+  await editor.getByLabel("Income grid view").selectOption("custom");
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 4))
+    .toEqual(["Room", "Self check-in", "Check-in desk", "Notes"]);
+  await editor.getByRole("button", { name: "Show check-in columns first" }).click();
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 4))
+    .toEqual(["Check-in desk", "Self check-in", "Room", "Notes"]);
+  page.once("dialog", (dialog) => dialog.accept());
+  await editor.getByLabel("Income grid view").selectOption("filtered");
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 1)).toEqual(["Room"]);
+  await editor.getByRole("button", { name: "Configure columns and groups" }).click();
+  await expect(panel.getByLabel("Freeze first visible columns")).toHaveValue("1");
+  await panel.getByRole("button", { name: "Close", exact: true }).click();
+  await editor.getByRole("button", { name: "Show check-in columns first" }).click();
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 4))
+    .toEqual(["Check-in desk", "Self check-in", "Notes", "Room"]);
+});
+
 test("named column colors and value filters are restored with a view", async ({ page }) => {
   const record = {
     id: "a".repeat(64), reference: "REC-1", source: "recorded", roomId, roomName: "Test room",
@@ -1008,10 +1099,10 @@ test("named column colors and value filters are restored with a view", async ({ 
   await page.getByRole("button", { name: "Open full-screen editor" }).click();
   const editor = page.getByRole("dialog", { name: "Income full-screen editor" });
   await editor.getByLabel("Income grid view").selectOption("old");
-  expect((await editor.getByRole("table", { name: "Booking income grid" }).locator("thead th > button").allTextContents()).slice(0, 2)).toEqual(["Notes", "Room"]);
+  expect((await editor.getByRole("table", { name: "Booking income grid" }).locator("thead th > button").allTextContents()).slice(0, 4)).toEqual(["Check-in desk", "Self check-in", "Notes", "Room"]);
   await editor.getByRole("button", { name: "Configure columns and groups" }).click();
   const panel = page.getByRole("dialog", { name: "Configure income view" });
-  await expect(panel.getByLabel("Freeze first visible columns")).toHaveValue("2");
+  await expect(panel.getByLabel("Freeze first visible columns")).toHaveValue("4");
   await panel.getByRole("button", { name: "Add color" }).click();
   await panel.getByLabel("Color name 1").fill("Invoices");
   await panel.getByLabel("Color value 1").fill("#ff0000");

@@ -28,14 +28,20 @@ function normalizeView(view: api.PnlGridLayout, columns: ViewColumn[], groups: G
   const known = new Set(columns.map((column) => column.key));
   const order = view.columns.filter((key) => known.has(key));
   const addNotes = known.has("notes") && !order.includes("notes");
+  const newCheckInColumns = ["checkInDesk", "selfCheckIn"].filter((key) => known.has(key) && !order.includes(key));
   const hiddenColumns = [...new Set([...(view.hiddenColumns ?? []), ...view.hiddenGroups.flatMap((id) => legacyGroups[id] ?? [])])].filter((key) => known.has(key));
+  const isVisible = (key: string) => {
+    const column = columns.find((item) => item.key === key);
+    const color = view.columnColors?.[key];
+    return column && !hiddenColumns.includes(key) && !view.hiddenGroups.includes(column.group) &&
+      (!view.colorFilter || (view.colorFilter === "uncolored" ? !color : color === view.colorFilter));
+  };
   return {
-    columns: [...(addNotes ? ["notes"] : []), ...order, ...columns.map((column) => column.key).filter((key) => key !== "notes" && !order.includes(key))],
+    columns: [...newCheckInColumns, ...(addNotes ? ["notes"] : []), ...order, ...columns.map((column) => column.key).filter((key) => key !== "notes" && !newCheckInColumns.includes(key) && !order.includes(key))],
     hiddenGroups: view.hiddenGroups.filter((key) => groups.some((group) => group.id === key)),
     hiddenColumns,
-    frozenColumns: view.frozenColumns + (addNotes && view.frozenColumns > 0 &&
-      !hiddenColumns.includes("notes") && !view.hiddenGroups.includes(columns.find((column) => column.key === "notes")!.group) &&
-      (!view.colorFilter || view.colorFilter === "uncolored") ? 1 : 0),
+    frozenColumns: view.frozenColumns + (view.frozenColumns > 0
+      ? [...newCheckInColumns, ...(addNotes ? ["notes"] : [])].filter(isVisible).length : 0),
     widths: Object.fromEntries(Object.entries(view.widths).filter(([key]) => known.has(key))),
     colorTags: view.colorTags ?? [],
     columnColors: Object.fromEntries(Object.entries(view.columnColors ?? {}).filter(([key]) => known.has(key))),
@@ -215,16 +221,12 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
   };
 
   return (
-    <div className="mt-3 text-sm">
-      <div className="flex flex-wrap items-center gap-2">
-        <label>View <select aria-label="Income grid view" value={selected} disabled={loading || busy || loadFailed} onChange={(event) => selectView(event.target.value)} className="ml-1 rounded border border-slate-300 bg-white px-2 py-1">
+    <div className="mt-3 min-w-0 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-sm">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
+        <label>View <select aria-label="Income grid view" value={selected} disabled={loading || busy || loadFailed} onChange={(event) => selectView(event.target.value)} className="ml-1 max-w-48 rounded border border-slate-300 bg-white px-2 py-1">
           <option value="">Default</option>
           {views.map((view) => <option key={view.id} value={view.id}>{view.name}</option>)}
         </select></label>
-        <div role="group" aria-label="Quick group views" className="flex min-w-0 flex-wrap items-center gap-1">
-          <Button size="sm" variant="outline" className="aria-pressed:bg-teal-700 aria-pressed:text-white" aria-pressed={layout.hiddenGroups.length === 0} onClick={() => onChange({ ...layout, hiddenGroups: [] })}>All groups</Button>
-          {groups.map((group) => <Button key={group.id} size="sm" variant="outline" className="aria-pressed:bg-teal-700 aria-pressed:text-white" aria-pressed={!layout.hiddenGroups.includes(group.id)} onClick={() => onChange({ ...layout, hiddenGroups: layout.hiddenGroups.includes(group.id) ? layout.hiddenGroups.filter((id) => id !== group.id) : [...layout.hiddenGroups, group.id] })}>{group.label}</Button>)}
-        </div>
         <Sheet>
           <SheetTrigger asChild><Button size="sm" variant="outline">Configure columns and groups</Button></SheetTrigger>
           <SheetContent overlayClassName="z-[110] bg-black/40" className="z-[120] w-full overflow-y-auto sm:max-w-xl">
@@ -314,16 +316,28 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
             </ol>
           </SheetContent>
         </Sheet>
-        <span aria-live="polite" className="text-slate-600">{loading ? "Loading views…" : busy ? "Saving view…" : dirty ? "Unsaved view changes" : "View unchanged"}</span>
-        <label>Filter columns by color <select aria-label="Filter columns by color" value={layout.colorFilter} onChange={(event) => onChange({ ...layout, colorFilter: event.target.value })} className="ml-1 rounded border border-slate-300 bg-white px-2 py-1">
+        <label>Filter columns by color <select aria-label="Filter columns by color" value={layout.colorFilter} onChange={(event) => onChange({ ...layout, colorFilter: event.target.value })} className="ml-1 max-w-40 rounded border border-slate-300 bg-white px-2 py-1">
           <option value="">All colors</option>
           {columns.some((column) => !layout.columnColors[column.key]) && <option value="uncolored">Uncolored</option>}
           {layout.colorTags.filter((tag) => usedColors.has(tag.id)).map((tag) => <option key={tag.id} value={tag.id}>{tag.name || "Unnamed color"}</option>)}
         </select></label>
+        <Button size="sm" variant="outline" onClick={() => onChange({
+          ...layout,
+          columns: ["checkInDesk", "selfCheckIn", ...layout.columns.filter((key) => key !== "checkInDesk" && key !== "selfCheckIn")],
+          hiddenGroups: layout.hiddenGroups.filter((id) => id !== "registrationV2"),
+          hiddenColumns: layout.hiddenColumns.filter((key) => key !== "checkInDesk" && key !== "selfCheckIn"),
+          colorFilter: "",
+        })}>Show check-in columns first</Button>
+        <span aria-live="polite" className="text-xs text-slate-600">{loading ? "Loading views…" : busy ? "Saving view…" : dirty ? "Unsaved view changes" : "View unchanged"}</span>
         {Object.keys(layout.columnFilters).length > 0 && <span>
           {Object.keys(layout.columnFilters).length} value filter(s) active (including hidden columns).
           <button type="button" className="ml-2 underline" onClick={() => onChange({ ...layout, columnFilters: {} })}>Clear value filters</button>
         </span>}
+      </div>
+      <div role="group" aria-label="Quick group views" className="flex min-w-0 flex-wrap items-center gap-1">
+        <span className="mr-1 text-xs font-medium text-slate-600">Groups</span>
+        <Button size="sm" variant="outline" className="aria-pressed:bg-teal-700 aria-pressed:text-white" aria-pressed={layout.hiddenGroups.length === 0} onClick={() => onChange({ ...layout, hiddenGroups: [] })}>All groups</Button>
+        {groups.map((group) => <Button key={group.id} size="sm" variant="outline" className="aria-pressed:bg-teal-700 aria-pressed:text-white" aria-pressed={!layout.hiddenGroups.includes(group.id)} onClick={() => onChange({ ...layout, hiddenGroups: layout.hiddenGroups.includes(group.id) ? layout.hiddenGroups.filter((id) => id !== group.id) : [...layout.hiddenGroups, group.id] })}>{group.label}</Button>)}
       </div>
       {error && <p role="alert" className="mt-1 text-rose-700">{error} {loadFailed && <button type="button" className="underline" onClick={() => setReload((value) => value + 1)}>Retry</button>}</p>}
     </div>

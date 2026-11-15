@@ -8,6 +8,8 @@ import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
 import BookingDayStatus from "../models/booking-day-status";
 import ExternalCalendarEvent from "../models/external-calendar-event";
+import PnlBookingIncome from "../models/pnl-booking-income";
+import { PnlBookingDetails } from "../models/pnl-booking-details";
 import {
   BOOKING_COM_SOURCE,
   BOOKING_COM_STATUS_LABEL,
@@ -1596,6 +1598,7 @@ router.get(
       .isIn(["upcoming", "past"])
       .withMessage("Horizon must be either upcoming or past"),
     query("hotelId").optional().isString().withMessage("Hotel ID must be a string"),
+    query("deskOnly").optional().isIn(["true", "false"]).withMessage("deskOnly must be true or false"),
   ],
   async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -1606,6 +1609,7 @@ router.get(
     try {
       const days = req.query.days ? Number(req.query.days) : 7;
       const horizon = req.query.horizon === "past" ? "past" : "upcoming";
+      const deskOnly = req.query.deskOnly === "true";
       const hotelId = req.query.hotelId ? String(req.query.hotelId) : "";
       let hotelQuery: Record<string, unknown> = req.userRole === "admin" ? {} : { userId: req.userId };
 
@@ -1631,14 +1635,16 @@ router.get(
       const tomorrow = new Date(today.getTime() + 86400000);
       const windowEnd = new Date(today.getTime() + days * 86400000);
       const isPastStayStart = (value: string | Date) => toUtcStartOfDay(value).getTime() < today.getTime();
+      const localCheckedInFilter = { hotelId: { $in: hotelIds }, "checkInInfo.checkedInAt": { $gte: today, $lt: tomorrow } };
+      const importedCheckedInFilter = { ...localCheckedInFilter, source: BOOKING_COM_SOURCE, status: "active" };
 
-      const [
+      let [
         localUpcoming,
         importedUpcoming,
         localInHouse,
         importedInHouse,
-        localCheckedInTodayCount,
-        importedCheckedInTodayCount,
+        localCheckedInToday,
+        importedCheckedInToday,
       ] =
         await Promise.all([
           Booking.find({
@@ -1654,7 +1660,7 @@ router.get(
                 }),
           })
             .select(
-              "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
+              `_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo ${deskOnly ? "+pnlIncome" : ""}`
             ),
           ExternalCalendarEvent.find({
             hotelId: { $in: hotelIds },
@@ -1665,7 +1671,7 @@ router.get(
               : { startDate: { $gte: today, $lt: windowEnd } }),
           })
             .select(
-              "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
+              `_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo ${deskOnly ? "+pnlIncome" : ""}`
             ),
           Booking.find({
             hotelId: { $in: hotelIds },
@@ -1678,7 +1684,7 @@ router.get(
             ],
           })
             .select(
-              "_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo"
+              `_id hotelId reservationNumber firstName lastName email phone nationality status checkIn checkOut arrivalTime checkInInfo ${deskOnly ? "+pnlIncome" : ""}`
             ),
           ExternalCalendarEvent.find({
             hotelId: { $in: hotelIds },
@@ -1692,19 +1698,35 @@ router.get(
             ],
           })
             .select(
-              "_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo"
+              `_id hotelId externalUid firstName lastName email phone nationality startDate endDate source summary checkInInfo ${deskOnly ? "+pnlIncome" : ""}`
             ),
-          Booking.countDocuments({
-            hotelId: { $in: hotelIds },
-            "checkInInfo.checkedInAt": { $gte: today, $lt: tomorrow },
-          }),
-          ExternalCalendarEvent.countDocuments({
-            hotelId: { $in: hotelIds },
-            source: BOOKING_COM_SOURCE,
-            status: "active",
-            "checkInInfo.checkedInAt": { $gte: today, $lt: tomorrow },
-          }),
+          deskOnly ? Booking.find(localCheckedInFilter).select("_id +pnlIncome") : Booking.countDocuments(localCheckedInFilter),
+          deskOnly ? ExternalCalendarEvent.find(importedCheckedInFilter).select("_id +pnlIncome") : ExternalCalendarEvent.countDocuments(importedCheckedInFilter),
         ]);
+
+      let checkedInToday: number;
+      if (deskOnly && Array.isArray(localCheckedInToday) && Array.isArray(importedCheckedInToday)) {
+        const localCandidates = [...localUpcoming, ...localInHouse, ...localCheckedInToday];
+        const importedCandidates = [...importedUpcoming, ...importedInHouse, ...importedCheckedInToday];
+        const keys = [...new Set([
+          ...localCandidates.map((booking) => `local:${String(booking._id)}`),
+          ...importedCandidates.map((booking) => `booking_com:${String(booking._id)}`),
+        ])];
+        const records = keys.length ? await PnlBookingIncome.find({ _id: { $in: keys } }).lean() : [];
+        const details = new Map(records.map((record) => [record._id, record.details]));
+        const isDesk = (source: "local" | "booking_com", booking: { _id: unknown; pnlIncome?: PnlBookingDetails }) =>
+          (details.get(`${source}:${String(booking._id)}`) ?? booking.pnlIncome)?.checkInDesk === true;
+        localUpcoming = localUpcoming.filter((booking) => isDesk("local", booking));
+        localInHouse = localInHouse.filter((booking) => isDesk("local", booking));
+        importedUpcoming = importedUpcoming.filter((booking) => isDesk("booking_com", booking));
+        importedInHouse = importedInHouse.filter((booking) => isDesk("booking_com", booking));
+        checkedInToday = localCheckedInToday.filter((booking) => isDesk("local", booking)).length +
+          importedCheckedInToday.filter((booking) => isDesk("booking_com", booking)).length;
+      } else if (!deskOnly && typeof localCheckedInToday === "number" && typeof importedCheckedInToday === "number") {
+        checkedInToday = localCheckedInToday + importedCheckedInToday;
+      } else {
+        throw new Error("Unexpected checked-in results");
+      }
 
       const localSortDirection = horizon === "past" ? -1 : 1;
       localUpcoming.sort((left, right) =>
@@ -1826,7 +1848,7 @@ router.get(
           arrivalsToday,
           upcomingArrivals: upcomingRows.length,
           inHouseToday: inHouseRows.length,
-          checkedInToday: localCheckedInTodayCount + importedCheckedInTodayCount,
+          checkedInToday,
           sync: {
             totalRooms: hotels.length,
             enabledRooms: roomsWithSync.length,

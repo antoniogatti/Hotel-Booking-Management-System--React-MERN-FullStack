@@ -33,6 +33,8 @@ type Column = {
 };
 
 const incomeColumns: Column[] = [
+  { key: "checkInDesk", label: "Check-in desk", width: 120, kind: "checkbox" },
+  { key: "selfCheckIn", label: "Self check-in", width: 120, kind: "checkbox" },
   { key: "notes", label: "Notes", width: 220 },
   { key: "roomId", label: "Room", width: 180, kind: "room", recordedOnly: true },
   { key: "date", label: "Check-in", kind: "date", recordedOnly: true },
@@ -49,8 +51,6 @@ const incomeColumns: Column[] = [
   { key: "city", label: "City" },
   { key: "phone", label: "Phone", width: 150, recordedOnly: true },
   { key: "email", label: "Email", width: 200, recordedOnly: true },
-  { key: "checkInDesk", label: "Check-in desk", kind: "checkbox" },
-  { key: "selfCheckIn", label: "Self check-in", kind: "checkbox" },
   { key: "invoiceDate", label: "Invoice date", kind: "date" },
   { key: "invoiceNumber", label: "Invoice number" },
   { key: "invoiceRequired", label: "Invoice required", kind: "boolean" },
@@ -482,11 +482,14 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
         if (event.shiftKey && (document.activeElement === first || document.activeElement === event.currentTarget)) { event.preventDefault(); last?.focus(); }
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }}
-      className="fixed inset-0 z-[100] flex flex-col bg-slate-100 text-slate-900">
-      <header className="max-h-[60vh] shrink-0 overflow-y-auto border-b border-slate-300 bg-white px-4 py-3 shadow-sm">
+      className="fixed inset-0 z-[100] !m-0 flex flex-col bg-slate-100 text-slate-900">
+      <header className="max-h-[60vh] min-w-0 shrink-0 overflow-x-hidden overflow-y-auto border-b border-slate-300 bg-white px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="text-xl font-semibold">{type === "income" ? "Income" : "Expenses"} editor <span className="text-slate-500">{year}</span></h2>
-            <p className="text-xs text-slate-600">Changes save when you leave a cell. Tab moves across; Enter moves down. Shift+Enter adds a line in text cells. Booking identity and calculated cells are read-only. Booking suggestions need review and do not link records or change totals. Inclusion warnings refresh when you reopen the editor.</p></div>
+          <div className="min-w-0 flex-1 basis-80"><h2 className="text-xl font-semibold">{type === "income" ? "Income" : "Expenses"} editor <span className="text-slate-500">{year}</span></h2>
+            <p className="text-xs text-slate-600">Changes save when you leave a cell{type === "income" ? "; check-in markers save immediately and do not send emails" : ""}.</p>
+            <details className="text-xs text-slate-600"><summary className="cursor-pointer text-teal-700">Editing tips</summary>
+              <p>Tab moves across; Enter moves down. Shift+Enter adds a line in text cells. Booking identity and calculated cells are read-only. Booking suggestions need review and do not link records or change totals. Inclusion warnings refresh when you reopen the editor.</p>
+            </details></div>
           <div className="flex flex-wrap items-center gap-2">
             <span aria-live="polite" className={`flex h-10 w-44 items-center text-sm ${errorCount ? "text-rose-700" : "text-slate-600"}`}>{savingCount ? `Saving ${savingCount}…` : errorCount ? `${errorCount} row(s) need attention` : dirtyCount ? `${dirtyCount} unsaved row(s)` : "All changes saved"}</span>
             <Button size="sm" onClick={() => void saveAll()}>Save all</Button>
@@ -494,7 +497,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
             <Button size="sm" variant="outline" disabled={checkInBusy} onClick={() => void close()}>Close editor</Button>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3">
+        <div className="mt-3 flex min-w-0 flex-wrap items-center gap-3">
           {type === "income" && <div role="group" aria-label="Income sheets" className="flex gap-1">
             {([["income", "Booking income"], ["additional", "Additional income"]] as const).map(([key, label]) =>
               <button key={key} type="button" disabled={checkInBusy} aria-pressed={sheet === key} onClick={() => { setSheet(key); setPage(0); setSort(null); }} className={`rounded-md px-3 py-1.5 text-sm font-medium ${sheet === key ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-700"}`}>{label}</button>)}
@@ -506,7 +509,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           <span className="text-sm text-slate-600">{filtered.length} rows</span>
           <div className="ml-auto flex items-center gap-2 text-sm"><button disabled={page === 0} onClick={() => setPage(page - 1)} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button><span>Page {page + 1} of {Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))}</span><button disabled={(page + 1) * PAGE_SIZE >= filtered.length} onClick={() => setPage(page + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Next</button></div>
         </div>
-        {type === "income" && <div hidden={sheet !== "income"}><PnlGridViews layout={incomeLayout} defaultLayout={defaultIncomeLayout} columns={incomeViewColumns} groups={incomeGroups} onChange={setIncomeLayout} onDirtyChange={setLayoutDirty} />
+        {type === "income" && <div className="min-w-0" hidden={sheet !== "income"}><PnlGridViews layout={incomeLayout} defaultLayout={defaultIncomeLayout} columns={incomeViewColumns} groups={incomeGroups} onChange={setIncomeLayout} onDirtyChange={setLayoutDirty} />
           <p className="mt-1 text-xs text-slate-600">Check-in actions are available for site and Booking.com bookings; recorded income is not linked to a booking.</p></div>}
         {message && <p role={errorCount || dirtyCount ? "alert" : "status"} className="mt-2 text-sm text-rose-700">{message}</p>}
       </header>
@@ -515,23 +518,23 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           <colgroup><col style={{ width: sheet === "income" ? 48 : 90 }} />{columns.map((column) => <col key={column.key} style={{ width: width(column) }} />)}</colgroup>
           <thead className="sticky top-0 z-20 bg-slate-100">
             <tr>{sheet !== "income" ? <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">Row</th> :
-              <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">
+              <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2 text-center">
                 <input type="checkbox" aria-label="Select bookings on this page" disabled={!selectable.length || checkInBusy} checked={selectable.length > 0 && selectable.every((row) => selectedBookings.has(row.key))}
                   ref={(element) => { if (element) element.indeterminate = selectable.some((row) => selectedBookings.has(row.key)) && !selectable.every((row) => selectedBookings.has(row.key)); }}
-                  onChange={(event) => { const checked = event.target.checked; setSelectedBookings((previous) => { const next = new Set(previous); for (const row of selectable) { if (checked) next.add(row.key); else next.delete(row.key); } return next; }); }} />
+                  onChange={(event) => { const checked = event.target.checked; setSelectedBookings((previous) => { const next = new Set(previous); for (const row of selectable) { if (checked) next.add(row.key); else next.delete(row.key); } return next; }); }} className="h-4 w-4 accent-teal-700" />
               </th>}
               {columns.map((column, index) => {
                 const color = sheet === "income" ? incomeLayout.colorTags.find((tag) => tag.id === incomeLayout.columnColors[column.key])?.color : undefined;
                 const selectedValue = incomeLayout.columnFilters[column.key];
                 const values = columnValues.get(column.key) || [];
-                return <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} style={{ left: pinnedOffset(index), backgroundColor: color ? tint(color, 0.3) : undefined }} className={`${pinnedOffset(index) !== undefined ? "sticky z-30" : "relative"} border-b border-r border-slate-300 bg-slate-100 p-2 pr-4 align-top`}
+                return <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} style={{ left: pinnedOffset(index), backgroundColor: color ? tint(color, 0.3) : undefined }} className={`${pinnedOffset(index) !== undefined ? "sticky z-30" : "relative"} border-b border-r border-slate-300 p-2 align-top ${column.kind === "checkbox" ? "bg-teal-50 pr-3" : "bg-slate-100 pr-4"}`}
                 onDragOver={(event) => { if (sheet === "income" && draggedColumn.current) event.preventDefault(); }}
                 onDrop={(event) => { event.preventDefault(); const from = draggedColumn.current; if (from) setIncomeLayout((previous) => ({ ...previous, columns: moveGridColumn(previous.columns, from, column.key) })); draggedColumn.current = null; }}>
                 {sheet === "income" && <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-600">{incomeGroups.find((group) => group.id === incomeViewColumns.find((item) => item.key === column.key)?.group)?.label}</div>}
                 {sheet === "income" && <span draggable aria-label={`Drag ${column.label} column`} title={`Drag ${column.label} to reorder`} className="mr-1 cursor-grab select-none text-slate-500"
                   onDragStart={(event) => { draggedColumn.current = column.key; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", column.key); }}
-                  onDragEnd={() => { draggedColumn.current = null; }}><GripVertical className="inline h-4 w-4" aria-hidden="true" /></span>}
-                <button type="button" className="text-left font-semibold" onClick={() => { setSort({ key: column.key, desc: sort?.key === column.key && !sort.desc }); setPage(0); }}>{column.label}{sort?.key === column.key ? sort.desc ? " ↓" : " ↑" : ""}</button>
+                  onDragEnd={() => { draggedColumn.current = null; }}><GripVertical className={`inline ${column.kind === "checkbox" ? "h-3 w-3" : "h-4 w-4"}`} aria-hidden="true" /></span>}
+                <button type="button" className={`text-left font-semibold ${column.kind === "checkbox" ? "whitespace-nowrap text-xs" : ""}`} onClick={() => { setSort({ key: column.key, desc: sort?.key === column.key && !sort.desc }); setPage(0); }}>{column.label}{sort?.key === column.key ? sort.desc ? " ↓" : " ↑" : ""}</button>
                 {sheet === "income" && showFilters && <select aria-label={`Filter ${column.label} by value`} value={selectedValue === undefined ? "" : JSON.stringify(selectedValue)} onChange={(event) => {
                   const filters = { ...incomeLayout.columnFilters };
                   if (event.target.value === "") delete filters[column.key];
@@ -551,8 +554,8 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
             {sheet !== "income" && <th scope="row" className={`sticky left-0 z-10 border-b border-r border-slate-300 p-2 text-xs ${row.error ? "bg-rose-100 text-rose-800" : rowDirty(row) ? "bg-amber-50" : "bg-slate-50"}`}>
               {page * PAGE_SIZE + index + 1}<span className="block font-normal">{row.saving ? "Saving" : row.error ? "Error" : rowDirty(row) ? "Unsaved" : "Saved"}</span>{row.error && <span role="alert" className="block break-words">{row.error}</span>}
             </th>}
-            {sheet === "income" && <td className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-2 align-top">
-              <input type="checkbox" aria-label={`Select ${rowLabel(row)} (${row.values.reference})`} disabled={!row.booking || row.booking.source === "recorded" || checkInBusy} checked={selectedBookings.has(row.key)} onChange={(event) => selectRow(row.key, event.target.checked)} />
+            {sheet === "income" && <td className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-2 text-center align-middle">
+              <input type="checkbox" aria-label={`Select ${rowLabel(row)} (${row.values.reference})`} disabled={!row.booking || row.booking.source === "recorded" || checkInBusy} checked={selectedBookings.has(row.key)} onChange={(event) => selectRow(row.key, event.target.checked)} className="h-4 w-4 accent-teal-700" />
             </td>}
             {columns.map((column, columnIndex) => {
               const readOnly = column.readOnly || (column.recordedOnly && row.booking?.source !== "recorded") || (column.overlapOnly && !row.booking?.possibleRecordedOverlap);
@@ -561,10 +564,10 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
               const cellClass = `h-full min-h-10 w-full border-0 bg-transparent px-2 py-2 text-left outline-none focus:bg-teal-50 focus:ring-2 focus:ring-inset focus:ring-teal-600 ${row.values[column.key] !== row.saved[column.key] ? "bg-amber-50" : ""}`;
               const common = { "aria-label": label, value, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => change(row, column.key, event.target.value), onBlur: () => { if (row.saving || row.values[column.key] !== row.saved[column.key]) void saveRow(row); } };
               const color = sheet === "income" ? incomeLayout.colorTags.find((tag) => tag.id === incomeLayout.columnColors[column.key])?.color : undefined;
-              return <td key={column.key} title={readOnly ? "Read-only" : undefined} style={{ left: pinnedOffset(columnIndex), backgroundColor: color ? tint(color, 0.08, readOnly ? 248 : 255) : undefined }} className={`${pinnedOffset(columnIndex) !== undefined ? "sticky z-10" : ""} border-b border-r border-slate-200 align-top ${readOnly ? "bg-slate-50 px-2 py-2 text-slate-600 [overflow-wrap:anywhere]" : "bg-white"}`}>
+              return <td key={column.key} title={readOnly ? "Read-only" : undefined} style={{ left: pinnedOffset(columnIndex), backgroundColor: color ? tint(color, 0.08, readOnly ? 248 : 255) : undefined }} className={`${pinnedOffset(columnIndex) !== undefined ? "sticky z-10" : ""} border-b border-r border-slate-200 ${column.kind === "checkbox" ? "align-middle" : "align-top"} ${readOnly ? "bg-slate-50 px-2 py-2 text-slate-600 [overflow-wrap:anywhere]" : column.kind === "checkbox" ? "bg-teal-50" : "bg-white"}`}>
                 {column.key === "possibleBookings" && row.booking ? row.booking.source === "recorded" ? <PnlBookingMatches matches={possibleBookingMatches({ source: row.booking.source, reference: row.values.reference, roomId: row.values.roomId, checkIn: row.values.date, checkOut: display(row, { key: "checkOut", label: "Check-out" }, rooms) }, bookings)} /> : "—"
-                  : readOnly ? value || "—" : column.kind === "checkbox" ? <div className={`flex min-h-10 items-center px-3 ${row.values[column.key] !== row.saved[column.key] ? "bg-amber-50" : ""}`}>
-                    <input type="checkbox" aria-label={label} checked={value === "yes"} onChange={(event) => { change(row, column.key, event.target.checked ? "yes" : "no"); void saveRow(row); }} className="h-4 w-4 accent-teal-700" />
+                  : readOnly ? value || "—" : column.kind === "checkbox" ? <div className={`flex min-h-10 items-center justify-center px-2 ${row.values[column.key] !== row.saved[column.key] ? "bg-amber-50" : ""}`}>
+                    <input type="checkbox" aria-label={label} checked={value === "yes"} onChange={(event) => { change(row, column.key, event.target.checked ? "yes" : "no"); void saveRow(row); }} className="h-5 w-5 cursor-pointer accent-teal-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700" />
                   </div>
                   : column.kind === "room" ? <select {...common} className={cellClass}><option value="">Unassigned</option>{value && !rooms.some((room) => room._id === value) && <option value={value}>Removed room</option>}{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select>
                   : column.kind === "payment" ? <select {...common} className={cellClass}><option value="unknown">Not specified</option><option value="paid">Paid</option><option value="pending">Pending</option></select>

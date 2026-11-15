@@ -96,6 +96,60 @@ async function mockSession(page: Page, role: "admin" | "hotel_owner") {
   });
 }
 
+test("check-in desk requests only marked bookings without filtering the overview", async ({ page }) => {
+  await mockSession(page, "admin");
+  let marked = true;
+  let fail = false;
+  const requests: string[] = [];
+  await page.route("**/api/bookings/dashboard/upcoming-check-ins?**", async (route) => {
+    const request = route.request();
+    const headers = {
+      "access-control-allow-origin": uiUrl, "access-control-allow-credentials": "true",
+      "access-control-allow-headers": "authorization,content-type", "access-control-allow-methods": "GET,OPTIONS",
+    };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    const url = new URL(request.url());
+    requests.push(url.searchParams.get("deskOnly") || "");
+    if (fail) return route.fulfill({ status: 500, headers, json: { message: "Unavailable" } });
+    const base = {
+      hotelId: "test-room", hotelName: "Test room", hotelCity: "", hotelCountry: "",
+      reservationNumber: "REF", lastName: "Guest", email: "", phone: "", nationality: "",
+      status: "confirmed", source: "local", sourceLabel: "Direct",
+      checkIn: new Date().toISOString(), checkOut: new Date().toISOString(),
+      arrivalTime: "", isCheckedIn: false, isImported: false,
+    };
+    const rows = [
+      { ...base, _id: "marked", firstName: "Marked" },
+      { ...base, _id: "unmarked", firstName: "Unmarked" },
+    ].filter((row) => url.searchParams.get("deskOnly") !== "true" || (row._id === "marked" && marked));
+    return route.fulfill({ headers, json: {
+      rows, range: { start: "", end: "", days: 1 },
+      summary: { arrivalsToday: rows.length, upcomingArrivals: rows.length, inHouseToday: 0, checkedInToday: 0,
+        sync: { totalRooms: 0, enabledRooms: 0, issueRooms: 0, lastSuccessfulSyncAt: null } },
+    } });
+  });
+  await page.goto(`${uiUrl}/admin-portal`);
+  await expect(page.getByRole("row").filter({ hasText: "Unmarked Guest" })).toBeVisible();
+  await page.getByRole("navigation", { name: "Admin navigation" }).getByRole("link", { name: "Check-in desk" }).click();
+  await expect(page.getByRole("heading", { name: "Check-In Desk", exact: true })).toBeVisible();
+  await expect(page.getByText("Loading arrivals...")).toBeHidden();
+  await expect(page.locator("table").getByText("Marked Guest", { exact: true })).toBeVisible();
+  await expect(page.getByText("Unmarked Guest", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("Arrivals Today", { exact: true }).locator("..").locator("..")).toContainText("1");
+  expect(requests).toContain("");
+  expect(requests).toContain("true");
+
+  marked = false;
+  await page.goto(`${uiUrl}/admin-portal/check-in`);
+  await expect(page.getByText("No bookings marked Check-in desk match the current filters.")).toBeVisible();
+  fail = true;
+  await page.reload();
+  await expect(page.getByRole("alert")).toContainText("Could not load check-in desk bookings");
+  fail = false;
+  await page.getByRole("button", { name: "Retry" }).click();
+  await expect(page.getByText("No bookings marked Check-in desk match the current filters.")).toBeVisible();
+});
+
 test("n8n monitor distinguishes setup, workflow status and failures", async ({ page }) => {
   await mockSession(page, "admin");
   let state: "not_configured" | "connected" | "error" = "not_configured";

@@ -86,13 +86,14 @@ const AdminPortalCheckIns = () => {
     }
   );
 
-  const { data, isLoading } = useQuery(
-    ["upcomingCheckIns", horizon, selectedHotelId],
+  const { data, isLoading, isError, refetch } = useQuery(
+    ["upcomingCheckIns", "desk", horizon, selectedHotelId],
     () =>
       apiClient.fetchUpcomingCheckIns({
         days: horizon === "past" ? undefined : Number(horizon),
         horizon: horizon === "past" ? "past" : "upcoming",
         hotelId: selectedHotelId || undefined,
+        deskOnly: true,
       })
   );
 
@@ -133,7 +134,7 @@ const AdminPortalCheckIns = () => {
             </Link>
             <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Check-In Desk</h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Upcoming arrivals with room, arrival time, WhatsApp, email, and direct access to booking updates or the check-in procedure.
+              Bookings marked Check-in desk in the income grid, with arrival details and access to the check-in procedure.
             </p>
           </div>
 
@@ -184,6 +185,9 @@ const AdminPortalCheckIns = () => {
           </div>
         </div>
 
+        {isError ? <div role="alert" className="rounded-xl border border-rose-200 bg-white p-4 text-sm text-rose-700">
+          Could not load check-in desk bookings. <button type="button" className="font-semibold underline" onClick={() => void refetch()}>Retry</button>
+        </div> : <>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           <Card className="border border-slate-200 shadow-none">
             <CardHeader className="pb-2">
@@ -226,8 +230,8 @@ const AdminPortalCheckIns = () => {
             ) : rows.length === 0 ? (
               <p className="text-sm text-slate-500">
                 {horizon === "past"
-                  ? "No past bookings match the current filters."
-                  : "No arrivals match the current filters."}
+                  ? "No past bookings marked Check-in desk match the current filters."
+                  : "No bookings marked Check-in desk match the current filters."}
               </p>
             ) : (
               <>
@@ -430,6 +434,7 @@ const AdminPortalCheckIns = () => {
             )}
           </CardContent>
         </Card>
+        </>}
       </div>
     </div>
   );
