@@ -32,6 +32,7 @@ type Column = {
 };
 
 const incomeColumns: Column[] = [
+  { key: "notes", label: "Notes", width: 220 },
   { key: "roomId", label: "Room", width: 180, kind: "room", recordedOnly: true },
   { key: "date", label: "Check-in", kind: "date", recordedOnly: true },
   { key: "checkOut", label: "Check-out", readOnly: true },
@@ -69,7 +70,7 @@ const incomeGroups = [
 ];
 const groupKeys: Record<string, string[]> = {
   stay: ["roomId", "date", "checkOut", "guestName", "month", "nights", "guestCount"],
-  booking: ["reference", "possibleBookings", "status", "includePossibleOverlap", "excludeFromTotals"],
+  booking: ["notes", "reference", "possibleBookings", "status", "includePossibleOverlap", "excludeFromTotals"],
   guest: ["phone", "email", "country", "identifier", "city", "guestDetails"],
   amounts: ["grossAmountCents", "sourceAmount", "unit", "netAmountCents", "paymentMethod", "taxQuarter"],
   invoices: ["invoiceNumber", "invoiceRequired", "invoiceCreated"],
@@ -79,7 +80,7 @@ const incomeViewColumns = incomeColumns.map((column) => ({
   group: incomeGroups.find((group) => groupKeys[group.id].includes(column.key))!.id,
 }));
 const defaultIncomeLayout: api.PnlGridLayout = {
-  columns: incomeColumns.map((column) => column.key), hiddenGroups: [], frozenColumns: 4, widths: {},
+  columns: incomeColumns.map((column) => column.key), hiddenGroups: [], hiddenColumns: [], frozenColumns: 5, widths: {},
   colorTags: [], columnColors: {}, colorFilter: "", columnFilters: {},
 };
 const tint = (hex: string, strength: number, base = 255) => {
@@ -118,7 +119,7 @@ function makeBookingRow(booking: api.PnlBooking): GridRow {
     country: booking.country, identifier: booking.identifier, city: booking.city,
     guestCount: stringNumber(booking.guestCount),
     grossAmountCents: booking.currency === "EUR" ? money(booking.amountCents) : "",
-    netAmountCents: money(booking.netAmountCents), guestDetails: booking.guestDetails,
+    netAmountCents: money(booking.netAmountCents), guestDetails: booking.guestDetails, notes: booking.notes || "",
     paymentMethod: booking.paymentMethod, taxQuarter: booking.taxQuarter,
     invoiceNumber: booking.invoiceNumber, invoiceRequired: booleanValue(booking.invoiceRequired),
     invoiceCreated: booleanValue(booking.invoiceCreated),
@@ -182,11 +183,11 @@ function buildSave(row: GridRow, values: Values, rooms: Room[]) {
   }
   const booking = row.booking!;
   const details = { ...booking.overrides };
-  const textFields = ["country", "identifier", "city", "guestDetails", "paymentMethod", "taxQuarter", "invoiceNumber"] as const;
+  const textFields = ["country", "identifier", "city", "guestDetails", "notes", "paymentMethod", "taxQuarter", "invoiceNumber"] as const;
   for (const key of textFields) {
     if (!changed(key)) continue;
     const value = values[key].trim();
-    if (value.length > (key === "guestDetails" ? 300 : 100)) throw new Error(`${key} is too long.`);
+    if (value.length > (key === "notes" ? 1000 : key === "guestDetails" ? 300 : 100)) throw new Error(`${key} is too long.`);
     details[key] = value || undefined;
   }
   if (changed("guestCount")) details.guestCount = count(values.guestCount, "Guests", 1, 1000);
@@ -360,10 +361,10 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   }), [incomeLayout.columns]);
   const columns = useMemo(() => sheet === "income" ? orderedIncomeColumns.filter((column) => {
     const color = incomeLayout.columnColors[column.key];
-    return !incomeLayout.hiddenGroups.includes(incomeViewColumns.find((item) => item.key === column.key)!.group) &&
+    return !incomeLayout.hiddenColumns.includes(column.key) && !incomeLayout.hiddenGroups.includes(incomeViewColumns.find((item) => item.key === column.key)!.group) &&
       (!incomeLayout.colorFilter || (incomeLayout.colorFilter === "uncolored" ? !color : color === incomeLayout.colorFilter));
   }) : sheet === "expense" ? entryColumns : additionalColumns,
-  [sheet, orderedIncomeColumns, incomeLayout.hiddenGroups, incomeLayout.colorFilter, incomeLayout.columnColors]);
+  [sheet, orderedIncomeColumns, incomeLayout.hiddenGroups, incomeLayout.hiddenColumns, incomeLayout.colorFilter, incomeLayout.columnColors]);
   const columnValues = useMemo(() => {
     if (sheet !== "income") return new Map<string, string[]>();
     return new Map(incomeColumns.map((column) => [
@@ -517,7 +518,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
                   : column.kind === "payment" ? <select {...common} className={cellClass}><option value="unknown">Not specified</option><option value="paid">Paid</option><option value="pending">Pending</option></select>
                   : column.kind === "boolean" || column.kind === "invoiceStatus" ? <select {...common} className={cellClass}><option value="">Not specified</option><option value="yes">{column.kind === "boolean" ? "Yes" : "Created"}</option><option value="no">{column.kind === "boolean" ? "No" : "Pending"}</option></select>
                   : ["description", "guestName", "notes", "guestDetails", "email", "payee"].includes(column.key)
-                    ? <textarea {...common} rows={2} className={`${cellClass} resize-none [overflow-wrap:anywhere]`} onKeyDown={enterCell} />
+                    ? <textarea {...common} rows={2} placeholder={column.key === "notes" ? "Add a note…" : undefined} className={`${cellClass} resize-none [overflow-wrap:anywhere]`} onKeyDown={enterCell} />
                     : <input {...common} type={column.kind === "date" ? "date" : "text"} inputMode={column.kind === "money" ? "decimal" : column.kind === "number" ? "numeric" : undefined} className={cellClass} onKeyDown={enterCell} />}
                 {sheet === "income" && columnIndex === 0 && (row.saving || row.error || rowDirty(row)) && <span className={`block px-2 pb-1 text-xs ${row.error ? "text-rose-800" : "text-slate-600"}`}>
                   {row.saving ? "Saving" : row.error ? "Error" : "Unsaved"}{row.error && <span role="alert" className="block break-words">{row.error}</span>}

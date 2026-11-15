@@ -11,6 +11,7 @@ const pnlGridViewSchema = new mongoose.Schema(
     name: { type: String, required: true, maxlength: 80 },
     columns: { type: [String], required: true },
     hiddenGroups: { type: [String], required: true },
+    hiddenColumns: { type: [String], default: [] },
     frozenColumns: { type: Number, required: true },
     widths: { type: mongoose.Schema.Types.Mixed, required: true },
     colorTags: { type: [colorTagSchema], default: [] },

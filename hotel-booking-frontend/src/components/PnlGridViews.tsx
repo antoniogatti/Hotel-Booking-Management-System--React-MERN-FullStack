@@ -36,7 +36,7 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
   const dirty = JSON.stringify(layout) !== baseline || (selected !== "" && name !== baselineName);
   const visibleCount = columns.filter((column) => {
     const color = layout.columnColors[column.key];
-    return !layout.hiddenGroups.includes(column.group) &&
+    return !layout.hiddenColumns.includes(column.key) && !layout.hiddenGroups.includes(column.group) &&
       (!layout.colorFilter || (layout.colorFilter === "uncolored" ? !color : color === layout.colorFilter));
   }).length;
   const usedColors = new Set(Object.values(layout.columnColors));
@@ -58,10 +58,14 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
   const normalize = (view: api.PnlGridLayout): api.PnlGridLayout => {
     const known = new Set(columns.map((column) => column.key));
     const order = view.columns.filter((key) => known.has(key));
+    const addNotes = known.has("notes") && !order.includes("notes");
     return {
-      columns: [...order, ...columns.map((column) => column.key).filter((key) => !order.includes(key))],
+      columns: [...(addNotes ? ["notes"] : []), ...order, ...columns.map((column) => column.key).filter((key) => key !== "notes" && !order.includes(key))],
       hiddenGroups: view.hiddenGroups.filter((key) => groups.some((group) => group.id === key)),
-      frozenColumns: view.frozenColumns,
+      hiddenColumns: (view.hiddenColumns ?? []).filter((key) => known.has(key)),
+      frozenColumns: view.frozenColumns + (addNotes && view.frozenColumns > 0 &&
+        !view.hiddenGroups.includes(columns.find((column) => column.key === "notes")!.group) &&
+        (!view.colorFilter || view.colorFilter === "uncolored") ? 1 : 0),
       widths: Object.fromEntries(Object.entries(view.widths).filter(([key]) => known.has(key))),
       colorTags: view.colorTags ?? [],
       columnColors: Object.fromEntries(Object.entries(view.columnColors ?? {}).filter(([key]) => known.has(key))),
@@ -153,7 +157,7 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
           <fieldset className="flex flex-wrap gap-3"><legend className="font-medium">Show groups</legend>
             {groups.map((group) => <label key={group.id} className="flex items-center gap-1"><input type="checkbox" checked={!layout.hiddenGroups.includes(group.id)} onChange={(event) => {
               const hiddenGroups = event.target.checked ? layout.hiddenGroups.filter((id) => id !== group.id) : [...layout.hiddenGroups, group.id];
-              const count = columns.filter((column) => !hiddenGroups.includes(column.group)).length;
+              const count = columns.filter((column) => !hiddenGroups.includes(column.group) && !layout.hiddenColumns.includes(column.key)).length;
               onChange({ ...layout, hiddenGroups, frozenColumns: Math.min(layout.frozenColumns, count) });
             }} />{group.label}</label>)}
           </fieldset>
@@ -178,13 +182,17 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
             <button type="button" aria-label={`Remove color ${tag.name || index + 1}`} className="rounded border border-slate-300 bg-white px-2 py-1" onClick={() => onChange({ ...layout, colorTags: layout.colorTags.filter((item) => item.id !== tag.id), columnColors: Object.fromEntries(Object.entries(layout.columnColors).filter(([, color]) => color !== tag.id)), colorFilter: layout.colorFilter === tag.id ? "" : layout.colorFilter })}>Remove</button>
           </div>)}
         </div>
-        <p className="mt-2 text-xs text-slate-600">Assign colors below. Drag column handles in the grid, or use these buttons to change the order. The first visible columns are frozen.</p>
+        <p className="mt-2 text-xs text-slate-600">Add a named color above, then assign it to columns below. Uncheck a column to hide it. Save the view to keep these settings. Drag column handles in the grid, or use these buttons to change the order. The first visible columns are frozen.</p>
         <ol aria-label="Column order" className="mt-2 flex max-h-40 flex-wrap gap-1 overflow-auto">
           {layout.columns.map((key, index) => {
             const column = columns.find((item) => item.key === key);
             if (!column) return null;
             return <li key={key} className="flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1">
-              <span>{column.label}</span>
+              <label className="flex items-center gap-1"><input type="checkbox" aria-label={`Show ${column.label} column`} checked={!layout.hiddenColumns.includes(key)} onChange={(event) => {
+                const hiddenColumns = event.target.checked ? layout.hiddenColumns.filter((item) => item !== key) : [...layout.hiddenColumns, key];
+                const count = columns.filter((item) => !hiddenColumns.includes(item.key) && !layout.hiddenGroups.includes(item.group)).length;
+                onChange({ ...layout, hiddenColumns, frozenColumns: Math.min(layout.frozenColumns, count) });
+              }} />{column.label}</label>
               <select aria-label={`Color for ${column.label}`} value={layout.columnColors[column.key] || ""} onChange={(event) => {
                 const columnColors = { ...layout.columnColors };
                 if (event.target.value) columnColors[key] = event.target.value;

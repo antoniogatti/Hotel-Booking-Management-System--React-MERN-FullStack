@@ -20,7 +20,7 @@ const validYear = (year: string) => /^\d{4}$/.test(year) && Number(year) >= 1900
 const parseGridView = (body: unknown) => {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const input = body as Record<string, unknown>;
-  if (Object.keys(input).some((key) => !["name", "columns", "hiddenGroups", "frozenColumns", "widths", "colorTags", "columnColors", "colorFilter", "columnFilters"].includes(key))) return null;
+  if (Object.keys(input).some((key) => !["name", "columns", "hiddenGroups", "hiddenColumns", "frozenColumns", "widths", "colorTags", "columnColors", "colorFilter", "columnFilters"].includes(key))) return null;
   const validKeys = (value: unknown, max: number): value is string[] =>
     Array.isArray(value) && value.length <= max &&
     value.every((key) => typeof key === "string" && /^[a-zA-Z][a-zA-Z0-9]{0,49}$/.test(key)) &&
@@ -32,6 +32,8 @@ const parseGridView = (body: unknown) => {
       !input.widths || typeof input.widths !== "object" || Array.isArray(input.widths)) return null;
   const widths = input.widths as Record<string, unknown>;
   const columns = input.columns;
+  const hiddenColumns = input.hiddenColumns ?? [];
+  if (!validKeys(hiddenColumns, 100) || hiddenColumns.some((key) => !columns.includes(key))) return null;
   if (Object.keys(widths).length > 100 || Object.entries(widths).some(([key, value]) =>
     !columns.includes(key) || typeof value !== "number" || !Number.isSafeInteger(value) || value < 90 || value > 600
   )) return null;
@@ -59,13 +61,13 @@ const parseGridView = (body: unknown) => {
   )) return null;
   const colorFilter = input.colorFilter ?? "";
   if (typeof colorFilter !== "string" || (colorFilter !== "" && colorFilter !== "uncolored" && !colorIds.has(colorFilter))) return null;
-  return { name: input.name.trim(), columns, hiddenGroups: input.hiddenGroups, frozenColumns: input.frozenColumns, widths,
+  return { name: input.name.trim(), columns, hiddenGroups: input.hiddenGroups, hiddenColumns, frozenColumns: input.frozenColumns, widths,
     colorTags, columnColors, colorFilter, columnFilters };
 };
 
-const gridViewResponse = (view: { _id: unknown; name: string; columns: string[]; hiddenGroups: string[]; frozenColumns: number; widths: unknown;
+const gridViewResponse = (view: { _id: unknown; name: string; columns: string[]; hiddenGroups: string[]; hiddenColumns?: string[]; frozenColumns: number; widths: unknown;
   colorTags?: unknown; columnColors?: unknown; colorFilter?: string; columnFilters?: unknown }) => ({
-  id: String(view._id), name: view.name, columns: view.columns, hiddenGroups: view.hiddenGroups,
+  id: String(view._id), name: view.name, columns: view.columns, hiddenGroups: view.hiddenGroups, hiddenColumns: view.hiddenColumns ?? [],
   frozenColumns: view.frozenColumns, widths: view.widths, colorTags: view.colorTags ?? [],
   columnColors: view.columnColors ?? {}, colorFilter: view.colorFilter ?? "", columnFilters: view.columnFilters ?? {},
 });
@@ -127,13 +129,13 @@ const validDate = (value: unknown): value is string => {
 const parseBookingDetails = (body: unknown): PnlBookingDetails | null => {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const input = body as Record<string, unknown>;
-  const fields = ["country", "city", "identifier", "guestDetails", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "paymentMethod", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
+  const fields = ["country", "city", "identifier", "guestDetails", "notes", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "paymentMethod", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
   if (Object.keys(input).some((key) => !fields.includes(key))) return null;
   const details: PnlBookingDetails = {};
-  for (const key of ["country", "city", "identifier", "guestDetails", "invoiceNumber", "paymentMethod", "taxQuarter"] as const) {
+  for (const key of ["country", "city", "identifier", "guestDetails", "notes", "invoiceNumber", "paymentMethod", "taxQuarter"] as const) {
     const value = input[key];
     if (value === undefined || value === null || value === "") continue;
-    if (typeof value !== "string" || value.trim().length > (key === "guestDetails" ? 300 : 100)) return null;
+    if (typeof value !== "string" || value.trim().length > (key === "notes" ? 1000 : key === "guestDetails" ? 300 : 100)) return null;
     if (value.trim()) details[key] = value.trim();
   }
   for (const key of ["guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents"] as const) {
@@ -201,6 +203,7 @@ const incomeDetails = (booking: {
     city: overrides.city || booking.city || previous?.city || "",
     identifier: overrides.identifier || previous?.identifier || "",
     guestDetails: overrides.guestDetails || (typeof rawDetails === "string" || typeof rawDetails === "number" ? String(rawDetails) : ""),
+    notes: overrides.notes || "",
     guestCount: overrides.guestCount ?? (adults + children || null),
     nights,
     netAmountCents,

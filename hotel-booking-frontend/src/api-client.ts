@@ -375,6 +375,7 @@ export type PnlBookingDetails = {
   city?: string;
   identifier?: string;
   guestDetails?: string;
+  notes?: string;
   guestCount?: number;
   grossAmountCents?: number;
   netAmountCents?: number;
@@ -407,6 +408,7 @@ export type PnlBooking = {
   city: string;
   identifier: string;
   guestDetails: string;
+  notes: string;
   guestCount: number | null;
   nights: number | null;
   netAmountCents: number | null;
@@ -452,6 +454,7 @@ export const fetchPnlEntries = async (year: number): Promise<PnlEntry[]> => {
 export type PnlGridLayout = {
   columns: string[];
   hiddenGroups: string[];
+  hiddenColumns: string[];
   frozenColumns: number;
   widths: Record<string, number>;
   colorTags: { id: string; name: string; color: string }[];

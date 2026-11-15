@@ -150,14 +150,17 @@ test("P&L endpoints require an admin", async () => {
 
 test("grid views validate and persist layouts per admin", async () => {
   const layout = { name: "Invoices", columns: ["roomId", "invoiceNumber"], hiddenGroups: ["guest"], frozenColumns: 1, widths: { roomId: 210 } };
-  const colorDefaults = { colorTags: [], columnColors: {}, colorFilter: "", columnFilters: {} };
+  const colorDefaults = { hiddenColumns: [], colorTags: [], columnColors: {}, colorFilter: "", columnFilters: {} };
   const defaultWidths = new PnlGridView({ ...layout, userId: adminId, widths: {} });
   assert.equal(defaultWidths.validateSync(), undefined);
   assert.deepEqual(defaultWidths.toObject().widths, {});
+  assert.deepEqual(defaultWidths.toObject().hiddenColumns, []);
   assert.equal((await request("/views", { method: "POST", body: { ...layout, columns: ["roomId", "roomId"] } })).status, 400);
   assert.equal((await request("/views", { method: "POST", body: { ...layout, frozenColumns: 3 } })).status, 400);
   assert.equal((await request("/views", { method: "POST", body: { ...layout, widths: { roomId: 601 } } })).status, 400);
   assert.equal((await request("/views", { method: "POST", body: { ...layout, widths: { other: 120 } } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...layout, hiddenColumns: ["other"] } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...layout, hiddenColumns: ["roomId", "roomId"] } })).status, 400);
   const response = await request("/views", { method: "POST", body: layout });
   assert.equal(response.status, 201);
   const created = await response.json();
@@ -165,7 +168,7 @@ test("grid views validate and persist layouts per admin", async () => {
   assert.equal((await (await request("/views", { user: secondAdminId })).json()).views.length, 0);
   assert.equal((await request(`/views/${created.id}`, { user: secondAdminId, method: "PUT", body: layout })).status, 404);
   assert.equal((await request(`/views/${created.id}`, { user: secondAdminId, method: "DELETE" })).status, 404);
-  const changed = { ...layout, name: "Guest", frozenColumns: 2, hiddenGroups: [], widths: { roomId: 300 },
+  const changed = { ...layout, name: "Guest", frozenColumns: 2, hiddenGroups: [], hiddenColumns: ["invoiceNumber"], widths: { roomId: 300 },
     colorTags: [{ id: "color-1", name: "Important", color: "#123456" }], columnColors: { invoiceNumber: "color-1" },
     colorFilter: "color-1", columnFilters: { invoiceNumber: "INV-1" } };
   assert.equal((await request("/views", { method: "POST", body: { ...changed, columnColors: { roomId: "missing" } } })).status, 400);
@@ -238,15 +241,19 @@ test("booking income details and invoice tracking are editable without altering 
   assert.equal((await request(path, { method: "PUT", body: { invoiceRequired: false, invoiceNumber: "X" } })).status, 400);
   assert.equal((await request(path, { method: "PUT", body: { guestCount: 1.5 } })).status, 400);
   assert.equal((await request(path, { method: "PUT", body: { netAmountCents: 0.1 } })).status, 400);
+  assert.equal((await request(path, { method: "PUT", body: { notes: "x".repeat(1001) } })).status, 400);
   const details = {
     country: "France", city: "Paris", identifier: "PASS-1", guestDetails: "F 44 - M 45",
-    guestCount: 2, grossAmountCents: 24000, netAmountCents: 21000,
+    notes: "Follow up with guest", guestCount: 2, grossAmountCents: 24000, netAmountCents: 21000,
     invoiceRequired: true, invoiceCreated: false,
   };
+  assert.equal(new PnlBookingIncome({ _id: `local:${localId}`, source: "local", bookingId: localId, updatedBy: adminId, details }).validateSync(), undefined);
   assert.equal((await request(path, { method: "PUT", body: details })).status, 200);
   let rows = (await (await request("/bookings?year=2026")).json()).bookings;
   let local = rows.find((row) => row.id === localId);
   assert.deepEqual([local.country, local.city, local.identifier, local.guestCount], ["France", "Paris", "PASS-1", 2]);
+  assert.equal(local.notes, "Follow up with guest");
+  assert.equal(local.overrides.notes, "Follow up with guest");
   assert.deepEqual([local.amountCents, local.netAmountCents, local.unitAmountCents], [24000, 21000, 7000]);
   assert.deepEqual([local.invoiceRequired, local.invoiceCreated], [true, false]);
   assert.equal(localBookings[0].totalCost, originalTotal);
@@ -256,15 +263,17 @@ test("booking income details and invoice tracking are editable without altering 
   local = rows.find((row) => row.id === localId);
   assert.deepEqual([local.invoiceRequired, local.invoiceCreated, local.invoiceNumber], [true, true, "INV-1"]);
   assert.equal(local.unitAmountCents, 7000);
-  assert.equal((await request(`/bookings/booking_com/${importedId}`, { method: "PUT", body: { grossAmountCents: 5000, netAmountCents: -2900, invoiceRequired: false } })).status, 200);
+  assert.equal((await request(`/bookings/booking_com/${importedId}`, { method: "PUT", body: { grossAmountCents: 5000, netAmountCents: -2900, invoiceRequired: false, notes: "Imported note" } })).status, 200);
   const imported = (await (await request("/bookings?year=2026")).json()).bookings.find((row) => row.id === importedId);
   assert.deepEqual([imported.amountCents, imported.currency, imported.reason, imported.netAmountCents, imported.unitAmountCents], [5000, "EUR", "", -2900, -967]);
   assert.equal(imported.invoiceRequired, false);
+  assert.equal(imported.notes, "Imported note");
   assert.equal((await request(`/bookings/local/${importedId}`, { method: "PUT", body: {} })).status, 404);
   assert.equal((await request(path, { method: "PUT", body: {} })).status, 200);
   rows = (await (await request("/bookings?year=2026")).json()).bookings;
   local = rows.find((row) => row.id === localId);
   assert.deepEqual([local.amountCents, local.country, local.invoiceRequired], [12345, "Italy", null]);
+  assert.equal(local.notes, "");
 });
 
 test("standalone income is reported, editable and prevents possible booking overlap", async () => {
@@ -283,9 +292,10 @@ test("standalone income is reported, editable and prevents possible booking over
   assert.equal(rows.find((row) => row.reference === "LOCAL-1").reason, "");
   assert.equal(rows.find((row) => row.reference === "LOCAL-1").possibleRecordedOverlap, true);
   const identity = { reference: "", guestName: "Example", phone: "", email: "", roomId, roomName: "", date: "2026-01-02", nights: 3 };
-  assert.equal((await request(`/bookings/recorded/${id}`, { method: "PUT", body: { ...identity, details: { grossAmountCents: 12000, netAmountCents: 11000, invoiceNumber: "INV-UNKNOWN" } } })).status, 200);
+  assert.equal((await request(`/bookings/recorded/${id}`, { method: "PUT", body: { ...identity, details: { grossAmountCents: 12000, netAmountCents: 11000, invoiceNumber: "INV-UNKNOWN", notes: "Recorded note" } } })).status, 200);
   rows = (await (await request("/bookings?year=2026")).json()).bookings;
   assert.equal(rows.find((row) => row.id === id).unitAmountCents, 3667);
+  assert.equal(rows.find((row) => row.id === id).notes, "Recorded note");
   assert.equal((await request(`/bookings/recorded/${id}`, { method: "PUT", body: { ...identity, details: { grossAmountCents: 12000, excludeFromTotals: true } } })).status, 200);
   rows = (await (await request("/bookings?year=2026")).json()).bookings;
   assert.equal(rows.find((row) => row.id === id).reason, "Excluded by administrator");
