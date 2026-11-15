@@ -449,6 +449,31 @@ export const fetchPnlEntries = async (year: number): Promise<PnlEntry[]> => {
   return response.data.entries;
 };
 
+export type PnlGridLayout = {
+  columns: string[];
+  hiddenGroups: string[];
+  frozenColumns: number;
+  widths: Record<string, number>;
+};
+
+export type PnlGridView = PnlGridLayout & { id: string; name: string };
+
+export const fetchPnlGridViews = async (): Promise<PnlGridView[]> => {
+  const response = await axiosInstance.get<{ views: PnlGridView[] }>("/api/pnl/views");
+  return response.data.views;
+};
+
+export const savePnlGridView = async (name: string, layout: PnlGridLayout, id?: string): Promise<PnlGridView> => {
+  const response = id
+    ? await axiosInstance.put<PnlGridView>(`/api/pnl/views/${id}`, { name, ...layout })
+    : await axiosInstance.post<PnlGridView>("/api/pnl/views", { name, ...layout });
+  return response.data;
+};
+
+export const deletePnlGridView = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/api/pnl/views/${id}`);
+};
+
 export const savePnlEntry = async (entry: PnlEntryInput, id?: string): Promise<PnlEntry> => {
   const response = id
     ? await axiosInstance.put<PnlEntry>(`/api/pnl/entries/${id}`, entry)

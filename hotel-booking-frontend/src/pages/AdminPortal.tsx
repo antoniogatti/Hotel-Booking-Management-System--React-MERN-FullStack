@@ -114,9 +114,9 @@ const AdminPortal = () => {
               )}
               {userRole === "admin" && (
                 <Button asChild variant="outline">
-                  <Link to="/scheduler-monitor">
+                  <Link to="/n8n-workflows">
                     <Clock3 className="mr-2 h-4 w-4" />
-                    Open Scheduler Monitor
+                    Open n8n workflows
                   </Link>
                 </Button>
               )}

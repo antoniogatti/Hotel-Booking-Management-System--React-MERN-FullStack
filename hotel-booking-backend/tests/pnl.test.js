@@ -13,20 +13,41 @@ const ExternalCalendarEvent = require("../src/models/external-calendar-event").d
 const PnlEntry = require("../src/models/pnl-entry").default;
 const PnlBookingIncome = require("../src/models/pnl-booking-income").default;
 const PnlRecordedIncome = require("../src/models/pnl-recorded-income").default;
+const PnlGridView = require("../src/models/pnl-grid-view").default;
 const router = require("../src/routes/pnl").default;
 
 const adminId = "507f1f77bcf86cd799439011";
 const ownerId = "507f1f77bcf86cd799439012";
+const secondAdminId = "507f1f77bcf86cd799439015";
 const roomId = "507f1f77bcf86cd799439013";
 const entryId = "507f1f77bcf86cd799439014";
 const token = (userId) => jwt.sign({ userId }, process.env.JWT_SECRET_KEY);
 let saved;
 const dedicated = new Map();
 const recorded = [];
+const gridViews = new Map();
 
 User.findById = (id) => ({
-  select: async () => id === adminId ? { role: "admin" } : id === ownerId ? { role: "hotel_owner" } : null,
+  select: async () => id === adminId || id === secondAdminId ? { role: "admin" } : id === ownerId ? { role: "hotel_owner" } : null,
 });
+PnlGridView.find = ({ userId }) => ({ sort: () => ({ lean: async () => [...gridViews.values()].filter((view) => view.userId === userId) }) });
+PnlGridView.create = async (value) => {
+  const view = { ...value, _id: new mongoose.Types.ObjectId() };
+  gridViews.set(String(view._id), view);
+  return view;
+};
+PnlGridView.findOneAndUpdate = async ({ _id, userId }, value) => {
+  const view = gridViews.get(_id);
+  if (!view || view.userId !== userId) return null;
+  Object.assign(view, value);
+  return view;
+};
+PnlGridView.findOneAndDelete = async ({ _id, userId }) => {
+  const view = gridViews.get(_id);
+  if (!view || view.userId !== userId) return null;
+  gridViews.delete(_id);
+  return view;
+};
 Hotel.exists = async ({ _id }) => _id === roomId;
 PnlEntry.create = async (value) => (saved = { ...value, _id: entryId });
 PnlEntry.find = () => ({ lean: async () => saved ? [saved] : [] });
@@ -124,6 +145,30 @@ test("P&L endpoints require an admin", async () => {
   assert.equal((await request("/entries?year=2026", { user: null })).status, 401);
   assert.equal((await request("/entries?year=2026", { user: ownerId })).status, 403);
   assert.equal((await request("/bookings?year=2026", { user: ownerId })).status, 403);
+  assert.equal((await request("/views", { user: ownerId })).status, 403);
+});
+
+test("grid views validate and persist layouts per admin", async () => {
+  const layout = { name: "Invoices", columns: ["roomId", "invoiceNumber"], hiddenGroups: ["guest"], frozenColumns: 1, widths: { roomId: 210 } };
+  const defaultWidths = new PnlGridView({ ...layout, userId: adminId, widths: {} });
+  assert.equal(defaultWidths.validateSync(), undefined);
+  assert.deepEqual(defaultWidths.toObject().widths, {});
+  assert.equal((await request("/views", { method: "POST", body: { ...layout, columns: ["roomId", "roomId"] } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...layout, frozenColumns: 3 } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...layout, widths: { roomId: 601 } } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...layout, widths: { other: 120 } } })).status, 400);
+  const response = await request("/views", { method: "POST", body: layout });
+  assert.equal(response.status, 201);
+  const created = await response.json();
+  assert.deepEqual({ ...created, id: undefined }, { ...layout, id: undefined });
+  assert.equal((await (await request("/views", { user: secondAdminId })).json()).views.length, 0);
+  assert.equal((await request(`/views/${created.id}`, { user: secondAdminId, method: "PUT", body: layout })).status, 404);
+  assert.equal((await request(`/views/${created.id}`, { user: secondAdminId, method: "DELETE" })).status, 404);
+  const changed = { ...layout, name: "Guest", frozenColumns: 2, hiddenGroups: [], widths: { roomId: 300 } };
+  assert.equal((await request(`/views/${created.id}`, { method: "PUT", body: changed })).status, 200);
+  assert.deepEqual((await (await request("/views")).json()).views[0], { id: created.id, ...changed });
+  assert.equal((await request(`/views/${created.id}`, { method: "DELETE" })).status, 204);
+  assert.equal((await request(`/views/${created.id}`, { method: "DELETE" })).status, 404);
 });
 
 test("manual ledger validates and persists create, update and delete", async () => {

@@ -50,6 +50,7 @@ The backend imports and serves these route families:
 - `booking-com-sync`
 - `onenote`
 - `scheduler-monitor`
+- `n8n-monitor`
 - `mcp`
 - `telemetry`
 - `traffic-insights`
@@ -79,7 +80,6 @@ The backend owns the business data model and workflow around:
 The backend is not only request/response.
 It also runs scheduled or auxiliary jobs such as:
 - Booking.com iCal sync
-- booking enrichment scheduler
 - room seeding and bootstrap scripts
 - role setup utilities
 - OneNote parsing/sync utilities

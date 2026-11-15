@@ -10,11 +10,85 @@ import ExternalCalendarEvent from "../models/external-calendar-event";
 import { PnlBookingDetails } from "../models/pnl-booking-details";
 import PnlBookingIncome from "../models/pnl-booking-income";
 import PnlRecordedIncome from "../models/pnl-recorded-income";
+import PnlGridView from "../models/pnl-grid-view";
 
 const router = express.Router();
 router.use(verifyToken, requireRole("admin"));
 
 const validYear = (year: string) => /^\d{4}$/.test(year) && Number(year) >= 1900 && Number(year) <= 9998;
+
+const parseGridView = (body: unknown) => {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return null;
+  const input = body as Record<string, unknown>;
+  if (Object.keys(input).some((key) => !["name", "columns", "hiddenGroups", "frozenColumns", "widths"].includes(key))) return null;
+  const validKeys = (value: unknown, max: number): value is string[] =>
+    Array.isArray(value) && value.length <= max &&
+    value.every((key) => typeof key === "string" && /^[a-zA-Z][a-zA-Z0-9]{0,49}$/.test(key)) &&
+    new Set(value).size === value.length;
+  if (typeof input.name !== "string" || !input.name.trim() || input.name.trim().length > 80 ||
+      !validKeys(input.columns, 100) || input.columns.length === 0 || !validKeys(input.hiddenGroups, 20) ||
+      typeof input.frozenColumns !== "number" || !Number.isSafeInteger(input.frozenColumns) ||
+      input.frozenColumns < 0 || input.frozenColumns > input.columns.length ||
+      !input.widths || typeof input.widths !== "object" || Array.isArray(input.widths)) return null;
+  const widths = input.widths as Record<string, unknown>;
+  const columns = input.columns;
+  if (Object.keys(widths).length > 100 || Object.entries(widths).some(([key, value]) =>
+    !columns.includes(key) || typeof value !== "number" || !Number.isSafeInteger(value) || value < 90 || value > 600
+  )) return null;
+  return { name: input.name.trim(), columns: input.columns, hiddenGroups: input.hiddenGroups, frozenColumns: input.frozenColumns, widths };
+};
+
+const gridViewResponse = (view: { _id: unknown; name: string; columns: string[]; hiddenGroups: string[]; frozenColumns: number; widths: unknown }) => ({
+  id: String(view._id), name: view.name, columns: view.columns, hiddenGroups: view.hiddenGroups,
+  frozenColumns: view.frozenColumns, widths: view.widths,
+});
+
+router.get("/views", async (req, res) => {
+  try {
+    const views = await PnlGridView.find({ userId: req.userId }).sort({ name: 1 }).lean();
+    return res.json({ views: views.map(gridViewResponse) });
+  } catch (error) {
+    logError("Failed to load P&L grid views", error);
+    return res.status(500).json({ message: "Unable to load grid views." });
+  }
+});
+
+router.post("/views", async (req, res) => {
+  const view = parseGridView(req.body);
+  if (!view) return res.status(400).json({ message: "Provide a valid grid view." });
+  try {
+    const saved = await PnlGridView.create({ ...view, userId: req.userId });
+    return res.status(201).json(gridViewResponse(saved));
+  } catch (error) {
+    logError("Failed to create P&L grid view", error);
+    return res.status(500).json({ message: "Unable to save grid view." });
+  }
+});
+
+router.put("/views/:id", async (req, res) => {
+  const view = parseGridView(req.body);
+  if (!view || !mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Provide a valid grid view and ID." });
+  try {
+    const saved = await PnlGridView.findOneAndUpdate({ _id: req.params.id, userId: req.userId }, view, { new: true, runValidators: true });
+    if (!saved) return res.status(404).json({ message: "Grid view not found." });
+    return res.json(gridViewResponse(saved));
+  } catch (error) {
+    logError("Failed to update P&L grid view", error);
+    return res.status(500).json({ message: "Unable to save grid view." });
+  }
+});
+
+router.delete("/views/:id", async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid grid view ID." });
+  try {
+    const deleted = await PnlGridView.findOneAndDelete({ _id: req.params.id, userId: req.userId });
+    if (!deleted) return res.status(404).json({ message: "Grid view not found." });
+    return res.status(204).end();
+  } catch (error) {
+    logError("Failed to delete P&L grid view", error);
+    return res.status(500).json({ message: "Unable to delete grid view." });
+  }
+});
 
 const validDate = (value: unknown): value is string => {
   if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value) || Number(value.slice(0, 4)) < 1900 || Number(value.slice(0, 4)) > 9998) return false;

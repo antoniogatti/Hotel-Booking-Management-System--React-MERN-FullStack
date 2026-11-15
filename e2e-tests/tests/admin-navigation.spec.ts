@@ -96,6 +96,39 @@ async function mockSession(page: Page, role: "admin" | "hotel_owner") {
   });
 }
 
+test("n8n monitor distinguishes setup, workflow status and failures", async ({ page }) => {
+  await mockSession(page, "admin");
+  let state: "not_configured" | "connected" | "error" = "not_configured";
+  await page.route("**/api/n8n-monitor", async (route) => {
+    const headers = { "access-control-allow-origin": uiUrl, "access-control-allow-credentials": "true" };
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers: { ...headers, "access-control-allow-headers": "authorization,content-type" } });
+      return;
+    }
+    if (state === "error") {
+      await route.fulfill({ status: 502, headers, json: { message: "Unavailable" } });
+      return;
+    }
+    await route.fulfill({ headers, json: {
+      service: "healthy", origin: "https://n8n.example.test", api: state,
+      message: "Configure a read-only n8n API key.",
+      workflows: state === "connected" ? [{ id: "w1", name: "Knowledge sync", active: true, updatedAt: null }] : [],
+      executions: state === "connected" ? [{ id: "e1", workflowId: "w1", status: "error", startedAt: null, stoppedAt: null }] : [],
+    } });
+  });
+  await page.goto(`${uiUrl}/scheduler-monitor`);
+  await expect(page).toHaveURL(/\/n8n-workflows$/);
+  await expect(page.getByText("n8n health endpoint is responding.")).toBeVisible();
+  await expect(page.getByText(/Configure a read-only n8n API key/)).toBeVisible();
+  state = "connected";
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByText("Active", { exact: true })).toBeVisible();
+  await expect(page.getByText(/error · Not available/)).toBeVisible();
+  state = "error";
+  await page.getByRole("button", { name: "Refresh" }).click();
+  await expect(page.getByRole("alert")).toContainText("Unable to check n8n");
+});
+
 test("admin navigation remains available and marks the active page", async ({ page }) => {
   await mockSession(page, "admin");
   await page.goto(`${uiUrl}/admin-portal`);
@@ -113,7 +146,7 @@ test("admin navigation remains available and marks the active page", async ({ pa
     "Income",
     "Expenses",
     "Sync center",
-    "Scheduler",
+    "n8n workflows",
     "Traffic insights",
     "Business insights",
     "API docs",
@@ -143,7 +176,7 @@ test("admin navigation remains available and marks the active page", async ({ pa
     ["/booking/example", "Bookings & analytics"],
     ["/hotel/example/check-in/example", "Check-in desk"],
     ["/booking-com-sync", "Sync center"],
-    ["/scheduler-monitor", "Scheduler"],
+    ["/n8n-workflows", "n8n workflows"],
     ["/traffic-insights", "Traffic insights"],
     ["/pnl", "P&L overview"],
     ["/pnl/income", "Income"],

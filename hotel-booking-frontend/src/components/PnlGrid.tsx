@@ -4,6 +4,8 @@ import * as api from "../api-client";
 import { moneyToCents, signedMoneyToCents, validYear } from "../pages/pnl-utils";
 import { Button } from "./ui/button";
 import { PnlBookingMatches, possibleBookingMatches } from "./PnlBookingMatches";
+import PnlGridViews, { moveGridColumn } from "./PnlGridViews";
+import { GripVertical } from "lucide-react";
 
 type Room = { _id: string; name: string };
 type Values = Record<string, string>;
@@ -58,6 +60,27 @@ const incomeColumns: Column[] = [
   { key: "includePossibleOverlap", label: "Include booking overlap", kind: "boolean", overlapOnly: true },
   { key: "excludeFromTotals", label: "Exclude recorded income", kind: "boolean", recordedOnly: true },
 ];
+const incomeGroups = [
+  { id: "stay", label: "Stay" },
+  { id: "booking", label: "Booking" },
+  { id: "guest", label: "Guest details" },
+  { id: "amounts", label: "Amounts" },
+  { id: "invoices", label: "Invoices" },
+];
+const groupKeys: Record<string, string[]> = {
+  stay: ["roomId", "date", "checkOut", "guestName", "month", "nights", "guestCount"],
+  booking: ["reference", "possibleBookings", "status", "includePossibleOverlap", "excludeFromTotals"],
+  guest: ["phone", "email", "country", "identifier", "city", "guestDetails"],
+  amounts: ["grossAmountCents", "sourceAmount", "unit", "netAmountCents", "paymentMethod", "taxQuarter"],
+  invoices: ["invoiceNumber", "invoiceRequired", "invoiceCreated"],
+};
+const incomeViewColumns = incomeColumns.map((column) => ({
+  key: column.key, label: column.label,
+  group: incomeGroups.find((group) => groupKeys[group.id].includes(column.key))!.id,
+}));
+const defaultIncomeLayout: api.PnlGridLayout = {
+  columns: incomeColumns.map((column) => column.key), hiddenGroups: [], frozenColumns: 4, widths: {},
+};
 const entryColumns: Column[] = [
   { key: "description", label: "Description", width: 210 },
   { key: "date", label: "Date", kind: "date" },
@@ -235,10 +258,15 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<{ key: string; desc: boolean } | null>(null);
   const [widths, setWidths] = useState<Record<string, number>>({});
+  const [incomeLayout, setIncomeLayout] = useState<api.PnlGridLayout>(defaultIncomeLayout);
+  const [layoutDirty, setLayoutDirty] = useState(false);
+  const layoutDirtyRef = useRef(false);
+  layoutDirtyRef.current = layoutDirty;
   const [, redraw] = useState(0);
   const [message, setMessage] = useState("");
   const rows = useRef<GridRow[]>([...bookings.map(makeBookingRow), ...entries.map(makeEntryRow)]);
   const drag = useRef<{ key: string; x: number; width: number } | null>(null);
+  const draggedColumn = useRef<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
   const alive = useRef(true);
   const refresh = () => { if (alive.current) redraw((value) => value + 1); };
@@ -247,7 +275,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     alive.current = true;
     dialog.current?.focus();
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (isUnsaved()) { event.preventDefault(); event.returnValue = ""; }
+      if (isUnsaved() || layoutDirtyRef.current) { event.preventDefault(); event.returnValue = ""; }
     };
     window.addEventListener("beforeunload", beforeUnload);
     return () => { alive.current = false; window.removeEventListener("beforeunload", beforeUnload); };
@@ -308,6 +336,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
       setMessage("You have unsaved changes. Fix errors and save, or discard them before closing.");
       return;
     }
+    if (layoutDirty && !window.confirm("Close without saving view changes?")) return;
     await Promise.all([queryClient.invalidateQueries("pnl-entries"), queryClient.invalidateQueries("pnl-bookings")]);
     onClose();
   };
@@ -318,13 +347,20 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     refresh();
     setMessage("Unsaved changes discarded.");
   };
-  const columns = sheet === "income" ? incomeColumns : sheet === "expense" ? entryColumns : additionalColumns;
+  const orderedIncomeColumns = useMemo(() => incomeLayout.columns.flatMap((key) => {
+    const column = incomeColumns.find((item) => item.key === key);
+    return column ? [column] : [];
+  }), [incomeLayout.columns]);
+  const columns = useMemo(() => sheet === "income" ? orderedIncomeColumns.filter((column) =>
+    !incomeLayout.hiddenGroups.includes(incomeViewColumns.find((item) => item.key === column.key)!.group)
+  ) : sheet === "expense" ? entryColumns : additionalColumns, [sheet, orderedIncomeColumns, incomeLayout.hiddenGroups]);
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
-    const result = rows.current.filter((row) => row.sheet === sheet && (!term || columns.some((column) =>
+    const searchColumns = sheet === "income" ? orderedIncomeColumns : columns;
+    const result = rows.current.filter((row) => row.sheet === sheet && (!term || searchColumns.some((column) =>
       display(row, column, rooms, bookings).toLocaleLowerCase().includes(term))));
     if (sort) {
-      const column = columns.find((item) => item.key === sort.key);
+      const column = searchColumns.find((item) => item.key === sort.key);
       if (column) result.sort((a, b) => {
         const left = display(a, column, rooms, bookings);
         const right = display(b, column, rooms, bookings);
@@ -336,14 +372,18 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     }
     return result;
     // Row edits are deliberately not re-sorted while typing.
-  }, [sheet, search, sort, rooms, columns, bookings]);
+  }, [sheet, search, sort, rooms, columns, orderedIncomeColumns, bookings]);
   const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const dirtyCount = rows.current.filter(rowDirty).length;
   const savingCount = rows.current.filter((row) => row.saving).length;
   const errorCount = rows.current.filter((row) => row.error).length;
-  const resize = (key: string, width: number) => setWidths((previous) => ({ ...previous, [key]: Math.max(90, Math.min(600, Math.round(width))) }));
-  const width = (column: Column) => widths[column.key] ?? column.width ?? 145;
-  const pinnedOffset = (index: number) => sheet === "income" && index < 3
+  const resize = (key: string, value: number) => {
+    const size = Math.max(90, Math.min(600, Math.round(value)));
+    if (sheet === "income") setIncomeLayout((previous) => ({ ...previous, widths: { ...previous.widths, [key]: size } }));
+    else setWidths((previous) => ({ ...previous, [key]: size }));
+  };
+  const width = (column: Column) => (sheet === "income" ? incomeLayout.widths : widths)[column.key] ?? column.width ?? 145;
+  const pinnedOffset = (index: number) => sheet === "income" && index < incomeLayout.frozenColumns
     ? columns.slice(0, index).reduce((total, column) => total + width(column), 0)
     : undefined;
   const moveResize = (event: PointerEvent<HTMLDivElement>) => {
@@ -385,7 +425,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
         else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
       }}
       className="fixed inset-0 z-[100] flex flex-col bg-slate-100 text-slate-900">
-      <header className="shrink-0 border-b border-slate-300 bg-white px-4 py-3 shadow-sm">
+      <header className="max-h-[60vh] shrink-0 overflow-y-auto border-b border-slate-300 bg-white px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-xl font-semibold">{type === "income" ? "Income" : "Expenses"} editor <span className="text-slate-500">{year}</span></h2>
             <p className="text-xs text-slate-600">Changes save when you leave a cell. Tab moves across; Enter moves down. Shift+Enter adds a line in text cells. Grey cells are read-only. Booking suggestions need review and do not link records or change totals. Inclusion warnings refresh when you reopen the editor.</p></div>
@@ -405,6 +445,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           <span className="text-sm text-slate-600">{filtered.length} rows</span>
           <div className="ml-auto flex items-center gap-2 text-sm"><button disabled={page === 0} onClick={() => setPage(page - 1)} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button><span>Page {page + 1} of {Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))}</span><button disabled={(page + 1) * PAGE_SIZE >= filtered.length} onClick={() => setPage(page + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Next</button></div>
         </div>
+        {type === "income" && <div hidden={sheet !== "income"}><PnlGridViews layout={incomeLayout} defaultLayout={defaultIncomeLayout} columns={incomeViewColumns} groups={incomeGroups} onChange={setIncomeLayout} onDirtyChange={setLayoutDirty} /></div>}
         {message && <p role={errorCount || dirtyCount ? "alert" : "status"} className="mt-2 text-sm text-rose-700">{message}</p>}
       </header>
       <div role="region" aria-label="Editable grid" tabIndex={0} className="min-h-0 flex-1 overflow-auto">
@@ -412,7 +453,12 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           <colgroup>{sheet !== "income" && <col style={{ width: 90 }} />}{columns.map((column) => <col key={column.key} style={{ width: width(column) }} />)}</colgroup>
           <thead className="sticky top-0 z-20 bg-slate-100">
             <tr>{sheet !== "income" && <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">Row</th>}
-              {columns.map((column, index) => <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} style={{ left: pinnedOffset(index) }} className={`${pinnedOffset(index) !== undefined ? "sticky z-30" : "relative"} border-b border-r border-slate-300 bg-slate-100 p-2 pr-4 align-top`}>
+              {columns.map((column, index) => <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} style={{ left: pinnedOffset(index) }} className={`${pinnedOffset(index) !== undefined ? "sticky z-30" : "relative"} border-b border-r border-slate-300 bg-slate-100 p-2 pr-4 align-top`}
+                onDragOver={(event) => { if (sheet === "income" && draggedColumn.current) event.preventDefault(); }}
+                onDrop={(event) => { event.preventDefault(); const from = draggedColumn.current; if (from) setIncomeLayout((previous) => ({ ...previous, columns: moveGridColumn(previous.columns, from, column.key) })); draggedColumn.current = null; }}>
+                {sheet === "income" && <span draggable aria-label={`Drag ${column.label} column`} title={`Drag ${column.label} to reorder`} className="mr-1 cursor-grab select-none text-slate-500"
+                  onDragStart={(event) => { draggedColumn.current = column.key; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", column.key); }}
+                  onDragEnd={() => { draggedColumn.current = null; }}><GripVertical className="inline h-4 w-4" aria-hidden="true" /></span>}
                 <button type="button" className="text-left font-semibold" onClick={() => { setSort({ key: column.key, desc: sort?.key === column.key && !sort.desc }); setPage(0); }}>{column.label}{sort?.key === column.key ? sort.desc ? " ↓" : " ↑" : ""}</button>
                 <div role="separator" aria-label={`Resize ${column.label} column`} aria-orientation="vertical" aria-valuemin={90} aria-valuemax={600} aria-valuenow={width(column)} tabIndex={0} style={{ touchAction: "none" }} className="absolute inset-y-0 right-0 w-3 cursor-col-resize border-r border-slate-300 focus-visible:outline focus-visible:outline-teal-600"
                   onKeyDown={(event) => keyboardResize(event, column)} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { key: column.key, x: event.clientX, width: width(column) }; }} onPointerMove={moveResize} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} />

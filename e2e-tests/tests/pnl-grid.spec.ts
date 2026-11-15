@@ -7,7 +7,7 @@ const headers = {
   "access-control-allow-origin": uiUrl,
   "access-control-allow-credentials": "true",
   "access-control-allow-headers": "authorization,content-type",
-  "access-control-allow-methods": "GET,PUT,OPTIONS",
+  "access-control-allow-methods": "GET,POST,PUT,DELETE,OPTIONS",
 };
 
 test.beforeEach(async ({ page }) => {
@@ -21,6 +21,7 @@ test.beforeEach(async ({ page }) => {
     if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
     if (path === "/api/auth/validate-token") return route.fulfill({ headers, json: { role: "admin", userId: "test-user" } });
     if (path === "/api/bookings/rooms") return route.fulfill({ headers, json: [{ _id: roomId, name: "Test room" }] });
+    if (path === "/api/pnl/views") return route.fulfill({ headers, json: { views: [] } });
     return route.fulfill({ status: 503, headers, json: { message: "Unavailable" } });
   });
 });
@@ -256,8 +257,8 @@ test("income starts with stay keys and proposes site and booking.com matches wit
       const region = table.parentElement!;
       return {
         left: region.getBoundingClientRect().left,
-        headers: Array.from(table.querySelectorAll("thead th")).slice(0, 3).map((cell) => cell.getBoundingClientRect().left),
-        cells: Array.from(table.querySelectorAll("tbody tr:first-child td")).slice(0, 3).map((cell) => cell.getBoundingClientRect().left),
+        headers: Array.from(table.querySelectorAll("thead th")).slice(0, 4).map((cell) => cell.getBoundingClientRect().left),
+        cells: Array.from(table.querySelectorAll("tbody tr:first-child td")).slice(0, 4).map((cell) => cell.getBoundingClientRect().left),
         scrollLeft: region.scrollLeft,
       };
     });
@@ -268,19 +269,112 @@ test("income starts with stay keys and proposes site and booking.com matches wit
     }
   };
   await region.evaluate((element) => { element.scrollLeft = 1000; });
-  await checkPinnedColumns([0, 180, 325]);
+  await checkPinnedColumns([0, 180, 325, 470]);
   await editor.getByRole("separator", { name: "Resize Room column" }).focus();
   await page.keyboard.press("ArrowRight");
   await region.evaluate((element) => { element.scrollLeft = 1000; });
-  await checkPinnedColumns([0, 196, 341]);
+  await checkPinnedColumns([0, 196, 341, 486]);
   await editor.getByRole("separator", { name: "Resize Check-in column" }).focus();
   await page.keyboard.press("ArrowRight");
   await region.evaluate((element) => { element.scrollLeft = 1000; });
-  await checkPinnedColumns([0, 196, 357]);
+  await checkPinnedColumns([0, 196, 357, 502]);
   await expect(gridRow).toContainText("Check-out matches");
   await expect(gridRow).toContainText("Check-out differs");
   await editor.getByLabel("Nights for Recorded guest").fill("4");
   await expect(gridRow.getByText("Check-out matches")).toHaveCount(1);
   await expect(gridRow.getByText("Check-out differs")).toHaveCount(1);
   expect(writes).toBe(0);
+});
+
+test("income views save and restore column order, groups, widths and freeze settings", async ({ page }) => {
+  type View = { id: string; name: string; columns: string[]; hiddenGroups: string[]; frozenColumns: number; widths: Record<string, number> };
+  let views: View[] = [];
+  let failSave = false;
+  await page.route(/\/api\/pnl\/entries(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { entries: [] } }));
+  await page.route(/\/api\/pnl\/bookings(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { bookings: [] } }));
+  await page.route(/\/api\/pnl\/views(?:\/|$)/, async (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (request.method() === "GET") return route.fulfill({ headers, json: { views } });
+    if (request.method() === "POST") {
+      if (failSave) return route.fulfill({ status: 500, headers, json: { message: "Unavailable" } });
+      const saved = { ...request.postDataJSON(), id: String(views.length + 1) } as View;
+      views.push(saved);
+      return route.fulfill({ status: 201, headers, json: saved });
+    }
+    if (request.method() === "PUT") {
+      const id = request.url().split("/").pop()!;
+      const saved = { ...request.postDataJSON(), id } as View;
+      views = views.map((view) => view.id === id ? saved : view);
+      return route.fulfill({ headers, json: saved });
+    }
+    if (request.method() === "DELETE") {
+      const id = request.url().split("/").pop()!;
+      views = views.filter((view) => view.id !== id);
+      return route.fulfill({ status: 204, headers });
+    }
+    return route.fulfill({ status: 500, headers });
+  });
+  await page.goto(`${uiUrl}/pnl/income`);
+  await page.getByRole("button", { name: "Open full-screen editor" }).click();
+  const editor = page.getByRole("dialog");
+  const table = editor.getByRole("table", { name: "Booking income grid" });
+  await editor.getByLabel("Drag Guest column").dragTo(editor.getByRole("button", { name: "Reference", exact: true }));
+  expect((await table.getByRole("columnheader").allTextContents()).slice(0, 5)).toEqual(["Room", "Check-in", "Check-out", "Reference", "Guest"]);
+  await editor.getByText("Configure columns and groups").click();
+  await editor.getByLabel("Freeze first visible columns").selectOption("2");
+  await editor.getByLabel("Guest details", { exact: true }).uncheck();
+  await editor.getByRole("separator", { name: "Resize Room column" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await editor.getByLabel("View name").fill("Invoice review");
+  failSave = true;
+  await editor.getByRole("button", { name: "Save as new view" }).click();
+  await expect(editor.getByRole("alert")).toContainText("Could not save this view");
+  expect(views).toHaveLength(0);
+  failSave = false;
+  await editor.getByRole("button", { name: "Save as new view" }).click();
+  await expect.poll(() => views.length).toBe(1);
+  expect(views[0].columns.slice(0, 5)).toEqual(["roomId", "date", "checkOut", "reference", "guestName"]);
+  expect(views[0].hiddenGroups).toEqual(["guest"]);
+  expect(views[0].frozenColumns).toBe(2);
+  expect(views[0].widths.roomId).toBe(196);
+  await editor.getByLabel("View name").fill("Second view");
+  await editor.getByLabel("Freeze first visible columns").selectOption("1");
+  await editor.getByRole("button", { name: "Save as new view" }).click();
+  await expect.poll(() => views.length).toBe(2);
+  await editor.getByLabel("Income grid view").selectOption("1");
+  await expect(editor.getByLabel("Freeze first visible columns")).toHaveValue("2");
+  await expect(editor.getByLabel("Guest details", { exact: true })).not.toBeChecked();
+  await expect(editor.getByRole("separator", { name: "Resize Room column" })).toHaveAttribute("aria-valuenow", "196");
+  await editor.getByLabel("Income grid view").selectOption("");
+  expect((await table.getByRole("columnheader").allTextContents()).slice(0, 4)).toEqual(["Room", "Check-in", "Check-out", "Guest"]);
+  await editor.getByRole("button", { name: "Close editor" }).click();
+  await page.getByRole("button", { name: "Open full-screen editor" }).click();
+  const reopened = page.getByRole("dialog");
+  await reopened.getByLabel("Income grid view").selectOption("1");
+  await reopened.getByText("Configure columns and groups").click();
+  await expect(reopened.getByLabel("Freeze first visible columns")).toHaveValue("2");
+  await expect(reopened.getByLabel("Guest details", { exact: true })).not.toBeChecked();
+  await expect(reopened.getByRole("button", { name: "Email", exact: true })).toHaveCount(0);
+  expect((await reopened.getByRole("table", { name: "Booking income grid" }).getByRole("columnheader").allTextContents()).slice(0, 5))
+    .toEqual(["Room", "Check-in", "Check-out", "Reference", "Guest"]);
+  const positions = await reopened.getByRole("table", { name: "Booking income grid" }).locator("thead th").evaluateAll(
+    (cells) => cells.slice(0, 3).map((cell) => getComputedStyle(cell).position)
+  );
+  expect(positions).toEqual(["sticky", "sticky", "relative"]);
+  await reopened.getByLabel("Freeze first visible columns").selectOption("3");
+  await reopened.getByRole("button", { name: "Save view", exact: true }).click();
+  await expect.poll(() => views.find((view) => view.id === "1")?.frozenColumns).toBe(3);
+  await reopened.getByRole("button", { name: "Move Guest left" }).click();
+  await expect(reopened.getByText("Unsaved view changes")).toBeVisible();
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await reopened.getByLabel("Income grid view").selectOption("2");
+  await expect(reopened.getByLabel("Income grid view")).toHaveValue("1");
+  page.once("dialog", (dialog) => dialog.accept());
+  await reopened.getByLabel("Income grid view").selectOption("2");
+  await expect(reopened.getByLabel("Freeze first visible columns")).toHaveValue("1");
+  page.once("dialog", (dialog) => dialog.accept());
+  await reopened.getByRole("button", { name: "Delete view" }).click();
+  await expect.poll(() => views.length).toBe(1);
+  await expect(reopened.getByLabel("Income grid view")).toHaveValue("");
 });

@@ -8,7 +8,7 @@ const adminPages = new Set([
   "/api-docs", "/api-status", "/business-insights", "/my-hotels",
   "/admin-portal", "/admin-portal/check-in", "/admin-portal/self-checkins",
   "/booking-dashboard", "/vacancy-management", "/booking-com-sync",
-  "/scheduler-monitor", "/traffic-insights", "/pnl", "/pnl/income",
+  "/scheduler-monitor", "/n8n-workflows", "/traffic-insights", "/pnl", "/pnl/income",
   "/pnl/expenses", "/manage-bookings", "/wa-inbox", "/add-hotel",
 ]);
 

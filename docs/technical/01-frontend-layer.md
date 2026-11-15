@@ -49,7 +49,7 @@ From `hotel-booking-frontend/package.json` the frontend uses:
 - `/admin-portal/check-in`
 - `/admin-portal/self-checkins`
 - `/booking-com-sync`
-- `/scheduler-monitor`
+- `/n8n-workflows` (`/scheduler-monitor` redirects here)
 - `/traffic-insights`
 - `/manage-bookings`
 - `/vacancy-management`

@@ -55,7 +55,7 @@ const workspaceItems: NavItem[] = [
 
 const administrationItems: NavItem[] = [
   { label: "Sync center", to: "/booking-com-sync", icon: RefreshCw, adminOnly: true },
-  { label: "Scheduler", to: "/scheduler-monitor", icon: Clock3, adminOnly: true },
+  { label: "n8n workflows", to: "/n8n-workflows", icon: Clock3, adminOnly: true },
   { label: "Traffic insights", to: "/traffic-insights", icon: Activity, adminOnly: true },
   { label: "Business insights", to: "/business-insights", icon: BarChart3, adminOnly: true },
   { label: "API docs", to: "/api-docs", icon: FileText, adminOnly: true },

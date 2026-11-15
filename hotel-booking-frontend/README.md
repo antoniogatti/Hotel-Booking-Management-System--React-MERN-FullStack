@@ -35,8 +35,11 @@ you leave a cell; Save all retries unsaved rows. Errors keep the edited values
 visible until corrected or discarded. Tab moves across editable cells, Enter
 moves down, and Shift+Enter adds a line in text cells. Use search, sorting,
 pagination and column resizing to navigate large ledgers. In the booking
-income sheet, Room, Check-in and Check-out stay visible while scrolling
-horizontally. Booking-sourced
+income sheet, Room, Check-in, Check-out and Guest are frozen by default.
+Drag column handles to reorder them, and use Configure columns and groups
+to show or hide groups and choose how many visible columns to freeze.
+Name and save multiple views for your account; each view stores column order,
+group visibility, frozen-column count and widths. Booking-sourced
 identity fields and calculated values are read-only; inclusion warnings
 refresh when the editor is reopened. Recorded income shows possible site and
 Booking.com matches based on reference or room and check-in; compare check-out

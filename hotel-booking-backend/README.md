@@ -60,6 +60,17 @@ The Monitoring Reader role provides the required read access when assigned at
 the appropriate resource scope. Configure these settings and role assignments
 on the deployed backend separately.
 
+### n8n workflow monitor
+
+The admin-only monitor checks the existing n8n health endpoint and reads workflow
+and execution summaries through its API. Create an n8n API key with only
+`workflow:list` and `execution:list` scopes and configure `N8N_API_KEY` as a
+backend secret (for Azure, preferably a Key Vault reference). Do not expose it
+to the frontend or commit it. The optional `N8N_MONITOR_ORIGIN` must be an HTTPS
+origin and defaults to `https://n8n-palazzopinto.azurewebsites.net`. The monitor
+shows up to 250 workflows and 100 saved executions; a healthy service alone
+does not establish that workflows are running successfully.
+
 ### P&L management
 
 The admin-only P&L pages combine independently recorded income, booking values,

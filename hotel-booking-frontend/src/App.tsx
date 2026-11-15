@@ -40,7 +40,7 @@ import AdminPortal from "./pages/AdminPortal";
 import AdminPortalCheckIns from "./pages/AdminPortalCheckIns";
 import AdminSelfCheckins from "./pages/AdminSelfCheckins";
 import AdminSelfCheckinDetail from "./pages/AdminSelfCheckinDetail";
-import SchedulerMonitor from "./pages/SchedulerMonitor";
+import N8nMonitor from "./pages/N8nMonitor";
 import TrafficInsightsDashboard from "./pages/TrafficInsightsDashboard";
 import PnlOverview from "./pages/PnlOverview";
 import PnlEntries from "./pages/PnlEntries";
@@ -95,7 +95,7 @@ const getPageTitle = (pathname: string): string => {
   if (pathname.startsWith("/booking/")) return `${BRAND_NAME} | Booking Details`;
   if (pathname === "/vacancy-management") return `${BRAND_NAME} | Vacancy Management`;
   if (pathname === "/booking-com-sync") return `${BRAND_NAME} | Booking.com Sync`;
-  if (pathname === "/scheduler-monitor") return `${BRAND_NAME} | Scheduler Monitor`;
+  if (pathname === "/n8n-workflows") return `${BRAND_NAME} | n8n Workflows`;
   if (pathname === "/traffic-insights") return `${BRAND_NAME} | Traffic Insights`;
   if (pathname === "/pnl") return `${BRAND_NAME} | P&L Overview`;
   if (pathname === "/pnl/income") return `${BRAND_NAME} | Income`;
@@ -456,10 +456,14 @@ const App = () => {
         />
         <Route
           path="/scheduler-monitor"
+          element={<Navigate to="/n8n-workflows" replace />}
+        />
+        <Route
+          path="/n8n-workflows"
           element={
             userRole === "admin" ? (
               <Layout admin>
-                <SchedulerMonitor />
+                <N8nMonitor />
               </Layout>
             ) : (
               <Navigate to="/" />
