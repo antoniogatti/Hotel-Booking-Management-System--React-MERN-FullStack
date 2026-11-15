@@ -26,9 +26,20 @@ let saved;
 const dedicated = new Map();
 const recorded = [];
 const gridViews = new Map();
+const defaultViews = new Map();
 
 User.findById = (id) => ({
   select: async () => id === adminId || id === secondAdminId ? { role: "admin" } : id === ownerId ? { role: "hotel_owner" } : null,
+});
+User.findOne = ({ _id }) => ({
+  select: () => ({ lean: async () => _id === adminId || _id === secondAdminId ? { pnlDefaultGridView: defaultViews.get(_id) } : null }),
+});
+User.findByIdAndUpdate = (id, update) => ({
+  select: async () => {
+    if (id !== adminId && id !== secondAdminId) return null;
+    defaultViews.set(id, update.$set.pnlDefaultGridView);
+    return { _id: id };
+  },
 });
 PnlGridView.find = ({ userId }) => ({ lean: async () => [...gridViews.values()].filter((view) => view.userId === userId) });
 PnlGridView.create = async (value) => {
@@ -178,6 +189,10 @@ test("grid views validate and persist layouts per admin", async () => {
   assert.equal((await request("/views", { method: "POST", body: { ...changed, colorFilter: "missing" } })).status, 400);
   assert.equal((await request(`/views/${created.id}`, { method: "PUT", body: changed })).status, 200);
   assert.deepEqual((await (await request("/views")).json()).views[0], { id: created.id, ...changed });
+  const pickerId = "group-registrationV2-12345678-1234-1234-1234-123456789abc";
+  const pickerView = { ...changed, colorTags: [{ id: pickerId, name: "02 Registration", color: "#abcdef" }], columnColors: { invoiceNumber: pickerId }, colorFilter: pickerId };
+  assert.equal((await request(`/views/${created.id}`, { method: "PUT", body: pickerView })).status, 200);
+  assert.deepEqual((await (await request("/views")).json()).views[0], { id: created.id, ...pickerView });
   assert.equal((await request(`/views/${created.id}`, { method: "DELETE" })).status, 204);
   assert.equal((await request(`/views/${created.id}`, { method: "DELETE" })).status, 404);
 });
@@ -194,6 +209,27 @@ test("grid views are sorted by name without requiring a database sort index", as
   } finally {
     gridViews.clear();
   }
+});
+
+test("default grid view is validated, saved per admin and separate from named views", async () => {
+  const layout = { name: "Default", columns: ["roomId", "invoiceNumber"], hiddenGroups: ["guest"], hiddenColumns: ["invoiceNumber"], frozenColumns: 1, widths: { roomId: 210 }, colorTags: [], columnColors: {}, colorFilter: "", columnFilters: {} };
+  assert.equal(User.schema.path("pnlDefaultGridView").options.select, false);
+  const castQuery = new mongoose.Query({}, {}, User);
+  assert.deepEqual(castQuery._castUpdate({ $set: { pnlDefaultGridView: { ...layout, widths: {} } } }).$set.pnlDefaultGridView.widths, {});
+  assert.equal((await request("/views/default", { user: ownerId, method: "PUT", body: layout })).status, 403);
+  assert.equal((await request("/views/default", { method: "PUT", body: { ...layout, frozenColumns: 3 } })).status, 400);
+  const named = await request("/views", { method: "POST", body: layout });
+  assert.equal(named.status, 201);
+  const namedId = (await named.json()).id;
+  assert.equal((await request("/views/default", { method: "PUT", body: layout })).status, 200);
+  assert.deepEqual((await (await request("/views")).json()).defaultView, layout);
+  assert.equal((await (await request("/views", { user: secondAdminId })).json()).defaultView, null);
+  const changed = { ...layout, hiddenGroups: [], frozenColumns: 2 };
+  assert.equal((await request("/views/default", { method: "PUT", body: changed })).status, 200);
+  assert.deepEqual((await (await request("/views")).json()).defaultView, changed);
+  assert.equal((await (await request("/views")).json()).views[0].id, namedId);
+  assert.equal((await request(`/views/${namedId}`, { method: "DELETE" })).status, 204);
+  defaultViews.clear();
 });
 
 test("manual ledger validates and persists create, update and delete", async () => {
@@ -242,10 +278,13 @@ test("booking income details and invoice tracking are editable without altering 
   assert.equal((await request(path, { method: "PUT", body: { guestCount: 1.5 } })).status, 400);
   assert.equal((await request(path, { method: "PUT", body: { netAmountCents: 0.1 } })).status, 400);
   assert.equal((await request(path, { method: "PUT", body: { notes: "x".repeat(1001) } })).status, 400);
+  assert.equal((await request(path, { method: "PUT", body: { invoiceDate: "2026-02-30" } })).status, 400);
+  assert.equal((await request(path, { method: "PUT", body: { touristTaxCents: -1 } })).status, 400);
+  assert.equal((await request(path, { method: "PUT", body: { paymentStatus: "other" } })).status, 400);
   const details = {
     country: "France", city: "Paris", identifier: "PASS-1", guestDetails: "F 44 - M 45",
     notes: "Follow up with guest", guestCount: 2, grossAmountCents: 24000, netAmountCents: 21000,
-    invoiceRequired: true, invoiceCreated: false,
+    invoiceRequired: true, invoiceCreated: false, invoiceDate: "2026-02-20", touristTaxCents: 0, paymentStatus: "pending",
   };
   assert.equal(new PnlBookingIncome({ _id: `local:${localId}`, source: "local", bookingId: localId, updatedBy: adminId, details }).validateSync(), undefined);
   assert.equal((await request(path, { method: "PUT", body: details })).status, 200);
@@ -256,12 +295,14 @@ test("booking income details and invoice tracking are editable without altering 
   assert.equal(local.overrides.notes, "Follow up with guest");
   assert.deepEqual([local.amountCents, local.netAmountCents, local.unitAmountCents], [24000, 21000, 7000]);
   assert.deepEqual([local.invoiceRequired, local.invoiceCreated], [true, false]);
+  assert.deepEqual([local.invoiceDate, local.touristTaxCents, local.paymentStatus], ["2026-02-20", 0, "pending"]);
   assert.equal(localBookings[0].totalCost, originalTotal);
   assert.equal(localBookings[0].country, "Italy");
   assert.equal((await request(path, { method: "PUT", body: { ...details, unitAmountCents: 6900, invoiceCreated: true, invoiceNumber: "INV-1" } })).status, 200);
   rows = (await (await request("/bookings?year=2026")).json()).bookings;
   local = rows.find((row) => row.id === localId);
   assert.deepEqual([local.invoiceRequired, local.invoiceCreated, local.invoiceNumber], [true, true, "INV-1"]);
+  assert.deepEqual([local.invoiceDate, local.touristTaxCents, local.paymentStatus], ["2026-02-20", 0, "pending"]);
   assert.equal(local.unitAmountCents, 7000);
   assert.equal((await request(`/bookings/booking_com/${importedId}`, { method: "PUT", body: { grossAmountCents: 5000, netAmountCents: -2900, invoiceRequired: false, notes: "Imported note" } })).status, 200);
   const imported = (await (await request("/bookings?year=2026")).json()).bookings.find((row) => row.id === importedId);
@@ -292,10 +333,14 @@ test("standalone income is reported, editable and prevents possible booking over
   assert.equal(rows.find((row) => row.reference === "LOCAL-1").reason, "");
   assert.equal(rows.find((row) => row.reference === "LOCAL-1").possibleRecordedOverlap, true);
   const identity = { reference: "", guestName: "Example", phone: "", email: "", roomId, roomName: "", date: "2026-01-02", nights: 3 };
-  assert.equal((await request(`/bookings/recorded/${id}`, { method: "PUT", body: { ...identity, details: { grossAmountCents: 12000, netAmountCents: 11000, invoiceNumber: "INV-UNKNOWN", notes: "Recorded note" } } })).status, 200);
+  assert.equal((await request(`/bookings/recorded/${id}`, { method: "PUT", body: { ...identity, details: { grossAmountCents: 12000, netAmountCents: 11000, invoiceNumber: "INV-UNKNOWN", invoiceDate: "2026-01-06", touristTaxCents: 500, paymentStatus: "paid", notes: "Recorded note" } } })).status, 200);
   rows = (await (await request("/bookings?year=2026")).json()).bookings;
   assert.equal(rows.find((row) => row.id === id).unitAmountCents, 3667);
   assert.equal(rows.find((row) => row.id === id).notes, "Recorded note");
+  assert.deepEqual(
+    [rows.find((row) => row.id === id).invoiceDate, rows.find((row) => row.id === id).touristTaxCents, rows.find((row) => row.id === id).paymentStatus],
+    ["2026-01-06", 500, "paid"]
+  );
   assert.equal((await request(`/bookings/recorded/${id}`, { method: "PUT", body: { ...identity, details: { grossAmountCents: 12000, excludeFromTotals: true } } })).status, 200);
   rows = (await (await request("/bookings?year=2026")).json()).bookings;
   assert.equal(rows.find((row) => row.id === id).reason, "Excluded by administrator");

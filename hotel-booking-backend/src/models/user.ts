@@ -31,6 +31,7 @@ const userSchema = new mongoose.Schema(
         max: Number,
       },
     },
+    pnlDefaultGridView: { type: mongoose.Schema.Types.Mixed, select: false },
     // Analytics and tracking fields
     totalBookings: { type: Number, default: 0 },
     totalSpent: { type: Number, default: 0 },

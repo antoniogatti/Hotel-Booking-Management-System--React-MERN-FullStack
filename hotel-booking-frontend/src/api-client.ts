@@ -383,7 +383,10 @@ export type PnlBookingDetails = {
   invoiceRequired?: boolean;
   invoiceCreated?: boolean;
   invoiceNumber?: string;
+  invoiceDate?: string;
+  touristTaxCents?: number;
   paymentMethod?: string;
+  paymentStatus?: "paid" | "pending" | "unknown";
   taxQuarter?: string;
   includePossibleOverlap?: boolean;
   excludeFromTotals?: boolean;
@@ -416,7 +419,10 @@ export type PnlBooking = {
   invoiceRequired: boolean | null;
   invoiceCreated: boolean | null;
   invoiceNumber: string;
+  invoiceDate: string;
+  touristTaxCents: number | null;
   paymentMethod: string;
+  paymentStatus: "paid" | "pending" | "unknown";
   taxQuarter: string;
   overrides: PnlBookingDetails;
   amountCents: number | null;
@@ -424,6 +430,16 @@ export type PnlBooking = {
   reason: string;
   possibleRecordedOverlap?: boolean;
   possibleRepeatedRecord?: boolean;
+};
+
+export type PnlCheckInInvitation = {
+  source: "local" | "booking_com";
+  id: string;
+  expectedEmail: string;
+} & ({ mode: "desk" } | { mode: "self"; accessCode: string; locker: string; breakfastIncluded: boolean });
+
+export const sendPnlCheckInInvitation = async (invitation: PnlCheckInInvitation): Promise<void> => {
+  await axiosInstance.post("/api/pnl/check-in-invitations", invitation);
 };
 
 export type PnlRecordedIdentity = {
@@ -465,9 +481,14 @@ export type PnlGridLayout = {
 
 export type PnlGridView = PnlGridLayout & { id: string; name: string };
 
-export const fetchPnlGridViews = async (): Promise<PnlGridView[]> => {
-  const response = await axiosInstance.get<{ views: PnlGridView[] }>("/api/pnl/views");
-  return response.data.views;
+export const fetchPnlGridViews = async (): Promise<{ views: PnlGridView[]; defaultView: PnlGridLayout | null }> => {
+  const response = await axiosInstance.get<{ views: PnlGridView[]; defaultView?: PnlGridLayout | null }>("/api/pnl/views");
+  return { views: response.data.views, defaultView: response.data.defaultView ?? null };
+};
+
+export const saveDefaultPnlGridView = async (layout: PnlGridLayout): Promise<PnlGridLayout> => {
+  const response = await axiosInstance.put<{ defaultView: PnlGridLayout }>("/api/pnl/views/default", { name: "Default", ...layout });
+  return response.data.defaultView;
 };
 
 export const savePnlGridView = async (name: string, layout: PnlGridLayout, id?: string): Promise<PnlGridView> => {

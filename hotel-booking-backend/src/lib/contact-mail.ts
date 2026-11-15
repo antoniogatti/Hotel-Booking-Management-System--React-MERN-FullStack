@@ -68,6 +68,17 @@ type CheckInNotificationPayload = {
   };
 };
 
+type CheckInInvitationPayload = {
+  email: string;
+  guestName: string;
+  reference: string;
+  checkIn: string;
+  mode: "desk" | "self";
+  accessCode?: string;
+  locker?: string;
+  breakfastIncluded?: boolean;
+};
+
 const GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0";
 const TECH_SUBJECT_PREFIX = "[B&B System]";
 const BRAND_NAME = "Palazzo Pinto B&B";
@@ -665,6 +676,36 @@ export const sendBookingDecisionEmails = async (
       text: `Booking ${decisionLabel.toLowerCase()} for reservation ${payload.reservationNumber}`,
     });
   }
+};
+
+export const sendCheckInInvitationEmail = async (payload: CheckInInvitationPayload) => {
+  if (process.env.DISABLE_CONTACT_EMAILS === "true") {
+    throw new Error("Email delivery is disabled.");
+  }
+  const { tenantId, clientId, clientSecret, senderAddress } = resolveMailConfig();
+  let link = "";
+  if (payload.mode === "self") {
+    const url = new URL("/self-checkin", resolvePublicBaseUrls().frontendBase);
+    if (url.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname))) {
+      throw new Error("The public website URL must use HTTPS.");
+    }
+    url.searchParams.set("q", payload.accessCode!);
+    if (payload.locker) url.searchParams.set("l", payload.locker);
+    if (payload.breakfastIncluded === false) url.searchParams.set("b", "false");
+    link = url.toString();
+  }
+  const token = await getGraphAccessToken(tenantId, clientId, clientSecret);
+  const instructions = payload.mode === "self"
+    ? `<p>Please complete your self check-in using your personal link:</p><p><a href="${escapeHtml(link)}">Complete self check-in</a></p><p>This link contains your access code. Please keep it private.</p>`
+    : "<p>Our team will assist you with check-in when you arrive. Please contact us if you need to arrange your arrival.</p>";
+  await sendMail({
+    token,
+    senderAddress,
+    to: payload.email,
+    subject: `Check-in instructions - ${BRAND_NAME} (${payload.reference})`,
+    html: `<p>Hello ${escapeHtml(payload.guestName || "Guest")},</p><p>Booking reference: ${escapeHtml(payload.reference)}<br/>Check-in: ${escapeHtml(formatFriendlyDate(payload.checkIn))}</p>${instructions}<p>Kind regards,<br/>${BRAND_NAME}</p>`,
+    text: payload.mode === "self" ? `Complete self check-in: ${link}` : "Our team will assist you with check-in when you arrive.",
+  });
 };
 
 export const sendCheckInNotificationEmail = async (

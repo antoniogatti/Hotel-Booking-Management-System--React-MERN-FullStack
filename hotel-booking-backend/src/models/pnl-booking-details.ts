@@ -13,7 +13,10 @@ export type PnlBookingDetails = {
   invoiceRequired?: boolean;
   invoiceCreated?: boolean;
   invoiceNumber?: string;
+  invoiceDate?: string;
+  touristTaxCents?: number;
   paymentMethod?: string;
+  paymentStatus?: "paid" | "pending" | "unknown";
   taxQuarter?: string;
   includePossibleOverlap?: boolean;
   excludeFromTotals?: boolean;
@@ -33,7 +36,10 @@ const pnlBookingDetailsSchema = new mongoose.Schema<PnlBookingDetails>(
     invoiceRequired: { type: Boolean },
     invoiceCreated: { type: Boolean },
     invoiceNumber: { type: String, trim: true, maxlength: 100 },
+    invoiceDate: { type: String },
+    touristTaxCents: { type: Number, min: 0, max: 10000000000, validate: Number.isSafeInteger },
     paymentMethod: { type: String, trim: true, maxlength: 100 },
+    paymentStatus: { type: String, enum: ["paid", "pending", "unknown"] },
     taxQuarter: { type: String, trim: true, maxlength: 100 },
     includePossibleOverlap: { type: Boolean },
     excludeFromTotals: { type: Boolean },

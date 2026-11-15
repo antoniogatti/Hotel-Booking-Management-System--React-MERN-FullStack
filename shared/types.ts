@@ -22,6 +22,7 @@ export type UserType = {
       max: number;
     };
   };
+  pnlDefaultGridView?: unknown;
   totalBookings?: number;
   totalSpent?: number;
   lastLogin?: Date;

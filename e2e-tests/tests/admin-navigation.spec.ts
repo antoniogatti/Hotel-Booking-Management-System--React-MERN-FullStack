@@ -353,6 +353,9 @@ test("income details and invoice tracking can be recorded for a booking", async 
   await page.getByLabel("Guest identifier").fill("ID-123");
   await page.getByLabel("Guest count override").fill("3");
   await page.getByLabel("Guest ages / details", { exact: true }).fill("F 44 - M 45");
+  await page.getByLabel("Invoice date", { exact: true }).fill(`${year}-01-11`);
+  await page.getByLabel("Tourist tax (EUR)", { exact: true }).fill("6.00");
+  await page.getByLabel("Booking payment status").selectOption("paid");
   await page.getByLabel("Booking value override (EUR)").fill("240");
   await page.getByLabel("Before tourist tax override (EUR)").fill("210");
   await page.locator("label").filter({ hasText: "Invoice required" }).locator("select").selectOption("yes");
@@ -368,16 +371,18 @@ test("income details and invoice tracking can be recorded for a booking", async 
   await expect(row).toContainText("€210.00");
   await expect(row).toContainText("€70.00");
   await expect(row).toContainText("Pending");
-  expect(details).toMatchObject({ guestCount: 3, grossAmountCents: 24000, netAmountCents: 21000, invoiceRequired: true, invoiceCreated: false });
+  expect(details).toMatchObject({ guestCount: 3, grossAmountCents: 24000, netAmountCents: 21000, invoiceRequired: true, invoiceCreated: false, invoiceDate: `${year}-01-11`, touristTaxCents: 600, paymentStatus: "paid" });
 
   await page.getByRole("button", { name: "Edit income details for LOCAL-123" }).click();
+  await expect(page.getByLabel("Invoice date", { exact: true })).toHaveValue(`${year}-01-11`);
+  await expect(page.getByLabel("Tourist tax (EUR)", { exact: true })).toHaveValue("6.00");
   await page.locator("label").filter({ hasText: "Invoice status" }).locator("select").selectOption("yes");
   await expect(page.getByLabel("Invoice number", { exact: true })).toHaveAttribute("required", "");
   await page.getByLabel("Invoice number", { exact: true }).fill("INV-2026-1");
   await page.getByRole("button", { name: "Save income details" }).click();
   await expect(row).toContainText("Created");
   await expect(row).toContainText("INV-2026-1");
-  expect(details).toMatchObject({ invoiceRequired: true, invoiceCreated: true, invoiceNumber: "INV-2026-1" });
+  expect(details).toMatchObject({ invoiceRequired: true, invoiceCreated: true, invoiceNumber: "INV-2026-1", invoiceDate: `${year}-01-11`, touristTaxCents: 600, paymentStatus: "paid" });
 });
 
 test("standalone income records remain editable without a booking link", async ({ page }) => {
@@ -404,7 +409,8 @@ test("standalone income records remain editable without a booking link", async (
       await route.fulfill({ headers, json: { message: "Saved" } });
     } else {
       await route.fulfill({ headers, json: { bookings: [{
-        id, ...identity, source: "recorded", checkIn: identity.date, checkOut: "", status: "recorded",
+        id, ...identity, source: "recorded", checkIn: identity.date,
+        checkOut: identity.nights ? new Date(Date.parse(`${identity.date}T00:00:00Z`) + Number(identity.nights) * 86400000).toISOString().slice(0, 10) : "", status: "recorded",
         country: "", city: "", identifier: "", guestDetails: "", guestCount: null,
         amountCents: details.grossAmountCents, netAmountCents: details.netAmountCents,
         unitAmountCents: 3000, currency: "EUR", reason: details.excludeFromTotals ? "Excluded by administrator" : "",
@@ -419,7 +425,12 @@ test("standalone income records remain editable without a booking link", async (
   await expect(row.getByRole("link")).toHaveCount(0);
   await page.getByRole("button", { name: "Edit income details for Standalone Guest" }).click();
   await page.getByLabel("Guest name", { exact: true }).fill("Updated Guest");
-  await page.getByLabel("Nights", { exact: true }).fill("4");
+  await page.getByLabel("Check-out date").fill(`${new Date().getFullYear()}-02-01`);
+  await page.getByRole("button", { name: "Save income details" }).click();
+  await expect(page.getByRole("alert")).toContainText("check-out after check-in");
+  expect(identity.nights).toBe(3);
+  await page.getByLabel("Check-out date").fill(`${new Date().getFullYear()}-02-05`);
+  await expect(page.getByText("Nights: 4")).toBeVisible();
   await expect(page.getByLabel("Invoice number", { exact: true })).toHaveValue("INV-1");
   expect(await page.locator("form").evaluate((form: HTMLFormElement) =>
     [...form.elements].filter((element): element is HTMLInputElement => element instanceof HTMLInputElement && !element.validity.valid)
@@ -439,42 +450,61 @@ test("standalone income records remain editable without a booking link", async (
   await expect(updatedRow).toContainText("Excluded by administrator");
 });
 
-test("P&L overview includes business insights and keeps the old URL working", async ({ page }) => {
+test("P&L insights use included records and the selected year", async ({ page }) => {
   await mockSession(page, "admin");
+  const year = new Date().getFullYear();
   const headers = {
     "access-control-allow-origin": uiUrl,
     "access-control-allow-credentials": "true",
     "access-control-allow-headers": "authorization,content-type",
   };
+  let legacyRequests = 0;
   await page.route("**/api/business-insights/**", async (route) => {
-    if (route.request().method() === "OPTIONS") {
-      await route.fulfill({ status: 204, headers });
-      return;
-    }
-    const path = new URL(route.request().url()).pathname;
-    const body = path.endsWith("/forecast") ? {
-      historical: [], forecasts: [], seasonalGrowth: 3,
-      trends: { bookingTrend: "increasing", revenueTrend: "increasing" }, lastUpdated: new Date().toISOString(),
-    } : path.endsWith("/system-stats") ? {
-      system: { memory: { used: 10, total: 100, percentage: 10 }, cpu: { user: 0, system: 0 }, uptime: 60 },
-      database: { collections: 1, totalHotels: 1, totalBookings: 7, totalRevenue: 300 },
-      application: { avgResponseTime: 10, requestsPerMinute: 0, errorRate: 0, uptime: "online", todayBookings: 0, thisWeekBookings: 1 },
-      lastUpdated: new Date().toISOString(),
-    } : {
-      overview: { totalHotels: 1, totalUsers: 2, totalBookings: 7, recentBookings: 1, totalRevenue: 300, recentRevenue: 100, revenueGrowth: 10 },
-      popularDestinations: [], dailyBookings: [], hotelPerformance: [], lastUpdated: new Date().toISOString(),
-    };
-    await route.fulfill({ headers, json: body });
+    legacyRequests++;
+    await route.fulfill({ status: 503, headers });
+  });
+  await page.route("**/api/pnl/entries**", async (route) => {
+    const selected = new URL(route.request().url()).searchParams.get("year");
+    const entries = selected === String(year) ? [
+      { _id: "income", type: "income", date: `${year}-01-02`, amountCents: 10000, roomId: null },
+      { _id: "expense", type: "expense", date: `${year}-01-03`, amountCents: 3000, roomId: null },
+    ] : [{ _id: "other", type: "expense", date: `${year - 1}-02-01`, amountCents: 1250, roomId: null }];
+    await route.fulfill({ headers, json: { entries } });
+  });
+  await page.route("**/api/pnl/bookings**", async (route) => {
+    const selected = new URL(route.request().url()).searchParams.get("year");
+    const bookings = selected === String(year) ? [
+      { id: "1", source: "local", roomId: "", checkIn: `${year}-01-01`, amountCents: 20000, reason: "" },
+      { id: "2", source: "recorded", roomId: "", checkIn: `${year}-02-01`, amountCents: 30000, reason: "" },
+      { id: "3", source: "booking_com", roomId: "", checkIn: `${year}-03-01`, amountCents: 40000, reason: "" },
+      { id: "4", source: "local", roomId: "", checkIn: `${year}-01-01`, amountCents: 50000, reason: "Possible duplicate stay" },
+    ] : [];
+    await route.fulfill({ headers, json: { bookings } });
   });
   await page.goto(`${uiUrl}/business-insights`);
   await expect(page).toHaveURL(/\/pnl$/);
   const insights = page.getByRole("region", { name: "Business insights" });
-  await expect(insights.getByText("Total Bookings")).toBeVisible();
-  await expect(insights).toContainText("not the selected P&L year");
-  await insights.getByRole("button", { name: "Forecasting" }).click();
-  await expect(insights.getByText("Booking Trend")).toBeVisible();
-  await insights.getByRole("button", { name: "Performance" }).click();
-  await expect(insights.getByText("Memory Usage")).toBeVisible();
+  await expect(page.getByRole("region", { name: "Annual P&L totals" })).toContainText("1,000.00");
+  await expect(insights).toContainText("97.0%");
+  await expect(insights).toContainText("€300.00");
+  await expect(insights).toContainText("3 included booking income rows");
+  const sources = insights.getByRole("table", { name: "Income by source" });
+  await expect(sources.getByRole("row", { name: /Site bookings/ })).toContainText("€200.00");
+  await expect(sources.getByRole("row", { name: /Booking.com/ })).toContainText("€400.00");
+  await expect(sources.getByRole("row", { name: /Recorded income/ })).toContainText("€300.00");
+  await expect(sources.getByRole("row", { name: /Additional income/ })).toContainText("€100.00");
+  await insights.getByText("Show monthly figures").click();
+  const january = insights.getByRole("table", { name: "Monthly P&L figures" }).getByRole("row", { name: /Jan/ });
+  await expect(january).toContainText("€300.00");
+  await expect(january).toContainText("€30.00");
+  await expect(january).toContainText("€270.00");
+  await expect(page.getByText(/1 income row excluded/)).toBeVisible();
+  await page.getByLabel("Year", { exact: true }).fill(String(year - 1));
+  await expect(insights).toContainText(`P&L income and expenses for ${year - 1}`);
+  await expect(insights.getByText("Not available")).toHaveCount(2);
+  await expect(page.getByRole("region", { name: "Annual P&L totals" })).toContainText("-€12.50");
+  await expect(sources.getByRole("row", { name: /Site bookings/ })).toContainText("€0.00");
+  expect(legacyRequests).toBe(0);
 });
 
 test("P&L overview and ledgers track room and shared entries", async ({ page }) => {
@@ -603,6 +633,7 @@ test("P&L shows a load error instead of fabricated totals", async ({ page }) => 
   await page.goto(`${uiUrl}/pnl`);
   await expect(page.getByRole("alert")).toContainText("Unable to load P&L data");
   await expect(page.getByRole("region", { name: "Annual P&L totals" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "Business insights" })).toHaveCount(0);
 });
 
 test("calendar distinguishes imported and booked reservations consistently", async ({ page }) => {

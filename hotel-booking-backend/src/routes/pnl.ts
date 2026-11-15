@@ -11,6 +11,8 @@ import { PnlBookingDetails } from "../models/pnl-booking-details";
 import PnlBookingIncome from "../models/pnl-booking-income";
 import PnlRecordedIncome from "../models/pnl-recorded-income";
 import PnlGridView from "../models/pnl-grid-view";
+import User from "../models/user";
+import { sendCheckInInvitationEmail } from "../lib/contact-mail";
 
 const router = express.Router();
 router.use(verifyToken, requireRole("admin"));
@@ -74,12 +76,31 @@ const gridViewResponse = (view: { _id: unknown; name: string; columns: string[];
 
 router.get("/views", async (req, res) => {
   try {
-    const views = await PnlGridView.find({ userId: req.userId }).lean();
+    const [views, user] = await Promise.all([
+      PnlGridView.find({ userId: req.userId }).lean(),
+      User.findOne({ _id: req.userId }).select("+pnlDefaultGridView").lean(),
+    ]);
+    if (!user) return res.status(404).json({ message: "User not found." });
+    const defaultView = user.pnlDefaultGridView == null ? null : parseGridView(user.pnlDefaultGridView);
+    if (user.pnlDefaultGridView != null && !defaultView) throw new Error("Stored default P&L grid view is invalid.");
     views.sort((a, b) => a.name.localeCompare(b.name));
-    return res.json({ views: views.map(gridViewResponse) });
+    return res.json({ views: views.map(gridViewResponse), defaultView });
   } catch (error) {
     logError("Failed to load P&L grid views", error);
     return res.status(500).json({ message: "Unable to load grid views." });
+  }
+});
+
+router.put("/views/default", async (req, res) => {
+  const view = parseGridView(req.body);
+  if (!view) return res.status(400).json({ message: "Provide a valid grid view." });
+  try {
+    const user = await User.findByIdAndUpdate(req.userId, { $set: { pnlDefaultGridView: view } }, { new: true, runValidators: true }).select("_id");
+    if (!user) return res.status(404).json({ message: "User not found." });
+    return res.json({ defaultView: view });
+  } catch (error) {
+    logError("Failed to save default P&L grid view", error);
+    return res.status(500).json({ message: "Unable to save default grid view." });
   }
 });
 
@@ -129,7 +150,7 @@ const validDate = (value: unknown): value is string => {
 const parseBookingDetails = (body: unknown): PnlBookingDetails | null => {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const input = body as Record<string, unknown>;
-  const fields = ["country", "city", "identifier", "guestDetails", "notes", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "paymentMethod", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
+  const fields = ["country", "city", "identifier", "guestDetails", "notes", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "invoiceDate", "touristTaxCents", "paymentMethod", "paymentStatus", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
   if (Object.keys(input).some((key) => !fields.includes(key))) return null;
   const details: PnlBookingDetails = {};
   for (const key of ["country", "city", "identifier", "guestDetails", "notes", "invoiceNumber", "paymentMethod", "taxQuarter"] as const) {
@@ -138,10 +159,18 @@ const parseBookingDetails = (body: unknown): PnlBookingDetails | null => {
     if (typeof value !== "string" || value.trim().length > (key === "notes" ? 1000 : key === "guestDetails" ? 300 : 100)) return null;
     if (value.trim()) details[key] = value.trim();
   }
-  for (const key of ["guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents"] as const) {
+  if (input.invoiceDate !== undefined && input.invoiceDate !== null && input.invoiceDate !== "") {
+    if (!validDate(input.invoiceDate)) return null;
+    details.invoiceDate = input.invoiceDate;
+  }
+  if (input.paymentStatus !== undefined && input.paymentStatus !== null && input.paymentStatus !== "") {
+    if (input.paymentStatus !== "paid" && input.paymentStatus !== "pending" && input.paymentStatus !== "unknown") return null;
+    details.paymentStatus = input.paymentStatus;
+  }
+  for (const key of ["guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "touristTaxCents"] as const) {
     const value = input[key];
     if (value === undefined || value === null) continue;
-    const min = key === "guestCount" || key === "grossAmountCents" ? 1 : -10000000000;
+    const min = key === "guestCount" || key === "grossAmountCents" ? 1 : key === "touristTaxCents" ? 0 : -10000000000;
     const max = key === "guestCount" ? 1000 : 10000000000;
     if (typeof value !== "number" || !Number.isSafeInteger(value) || value < min || value > max) return null;
     details[key] = value;
@@ -211,7 +240,10 @@ const incomeDetails = (booking: {
     invoiceRequired: overrides.invoiceRequired ?? null,
     invoiceCreated: overrides.invoiceRequired === true ? overrides.invoiceCreated ?? null : null,
     invoiceNumber: overrides.invoiceRequired === false ? "" : overrides.invoiceNumber || previous?.invoiceNumber || "",
+    invoiceDate: overrides.invoiceDate || "",
+    touristTaxCents: overrides.touristTaxCents ?? null,
     paymentMethod: overrides.paymentMethod || booking.checkInInfo?.paymentDetails || previous?.paymentVia || "",
+    paymentStatus: overrides.paymentStatus || "unknown",
     taxQuarter: overrides.taxQuarter || (typeof rawTaxQuarter === "string" || typeof rawTaxQuarter === "number" ? String(rawTaxQuarter) : ""),
     overrides,
   };
@@ -391,6 +423,50 @@ router.get("/bookings", async (req, res) => {
   } catch (error) {
     logError("Failed to load P&L bookings", error);
     return res.status(500).json({ message: "Unable to load P&L bookings." });
+  }
+});
+
+router.post("/check-in-invitations", async (req, res) => {
+  const input = req.body as Record<string, unknown> | null;
+  const selfDetails = input && input.mode === "self" && typeof input.accessCode === "string" &&
+    /^[a-zA-Z0-9_-]{1,80}$/.test(input.accessCode) && typeof input.locker === "string" &&
+    /^(\d{1,2})?$/.test(input.locker) && typeof input.breakfastIncluded === "boolean"
+    ? { accessCode: input.accessCode, locker: input.locker, breakfastIncluded: input.breakfastIncluded } : null;
+  if (!input || (input.source !== "local" && input.source !== "booking_com") ||
+      typeof input.id !== "string" || !mongoose.isValidObjectId(input.id) ||
+      typeof input.expectedEmail !== "string" || input.expectedEmail.length > 254 ||
+      (input.mode !== "desk" && input.mode !== "self") ||
+      (input.mode === "self" && !selfDetails)) {
+    return res.status(400).json({ message: "Provide valid booking and check-in details." });
+  }
+  try {
+    const booking = input.source === "local"
+      ? await Booking.findById(input.id).lean()
+      : await ExternalCalendarEvent.findOne({ _id: input.id, source: "booking_com" }).lean();
+    if (!booking) return res.status(404).json({ message: "Booking not found." });
+    if ((input.source === "local" && booking.status !== "confirmed") ||
+        (input.source === "booking_com" && booking.status !== "active")) {
+      return res.status(400).json({ message: "Only confirmed or active bookings can receive check-in invitations." });
+    }
+    const email = String(booking.email || "").trim();
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "This booking needs a valid guest email address." });
+    }
+    if (email.toLocaleLowerCase() !== input.expectedEmail.trim().toLocaleLowerCase()) {
+      return res.status(409).json({ message: "The guest email changed. Reopen the editor and review it before sending." });
+    }
+    const reference = "reservationNumber" in booking ? booking.reservationNumber : booking.externalUid;
+    const checkIn = "checkIn" in booking ? booking.checkIn : booking.startDate;
+    await sendCheckInInvitationEmail({
+      email, guestName: [booking.firstName, booking.lastName].filter(Boolean).join(" "),
+      reference: reference || input.id, checkIn: checkIn.toISOString(),
+      mode: input.mode,
+      ...(selfDetails || {}),
+    });
+    return res.json({ message: "Check-in invitation accepted for sending." });
+  } catch (error) {
+    logError("Failed to send check-in invitation", new Error(error instanceof Error ? error.name : "Unknown error"), { route: "pnl.check-in-invitation", bookingId: input.id });
+    return res.status(500).json({ message: "Could not confirm delivery. Check sent mail before retrying." });
   }
 });
 

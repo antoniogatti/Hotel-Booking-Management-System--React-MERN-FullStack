@@ -6,7 +6,7 @@ import PnlTable, { PnlColumn } from "../components/PnlTable";
 import PnlGrid from "../components/PnlGrid";
 import { PnlBookingMatches, possibleBookingMatches } from "../components/PnlBookingMatches";
 import * as apiClient from "../api-client";
-import { currentYear, formatMoney, moneyToCents, signedMoneyToCents, today, validYear } from "./pnl-utils";
+import { currentYear, formatMoney, moneyToCents, signedMoneyToCents, stayNights, today, validYear } from "./pnl-utils";
 
 type EntryType = "income" | "expense";
 type FormValues = {
@@ -31,7 +31,7 @@ type BookingForm = {
   email: string;
   roomId: string;
   date: string;
-  nights: string;
+  checkOut: string;
   country: string;
   city: string;
   identifier: string;
@@ -44,6 +44,9 @@ type BookingForm = {
   invoiceRequired: "unknown" | "yes" | "no";
   invoiceCreated: "unknown" | "yes" | "no";
   invoiceNumber: string;
+  invoiceDate: string;
+  touristTax: string;
+  paymentStatus: "paid" | "pending" | "unknown";
 };
 
 const emptyForm = (): FormValues => ({ date: today(), amount: "", category: "", description: "", roomId: "", status: "paid", nights: "", guestCount: "", numberOfNights: "", payee: "", reference: "", invoice: "", notes: "" });
@@ -128,7 +131,7 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
       email: booking.email,
       roomId: booking.roomId,
       date: booking.checkIn,
-      nights: booking.nights == null ? "" : String(booking.nights),
+      checkOut: booking.checkOut || "",
       country: details.country || "",
       city: details.city || "",
       identifier: details.identifier || "",
@@ -141,6 +144,9 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
       invoiceRequired: details.invoiceRequired === true ? "yes" : details.invoiceRequired === false ? "no" : "unknown",
       invoiceCreated: details.invoiceCreated === true ? "yes" : details.invoiceCreated === false ? "no" : "unknown",
       invoiceNumber: details.invoiceNumber || booking.invoiceNumber || "",
+      invoiceDate: details.invoiceDate || "",
+      touristTax: money(details.touristTaxCents),
+      paymentStatus: details.paymentStatus || "unknown",
     });
     setError("");
     setEditingBooking(booking);
@@ -150,18 +156,20 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
     if (!editingBooking || !bookingForm) return;
     const gross = bookingForm.grossAmount ? moneyToCents(bookingForm.grossAmount) : undefined;
     const net = bookingForm.netAmount ? signedMoneyToCents(bookingForm.netAmount) : undefined;
+    const touristTax = bookingForm.touristTax ? signedMoneyToCents(bookingForm.touristTax) : undefined;
     const guestCount = bookingForm.guestCount ? Number(bookingForm.guestCount) : undefined;
-    if (gross === null || net === null || (guestCount !== undefined && (!/^\d+$/.test(bookingForm.guestCount) || !Number.isSafeInteger(guestCount) || guestCount < 1 || guestCount > 1000))) {
-      setError("Enter valid amounts with at most two decimal places and a guest count between 1 and 1000.");
+    if (gross === null || net === null || touristTax === null || (touristTax !== undefined && touristTax < 0) || (guestCount !== undefined && (!/^\d+$/.test(bookingForm.guestCount) || !Number.isSafeInteger(guestCount) || guestCount < 1 || guestCount > 1000))) {
+      setError("Enter valid amounts, a non-negative tourist tax and a guest count between 1 and 1000.");
       return;
     }
     if (bookingForm.invoiceRequired === "yes" && bookingForm.invoiceCreated === "yes" && !bookingForm.invoiceNumber.trim()) {
       setError("Enter the invoice number when the invoice has been created.");
       return;
     }
+    const nights = stayNights(bookingForm.date, bookingForm.checkOut);
     if (editingBooking.source === "recorded" && (gross === undefined || !validYear(bookingForm.date.slice(0, 4)) ||
-      (bookingForm.nights !== "" && (!/^\d+$/.test(bookingForm.nights) || Number(bookingForm.nights) < 1 || Number(bookingForm.nights) > 10000)))) {
-      setError("Enter a date, positive booking value and a valid number of nights.");
+      (bookingForm.checkOut !== "" && (nights === null || nights > 10000)))) {
+      setError("Enter a check-in date, positive booking value and a check-out after check-in (maximum 10,000 nights).");
       return;
     }
     const details: apiClient.PnlBookingDetails = {
@@ -178,13 +186,16 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
       invoiceRequired: bookingForm.invoiceRequired === "unknown" ? undefined : bookingForm.invoiceRequired === "yes",
       invoiceCreated: bookingForm.invoiceRequired === "yes" && bookingForm.invoiceCreated !== "unknown" ? bookingForm.invoiceCreated === "yes" : undefined,
       invoiceNumber: bookingForm.invoiceRequired !== "no" ? bookingForm.invoiceNumber.trim() || undefined : undefined,
+      invoiceDate: bookingForm.invoiceDate || undefined,
+      touristTaxCents: touristTax,
+      paymentStatus: bookingForm.paymentStatus,
     };
     try {
       const identity = editingBooking.source === "recorded" ? {
         reference: bookingForm.reference.trim(), guestName: bookingForm.guestName.trim(),
         phone: bookingForm.phone.trim(), email: bookingForm.email.trim(), roomId: bookingForm.roomId,
         roomName: bookingForm.roomId === editingBooking.roomId ? editingBooking.roomName || "" : roomNames.get(bookingForm.roomId) || "",
-        date: bookingForm.date, nights: bookingForm.nights === "" ? null : Number(bookingForm.nights),
+        date: bookingForm.date, nights,
       } : undefined;
       await saveBooking.mutateAsync({ booking: editingBooking, details, identity });
       await queryClient.invalidateQueries("pnl-bookings");
@@ -329,13 +340,20 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
                 <label className="text-sm font-medium text-slate-700">Email<input maxLength={200} value={bookingForm.email} onChange={(e) => setBookingForm({ ...bookingForm, email: e.target.value })} className={fieldClass} /></label>
                 <label className="text-sm font-medium text-slate-700">Room<select value={bookingForm.roomId} onChange={(e) => setBookingForm({ ...bookingForm, roomId: e.target.value })} className={fieldClass}><option value="">Shared / unassigned</option>{bookingForm.roomId && !roomNames.has(bookingForm.roomId) && <option value={bookingForm.roomId}>Removed room</option>}{(rooms.data || []).map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select></label>
                 <label className="text-sm font-medium text-slate-700">Check-in date<input required type="date" min="1900-01-01" max="9998-12-31" value={bookingForm.date} onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })} className={fieldClass} /></label>
-                <label className="text-sm font-medium text-slate-700">Nights<input type="number" min="1" max="10000" step="1" value={bookingForm.nights} onChange={(e) => setBookingForm({ ...bookingForm, nights: e.target.value })} className={fieldClass} /></label>
+                <label className="text-sm font-medium text-slate-700">Check-out date<input type="date" min="1900-01-01" max="9998-12-31" value={bookingForm.checkOut} onChange={(e) => setBookingForm({ ...bookingForm, checkOut: e.target.value })} className={fieldClass} /></label>
+                <p className="text-sm text-slate-700">Nights: {stayNights(bookingForm.date, bookingForm.checkOut) ?? "Not available"}</p>
               </>}
               <label className="text-sm font-medium text-slate-700">Country override<input maxLength={100} value={bookingForm.country} placeholder={editingBooking.country || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, country: e.target.value })} className={fieldClass} /></label>
               <label className="text-sm font-medium text-slate-700">City override<input maxLength={100} value={bookingForm.city} placeholder={editingBooking.city || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, city: e.target.value })} className={fieldClass} /></label>
               <label className="text-sm font-medium text-slate-700">Guest identifier<input maxLength={100} value={bookingForm.identifier} placeholder={editingBooking.identifier || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, identifier: e.target.value })} className={fieldClass} /></label>
               <label className="text-sm font-medium text-slate-700">Guest count override<input type="number" min="1" max="1000" step="1" value={bookingForm.guestCount} placeholder={editingBooking.guestCount?.toString() || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, guestCount: e.target.value })} className={fieldClass} /></label>
               <label className="text-sm font-medium text-slate-700">Guest ages / details<input maxLength={300} value={bookingForm.guestDetails} placeholder={editingBooking.guestDetails || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, guestDetails: e.target.value })} className={fieldClass} /></label>
+              <label className="text-sm font-medium text-slate-700">Invoice date<input type="date" min="1900-01-01" max="9998-12-31" value={bookingForm.invoiceDate} onChange={(e) => setBookingForm({ ...bookingForm, invoiceDate: e.target.value })} className={fieldClass} /></label>
+              <label className="text-sm font-medium text-slate-700">Tourist tax (EUR)<input type="text" inputMode="decimal" value={bookingForm.touristTax} onChange={(e) => setBookingForm({ ...bookingForm, touristTax: e.target.value })} className={fieldClass} /></label>
+              <label className="text-sm font-medium text-slate-700">Booking payment status<select value={bookingForm.paymentStatus} onChange={(e) => {
+                const status = e.target.value;
+                if (status === "paid" || status === "pending" || status === "unknown") setBookingForm({ ...bookingForm, paymentStatus: status });
+              }} className={fieldClass}><option value="unknown">Not specified</option><option value="paid">Paid</option><option value="pending">Pending</option></select></label>
               <label className="text-sm font-medium text-slate-700">Booking value override (EUR)<input type="text" inputMode="decimal" value={bookingForm.grossAmount} placeholder={editingBooking.currency === "EUR" && editingBooking.amountCents != null ? (editingBooking.amountCents / 100).toFixed(2) : "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, grossAmount: e.target.value })} className={fieldClass} /></label>
               <label className="text-sm font-medium text-slate-700">Before tourist tax override (EUR)<input type="text" inputMode="decimal" value={bookingForm.netAmount} placeholder={editingBooking.netAmountCents != null ? (editingBooking.netAmountCents / 100).toFixed(2) : "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, netAmount: e.target.value })} className={fieldClass} /></label>
               <label className="text-sm font-medium text-slate-700">Payment method override<input maxLength={100} value={bookingForm.paymentMethod} placeholder={editingBooking.paymentMethod || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, paymentMethod: e.target.value })} className={fieldClass} /></label>

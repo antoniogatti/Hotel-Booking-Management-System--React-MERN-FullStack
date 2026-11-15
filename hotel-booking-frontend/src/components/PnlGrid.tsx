@@ -1,10 +1,11 @@
 import { KeyboardEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "react-query";
 import * as api from "../api-client";
-import { moneyToCents, signedMoneyToCents, validYear } from "../pages/pnl-utils";
+import { moneyToCents, signedMoneyToCents, stayNights, validYear } from "../pages/pnl-utils";
 import { Button } from "./ui/button";
 import { PnlBookingMatches, possibleBookingMatches } from "./PnlBookingMatches";
 import PnlGridViews, { moveGridColumn } from "./PnlGridViews";
+import PnlCheckInActions from "./PnlCheckInActions";
 import { GripVertical } from "lucide-react";
 
 type Room = { _id: string; name: string };
@@ -35,45 +36,47 @@ const incomeColumns: Column[] = [
   { key: "notes", label: "Notes", width: 220 },
   { key: "roomId", label: "Room", width: 180, kind: "room", recordedOnly: true },
   { key: "date", label: "Check-in", kind: "date", recordedOnly: true },
-  { key: "checkOut", label: "Check-out", readOnly: true },
+  { key: "checkOut", label: "Check-out", kind: "date", recordedOnly: true },
   { key: "guestName", label: "Guest", width: 180, recordedOnly: true },
   { key: "reference", label: "Reference", width: 160, recordedOnly: true },
-  { key: "possibleBookings", label: "Possible bookings", width: 260, readOnly: true },
+  { key: "source", label: "Source", readOnly: true },
+  { key: "grossAmountCents", label: "Booking value (€)", kind: "money" },
+  { key: "nights", label: "Nights", kind: "number", readOnly: true, width: 100 },
+  { key: "guestCount", label: "Pax", kind: "number", width: 100 },
+  { key: "identifier", label: "Guest ID" },
+  { key: "guestDetails", label: "Guest ages / details", width: 180 },
+  { key: "country", label: "Country" },
+  { key: "city", label: "City" },
   { key: "phone", label: "Phone", width: 150, recordedOnly: true },
   { key: "email", label: "Email", width: 200, recordedOnly: true },
+  { key: "invoiceDate", label: "Invoice date", kind: "date" },
   { key: "invoiceNumber", label: "Invoice number" },
-  { key: "country", label: "Country" },
-  { key: "identifier", label: "Identifier" },
-  { key: "city", label: "City" },
-  { key: "month", label: "Month", readOnly: true, width: 95 },
-  { key: "nights", label: "Nights", kind: "number", recordedOnly: true, width: 100 },
-  { key: "guestCount", label: "Guests", kind: "number", width: 100 },
-  { key: "grossAmountCents", label: "Booking value (€)", kind: "money" },
-  { key: "sourceAmount", label: "Original non-EUR value", readOnly: true },
-  { key: "unit", label: "Unit price (€)", readOnly: true },
-  { key: "netAmountCents", label: "Before tourist tax (€)", kind: "money", width: 175 },
-  { key: "guestDetails", label: "Guest ages / details", width: 180 },
-  { key: "paymentMethod", label: "Payment method" },
-  { key: "taxQuarter", label: "Tax quarter" },
   { key: "invoiceRequired", label: "Invoice required", kind: "boolean" },
   { key: "invoiceCreated", label: "Invoice status", kind: "invoiceStatus" },
+  { key: "unit", label: "Unit price (€)", readOnly: true },
+  { key: "netAmountCents", label: "Before tourist tax (€)", kind: "money", width: 175 },
+  { key: "touristTaxCents", label: "Tourist tax (€)", kind: "money" },
+  { key: "month", label: "Month", readOnly: true, width: 95 },
+  { key: "taxQuarter", label: "Tax quarter" },
+  { key: "paymentMethod", label: "Payment method" },
+  { key: "paymentStatus", label: "Payment status", kind: "payment" },
+  { key: "sourceAmount", label: "Original non-EUR value", readOnly: true },
+  { key: "possibleBookings", label: "Possible bookings", width: 260, readOnly: true },
   { key: "status", label: "Inclusion / status", width: 220, readOnly: true },
   { key: "includePossibleOverlap", label: "Include booking overlap", kind: "boolean", overlapOnly: true },
   { key: "excludeFromTotals", label: "Exclude recorded income", kind: "boolean", recordedOnly: true },
 ];
 const incomeGroups = [
-  { id: "stay", label: "Stay" },
-  { id: "booking", label: "Booking" },
-  { id: "guest", label: "Guest details" },
-  { id: "amounts", label: "Amounts" },
-  { id: "invoices", label: "Invoices" },
+  { id: "stayV2", label: "01 Stay" },
+  { id: "registrationV2", label: "02 Registration" },
+  { id: "invoicingV2", label: "03 Invoicing" },
+  { id: "reviewV2", label: "04 Payment & review" },
 ];
 const groupKeys: Record<string, string[]> = {
-  stay: ["roomId", "date", "checkOut", "guestName", "month", "nights", "guestCount"],
-  booking: ["notes", "reference", "possibleBookings", "status", "includePossibleOverlap", "excludeFromTotals"],
-  guest: ["phone", "email", "country", "identifier", "city", "guestDetails"],
-  amounts: ["grossAmountCents", "sourceAmount", "unit", "netAmountCents", "paymentMethod", "taxQuarter"],
-  invoices: ["invoiceNumber", "invoiceRequired", "invoiceCreated"],
+  stayV2: ["roomId", "date", "checkOut", "guestName", "reference", "source", "grossAmountCents", "nights", "guestCount"],
+  registrationV2: ["identifier", "guestDetails", "country", "city", "phone", "email"],
+  invoicingV2: ["invoiceDate", "invoiceNumber", "invoiceRequired", "invoiceCreated", "unit", "netAmountCents", "touristTaxCents", "month", "taxQuarter"],
+  reviewV2: ["notes", "paymentMethod", "paymentStatus", "sourceAmount", "possibleBookings", "status", "includePossibleOverlap", "excludeFromTotals"],
 };
 const incomeViewColumns = incomeColumns.map((column) => ({
   key: column.key, label: column.label,
@@ -115,12 +118,13 @@ const rowLabel = (row: GridRow) => row.values.guestName || row.values.descriptio
 function makeBookingRow(booking: api.PnlBooking): GridRow {
   const values: Values = {
     reference: booking.reference, guestName: booking.guestName, phone: booking.phone, email: booking.email,
-    roomId: booking.roomId, date: booking.checkIn, nights: stringNumber(booking.nights),
+    roomId: booking.roomId, date: booking.checkIn, checkOut: booking.checkOut || "",
     country: booking.country, identifier: booking.identifier, city: booking.city,
     guestCount: stringNumber(booking.guestCount),
     grossAmountCents: booking.currency === "EUR" ? money(booking.amountCents) : "",
     netAmountCents: money(booking.netAmountCents), guestDetails: booking.guestDetails, notes: booking.notes || "",
-    paymentMethod: booking.paymentMethod, taxQuarter: booking.taxQuarter,
+    paymentMethod: booking.paymentMethod, paymentStatus: booking.paymentStatus || "unknown", taxQuarter: booking.taxQuarter,
+    invoiceDate: booking.invoiceDate || "", touristTaxCents: money(booking.touristTaxCents),
     invoiceNumber: booking.invoiceNumber, invoiceRequired: booleanValue(booking.invoiceRequired),
     invoiceCreated: booleanValue(booking.invoiceCreated),
     includePossibleOverlap: booleanValue(booking.overrides?.includePossibleOverlap),
@@ -190,7 +194,19 @@ function buildSave(row: GridRow, values: Values, rooms: Room[]) {
     if (value.length > (key === "notes" ? 1000 : key === "guestDetails" ? 300 : 100)) throw new Error(`${key} is too long.`);
     details[key] = value || undefined;
   }
-  if (changed("guestCount")) details.guestCount = count(values.guestCount, "Guests", 1, 1000);
+  if (changed("guestCount")) details.guestCount = count(values.guestCount, "Pax", 1, 1000);
+  if (changed("invoiceDate")) details.invoiceDate = values.invoiceDate ? checkedDate(values.invoiceDate) : undefined;
+  if (changed("paymentStatus")) {
+    const status = values.paymentStatus;
+    if (status !== "paid" && status !== "pending" && status !== "unknown") throw new Error("Select a valid payment status.");
+    details.paymentStatus = status;
+  }
+  if (changed("touristTaxCents")) {
+    const value = values.touristTaxCents.trim();
+    const amount = value ? signedMoneyToCents(value) : undefined;
+    if (amount === null || (amount !== undefined && amount < 0)) throw new Error("Tourist tax must be zero or a positive amount with at most two decimal places.");
+    details.touristTaxCents = amount;
+  }
   if (changed("grossAmountCents")) {
     const value = values.grossAmountCents.trim();
     const amount = value ? moneyToCents(value) : undefined;
@@ -214,31 +230,32 @@ function buildSave(row: GridRow, values: Values, rooms: Room[]) {
   if (["reference", "guestName", "phone", "email"].some((key) => values[key].trim().length > 200)) {
     throw new Error("A text value exceeds 200 characters.");
   }
+  const date = checkedDate(values.date);
+  const nights = stayNights(date, values.checkOut);
+  if (values.checkOut && (nights === null || nights > 10000)) throw new Error("Check-out must be after check-in (maximum 10,000 nights).");
   const identity: api.PnlRecordedIdentity = {
     reference: values.reference.trim(), guestName: values.guestName.trim(), phone: values.phone.trim(),
     email: values.email.trim(), roomId: values.roomId,
     roomName: values.roomId === booking.roomId ? booking.roomName || "" : rooms.find((room) => room._id === values.roomId)?.name || "",
-    date: checkedDate(values.date), nights: count(values.nights, "Nights", 1, 10000) ?? null,
+    date, nights,
   };
   return { booking, details, identity };
 }
 
 function display(row: GridRow, column: Column, rooms: Room[], bookings: api.PnlBooking[] = []): string {
   if (column.key === "month") return row.values.date ? row.values.date.slice(0, 7) : "";
+  if (column.key === "source") return row.booking?.source === "local" ? "Site" : row.booking?.source === "booking_com" ? "Booking.com" : "Recorded income";
+  if (column.key === "nights" && row.booking) return stringNumber(stayNights(row.values.date, row.values.checkOut));
   if (column.key === "sourceAmount") return row.booking && row.booking.currency !== "EUR" && row.booking.amountCents != null
     ? `${money(row.booking.amountCents)} ${row.booking.currency || "(currency unknown)"}` : "";
   if (column.key === "unit") {
     const net = signedMoneyToCents(row.values.netAmountCents);
-    const nights = Number(row.values.nights);
-    return net !== null && Number.isSafeInteger(nights) && nights > 0
+    const nights = stayNights(row.values.date, row.values.checkOut);
+    return net !== null && nights !== null
       ? money(Math.sign(net) * Math.round(Math.abs(net) / nights)) : "";
   }
   if (column.key === "checkOut") {
-    if (row.booking?.source !== "recorded") return row.booking?.checkOut || "";
-    const nights = Number(row.values.nights);
-    const start = Date.parse(`${row.values.date}T00:00:00Z`);
-    return Number.isFinite(start) && Number.isSafeInteger(nights) && nights > 0
-      ? new Date(start + nights * 86400000).toISOString().slice(0, 10) : "";
+    return row.values.checkOut || "";
   }
   if (column.key === "possibleBookings" && row.booking?.source === "recorded") {
     return possibleBookingMatches({ source: row.booking.source, reference: row.values.reference, roomId: row.values.roomId,
@@ -266,6 +283,10 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   const [widths, setWidths] = useState<Record<string, number>>({});
   const [incomeLayout, setIncomeLayout] = useState<api.PnlGridLayout>(defaultIncomeLayout);
   const [layoutDirty, setLayoutDirty] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [selectedBookings, setSelectedBookings] = useState<Set<string>>(() => new Set());
+  const [checkInBusy, setCheckInBusy] = useState(false);
+  const checkInBusyRef = useRef(false);
   const [filterRevision, setFilterRevision] = useState(0);
   const layoutDirtyRef = useRef(false);
   layoutDirtyRef.current = layoutDirty;
@@ -282,7 +303,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     alive.current = true;
     dialog.current?.focus();
     const beforeUnload = (event: BeforeUnloadEvent) => {
-      if (isUnsaved() || layoutDirtyRef.current) { event.preventDefault(); event.returnValue = ""; }
+      if (isUnsaved() || layoutDirtyRef.current || checkInBusyRef.current) { event.preventDefault(); event.returnValue = ""; }
     };
     window.addEventListener("beforeunload", beforeUnload);
     return () => { alive.current = false; window.removeEventListener("beforeunload", beforeUnload); };
@@ -339,6 +360,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     }
   };
   const close = async () => {
+    if (checkInBusy) return;
     await Promise.all(rows.current.filter((row) => row.saving).map((row) => row.saving));
     if (isUnsaved()) {
       setMessage("You have unsaved changes. Fix errors and save, or discard them before closing.");
@@ -396,6 +418,13 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     // Row edits are deliberately not re-sorted while typing.
   }, [sheet, search, sort, rooms, columns, orderedIncomeColumns, bookings, incomeLayout.columnFilters, filterRevision]);
   const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const selectable = visible.filter((row) => row.booking && row.booking.source !== "recorded");
+  const selected = rows.current.flatMap((row) => row.booking && selectedBookings.has(row.key) ? [row.booking] : []);
+  const selectRow = (key: string, checked: boolean) => setSelectedBookings((previous) => {
+    const next = new Set(previous);
+    if (checked) next.add(key); else next.delete(key);
+    return next;
+  });
   const dirtyCount = rows.current.filter(rowDirty).length;
   const savingCount = rows.current.filter((row) => row.saving).length;
   const errorCount = rows.current.filter((row) => row.error).length;
@@ -406,7 +435,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   };
   const width = (column: Column) => (sheet === "income" ? incomeLayout.widths : widths)[column.key] ?? column.width ?? 145;
   const pinnedOffset = (index: number) => sheet === "income" && index < incomeLayout.frozenColumns
-    ? columns.slice(0, index).reduce((total, column) => total + width(column), 0)
+    ? 48 + columns.slice(0, index).reduce((total, column) => total + width(column), 0)
     : undefined;
   const moveResize = (event: PointerEvent<HTMLDivElement>) => {
     if (drag.current) resize(drag.current.key, drag.current.width + event.clientX - drag.current.x);
@@ -439,7 +468,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   return (
     <div ref={dialog} role="dialog" aria-modal="true" aria-label={`${type === "income" ? "Income" : "Expenses"} full-screen editor`} tabIndex={-1}
       onKeyDown={(event) => {
-        if (event.key !== "Tab") return;
+        if (event.key !== "Tab" || !event.currentTarget.contains(event.target as Node)) return;
         const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>("a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [role='separator'][tabindex='0'], [role='region'][tabindex='0']"));
         const first = controls[0];
         const last = controls[controls.length - 1];
@@ -455,26 +484,35 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
             <span aria-live="polite" className={`flex h-10 w-44 items-center text-sm ${errorCount ? "text-rose-700" : "text-slate-600"}`}>{savingCount ? `Saving ${savingCount}…` : errorCount ? `${errorCount} row(s) need attention` : dirtyCount ? `${dirtyCount} unsaved row(s)` : "All changes saved"}</span>
             <Button size="sm" onClick={() => void saveAll()}>Save all</Button>
             <Button size="sm" variant="outline" onClick={() => void discard()} disabled={!dirtyCount || !!savingCount}>Discard unsaved</Button>
-            <Button size="sm" variant="outline" onClick={() => void close()}>Close editor</Button>
+            <Button size="sm" variant="outline" disabled={checkInBusy} onClick={() => void close()}>Close editor</Button>
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-3">
           {type === "income" && <div role="group" aria-label="Income sheets" className="flex gap-1">
             {([["income", "Booking income"], ["additional", "Additional income"]] as const).map(([key, label]) =>
-              <button key={key} type="button" aria-pressed={sheet === key} onClick={() => { setSheet(key); setPage(0); setSort(null); }} className={`rounded-md px-3 py-1.5 text-sm font-medium ${sheet === key ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-700"}`}>{label}</button>)}
+              <button key={key} type="button" disabled={checkInBusy} aria-pressed={sheet === key} onClick={() => { setSheet(key); setPage(0); setSort(null); }} className={`rounded-md px-3 py-1.5 text-sm font-medium ${sheet === key ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-700"}`}>{label}</button>)}
           </div>}
           <label className="text-sm">Search <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} className="ml-1 rounded border border-slate-300 px-2 py-1" placeholder="Search this sheet" /></label>
+          {sheet === "income" && <button type="button" aria-pressed={showFilters} onClick={() => setShowFilters((value) => !value)} className="rounded border border-slate-300 px-2 py-1 text-sm">{showFilters ? "Hide value filters" : "Show value filters"}</button>}
+          {sheet === "income" && <><PnlCheckInActions bookings={selected} onSent={(key) => selectRow(key, false)} onBusyChange={(busy) => { checkInBusyRef.current = busy; setCheckInBusy(busy); }} />
+            {selected.length > 0 && <button type="button" disabled={checkInBusy} onClick={() => setSelectedBookings(new Set())} className="text-sm text-teal-700 underline">Clear selection</button>}</>}
           <span className="text-sm text-slate-600">{filtered.length} rows</span>
           <div className="ml-auto flex items-center gap-2 text-sm"><button disabled={page === 0} onClick={() => setPage(page - 1)} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button><span>Page {page + 1} of {Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))}</span><button disabled={(page + 1) * PAGE_SIZE >= filtered.length} onClick={() => setPage(page + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Next</button></div>
         </div>
-        {type === "income" && <div hidden={sheet !== "income"}><PnlGridViews layout={incomeLayout} defaultLayout={defaultIncomeLayout} columns={incomeViewColumns} groups={incomeGroups} onChange={setIncomeLayout} onDirtyChange={setLayoutDirty} /></div>}
+        {type === "income" && <div hidden={sheet !== "income"}><PnlGridViews layout={incomeLayout} defaultLayout={defaultIncomeLayout} columns={incomeViewColumns} groups={incomeGroups} onChange={setIncomeLayout} onDirtyChange={setLayoutDirty} />
+          <p className="mt-1 text-xs text-slate-600">Check-in actions are available for site and Booking.com bookings; recorded income is not linked to a booking.</p></div>}
         {message && <p role={errorCount || dirtyCount ? "alert" : "status"} className="mt-2 text-sm text-rose-700">{message}</p>}
       </header>
       <div role="region" aria-label="Editable grid" tabIndex={0} className="min-h-0 flex-1 overflow-auto">
-        <table className="table-fixed border-separate border-spacing-0 text-left text-sm" aria-label={`${sheet === "income" ? "Booking income" : sheet === "expense" ? "Expenses" : "Additional income"} grid`} style={{ width: (sheet === "income" ? 0 : 90) + columns.reduce((total, column) => total + width(column), 0) }}>
-          <colgroup>{sheet !== "income" && <col style={{ width: 90 }} />}{columns.map((column) => <col key={column.key} style={{ width: width(column) }} />)}</colgroup>
+        <table className="table-fixed border-separate border-spacing-0 text-left text-sm" aria-label={`${sheet === "income" ? "Booking income" : sheet === "expense" ? "Expenses" : "Additional income"} grid`} style={{ width: (sheet === "income" ? 48 : 90) + columns.reduce((total, column) => total + width(column), 0) }}>
+          <colgroup><col style={{ width: sheet === "income" ? 48 : 90 }} />{columns.map((column) => <col key={column.key} style={{ width: width(column) }} />)}</colgroup>
           <thead className="sticky top-0 z-20 bg-slate-100">
-            <tr>{sheet !== "income" && <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">Row</th>}
+            <tr>{sheet !== "income" ? <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">Row</th> :
+              <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">
+                <input type="checkbox" aria-label="Select bookings on this page" disabled={!selectable.length || checkInBusy} checked={selectable.length > 0 && selectable.every((row) => selectedBookings.has(row.key))}
+                  ref={(element) => { if (element) element.indeterminate = selectable.some((row) => selectedBookings.has(row.key)) && !selectable.every((row) => selectedBookings.has(row.key)); }}
+                  onChange={(event) => { const checked = event.target.checked; setSelectedBookings((previous) => { const next = new Set(previous); for (const row of selectable) { if (checked) next.add(row.key); else next.delete(row.key); } return next; }); }} />
+              </th>}
               {columns.map((column, index) => {
                 const color = sheet === "income" ? incomeLayout.colorTags.find((tag) => tag.id === incomeLayout.columnColors[column.key])?.color : undefined;
                 const selectedValue = incomeLayout.columnFilters[column.key];
@@ -482,11 +520,12 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
                 return <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} style={{ left: pinnedOffset(index), backgroundColor: color ? tint(color, 0.3) : undefined }} className={`${pinnedOffset(index) !== undefined ? "sticky z-30" : "relative"} border-b border-r border-slate-300 bg-slate-100 p-2 pr-4 align-top`}
                 onDragOver={(event) => { if (sheet === "income" && draggedColumn.current) event.preventDefault(); }}
                 onDrop={(event) => { event.preventDefault(); const from = draggedColumn.current; if (from) setIncomeLayout((previous) => ({ ...previous, columns: moveGridColumn(previous.columns, from, column.key) })); draggedColumn.current = null; }}>
+                {sheet === "income" && <div className="mb-1 text-[10px] font-medium uppercase tracking-wide text-slate-600">{incomeGroups.find((group) => group.id === incomeViewColumns.find((item) => item.key === column.key)?.group)?.label}</div>}
                 {sheet === "income" && <span draggable aria-label={`Drag ${column.label} column`} title={`Drag ${column.label} to reorder`} className="mr-1 cursor-grab select-none text-slate-500"
                   onDragStart={(event) => { draggedColumn.current = column.key; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", column.key); }}
                   onDragEnd={() => { draggedColumn.current = null; }}><GripVertical className="inline h-4 w-4" aria-hidden="true" /></span>}
                 <button type="button" className="text-left font-semibold" onClick={() => { setSort({ key: column.key, desc: sort?.key === column.key && !sort.desc }); setPage(0); }}>{column.label}{sort?.key === column.key ? sort.desc ? " ↓" : " ↑" : ""}</button>
-                {sheet === "income" && <select aria-label={`Filter ${column.label} by value`} value={selectedValue === undefined ? "" : JSON.stringify(selectedValue)} onChange={(event) => {
+                {sheet === "income" && showFilters && <select aria-label={`Filter ${column.label} by value`} value={selectedValue === undefined ? "" : JSON.stringify(selectedValue)} onChange={(event) => {
                   const filters = { ...incomeLayout.columnFilters };
                   if (event.target.value === "") delete filters[column.key];
                   else filters[column.key] = JSON.parse(event.target.value) as string;
@@ -505,6 +544,9 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
             {sheet !== "income" && <th scope="row" className={`sticky left-0 z-10 border-b border-r border-slate-300 p-2 text-xs ${row.error ? "bg-rose-100 text-rose-800" : rowDirty(row) ? "bg-amber-50" : "bg-slate-50"}`}>
               {page * PAGE_SIZE + index + 1}<span className="block font-normal">{row.saving ? "Saving" : row.error ? "Error" : rowDirty(row) ? "Unsaved" : "Saved"}</span>{row.error && <span role="alert" className="block break-words">{row.error}</span>}
             </th>}
+            {sheet === "income" && <td className="sticky left-0 z-10 border-b border-r border-slate-200 bg-white p-2 align-top">
+              <input type="checkbox" aria-label={`Select ${rowLabel(row)} (${row.values.reference})`} disabled={!row.booking || row.booking.source === "recorded" || checkInBusy} checked={selectedBookings.has(row.key)} onChange={(event) => selectRow(row.key, event.target.checked)} />
+            </td>}
             {columns.map((column, columnIndex) => {
               const readOnly = column.readOnly || (column.recordedOnly && row.booking?.source !== "recorded") || (column.overlapOnly && !row.booking?.possibleRecordedOverlap);
               const value = readOnly ? display(row, column, rooms) : row.values[column.key] || "";

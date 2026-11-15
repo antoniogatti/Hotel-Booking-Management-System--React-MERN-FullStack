@@ -28,7 +28,7 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 const isBookingRequestSubmission = (config?: InternalAxiosRequestConfig) => {
   const method = String(config?.method || "").toLowerCase();
   const url = String(config?.url || "");
-  return method === "post" && url.includes("/booking-request");
+  return method === "post" && (url.includes("/booking-request") || url.includes("/api/pnl/check-in-invitations"));
 };
 
 const clearStoredProfile = () => {

@@ -35,13 +35,28 @@ you leave a cell; Save all retries unsaved rows. Errors keep the edited values
 visible until corrected or discarded. Tab moves across editable cells, Enter
 moves down, and Shift+Enter adds a line in text cells. Use search, sorting,
 pagination and column resizing to navigate large ledgers. In the booking
-income sheet, Room, Check-in, Check-out and Guest are frozen by default.
-Drag column handles to reorder them, and use Configure columns and groups
-to show or hide groups and choose how many visible columns to freeze.
+income sheet, Notes, Room, Check-in, Check-out and Guest are frozen by default.
+The numbered Stay, Registration, Invoicing and Payment & review groups organize
+the columns. Nights are calculated from check-in and check-out; for recorded
+income, edit those dates to change the calculation. Pax is the guest count.
+Invoice date, tourist tax and payment status are optional manual details;
+entering tourist tax does not automatically change amounts or totals.
+Use the numbered group buttons to toggle groups independently, or All groups
+to show them all; individual hidden columns and active filters still apply. Drag column handles
+to reorder them, and use Configure columns and groups to show or hide groups
+and choose how many visible columns to freeze. The field list can be filtered
+to visible groups or a specific group, including one hidden from the grid.
 Name and save multiple views for your account; each view stores column order,
-group visibility, frozen-column count and widths. Create named colors, assign
-them to columns, and use the color filter to focus on those columns. Each
-column's value filter lists values present in the income data. Color settings
+group visibility, frozen-column count and widths. Use Save as default to make
+the current layout your personal default when reopening the editor. Resize
+columns using their header handles before saving a named or default view; those
+widths are restored when the view is loaded. Use the picker beside a group
+to choose its color directly, or create named colors and assign them to a group
+or individual columns. Rename colors in the Column colors section, and use the color filter to focus on
+those columns. Applying a group color replaces individual colors in that group;
+the resulting column colors are saved with the view. Each
+column's value filter lists values present in the income data; use Show value
+filters to reveal them. Color settings
 and active color and value filters are saved with the view; value filters
 still apply when their columns are hidden. Booking-sourced
 identity fields and calculated values are read-only; inclusion warnings
@@ -49,6 +64,18 @@ refresh when the editor is reopened. Recorded income shows possible site and
 Booking.com matches based on reference or room and check-in; compare check-out
 and guest details before deciding how to reconcile. These are suggestions only:
 they do not link records or alter totals.
+
+Select site or Booking.com rows and open Check-in actions to access each
+staff check-in procedure or email guests individually. Desk emails invite
+guests to check in with staff. Self check-in emails require the actual access
+code for each booking, with an optional locker and breakfast setting; the
+link contains the code and must be kept private. Only confirmed site bookings
+and active Booking.com bookings with valid guest emails can receive invitations.
+Recorded income cannot be selected because it is not linked to a booking.
+Email acceptance is shown per guest; if delivery is unconfirmed, check sent
+mail before retrying. Row selections and entered access codes are not saved in views.
+Codes are included in guest emails and the sender's Sent mail; self check-in
+submissions remain separate and do not automatically mark a booking checked in.
 
 ### **Architecture Highlights**
 
@@ -286,20 +313,13 @@ Landing page hero section with gradient background and search integration.
 
 ### **AnalyticsDashboard Component**
 
-Comprehensive analytics dashboard with charts and metrics.
-
-```typescript
-// Usage Example
-<AnalyticsDashboard />
-```
+P&L business insights for the selected year, derived from the same included income and expense records as the overview.
 
 **Features:**
 
-- Revenue charts and trends visualization
-- Booking analytics and performance metrics
-- Forecasting data and business insights
-- Interactive charts using Recharts library
-- Real-time data updates
+- Monthly income and expense chart with accessible figures
+- Income by source, net margin and average included booking income
+- Excludes P&L rows flagged for review, just like the overview totals
 
 ### **BookingLogModal Component**
 

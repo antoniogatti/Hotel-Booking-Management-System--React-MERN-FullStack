@@ -19,14 +19,25 @@ const PnlOverview = () => {
   const includedBookings = (bookings.data || []).filter((booking) => !booking.reason && booking.amountCents !== null);
   const excludedCount = (bookings.data || []).filter((booking) => booking.reason).length;
 
-  const totals = (entries.data || []).reduce(
-    (result, entry) => {
-      result[entry.type] += entry.amountCents;
-      return result;
-    },
-    { income: 0, expense: 0 }
-  );
-  totals.income += includedBookings.reduce((sum, booking) => sum + (booking.amountCents ?? 0), 0);
+  const monthlyTotals = months.map((month) => ({ month, income: 0, expense: 0 }));
+  for (const entry of entries.data || []) {
+    monthlyTotals[Number(entry.date.slice(5, 7)) - 1][entry.type] += entry.amountCents;
+  }
+  for (const booking of includedBookings) {
+    monthlyTotals[Number(booking.checkIn.slice(5, 7)) - 1].income += booking.amountCents ?? 0;
+  }
+  const totals = monthlyTotals.reduce((result, month) => ({
+    income: result.income + month.income, expense: result.expense + month.expense,
+  }), { income: 0, expense: 0 });
+  const bookingIncome = includedBookings.reduce((sum, booking) => sum + (booking.amountCents ?? 0), 0);
+  const sources: { label: string; count: number; amount: number }[] = ([
+    ["local", "Site bookings"], ["booking_com", "Booking.com"], ["recorded", "Recorded income"],
+  ] as const).map(([source, label]) => {
+    const items = includedBookings.filter((booking) => booking.source === source);
+    return { label, count: items.length, amount: items.reduce((sum, item) => sum + (item.amountCents ?? 0), 0) };
+  });
+  const additionalIncome = (entries.data || []).filter((entry) => entry.type === "income");
+  sources.push({ label: "Additional income", count: additionalIncome.length, amount: additionalIncome.reduce((sum, entry) => sum + entry.amountCents, 0) });
   const roomNames = new Map((rooms.data || []).map((room) => [room._id, room.name]));
   const keys = new Set((entries.data || []).map((entry) => entry.roomId || ""));
   includedBookings.forEach((booking) => keys.add(booking.roomId));
@@ -77,6 +88,7 @@ const PnlOverview = () => {
               </div>
             ))}
           </section>
+          <AnalyticsDashboard year={year} months={monthlyTotals} sources={sources} income={totals.income} expense={totals.expense} bookingIncome={bookingIncome} bookingCount={includedBookings.length} />
           <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div><h2 className="text-xl font-semibold text-slate-900">Room and month</h2><p className="mt-1 text-sm text-slate-500">Net = income minus expenses. Select a ledger to add or edit entries.</p></div>
@@ -87,7 +99,6 @@ const PnlOverview = () => {
           </section>
         </>
       }
-      <AnalyticsDashboard />
     </div>
   );
 };
