@@ -34,7 +34,9 @@ Open the full-screen editor from the Income or Expenses page. Edits save when
 you leave a cell; Save all retries unsaved rows. Errors keep the edited values
 visible until corrected or discarded. Tab moves across editable cells, Enter
 moves down, and Shift+Enter adds a line in text cells. Use search, sorting,
-pagination and column resizing to navigate large ledgers. Booking-sourced
+pagination and column resizing to navigate large ledgers. In the booking
+income sheet, Room, Check-in and Check-out stay visible while scrolling
+horizontally. Booking-sourced
 identity fields and calculated values are read-only; inclusion warnings
 refresh when the editor is reopened. Recorded income shows possible site and
 Booking.com matches based on reference or room and check-in; compare check-out

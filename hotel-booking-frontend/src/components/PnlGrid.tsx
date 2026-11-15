@@ -343,6 +343,9 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   const errorCount = rows.current.filter((row) => row.error).length;
   const resize = (key: string, width: number) => setWidths((previous) => ({ ...previous, [key]: Math.max(90, Math.min(600, Math.round(width))) }));
   const width = (column: Column) => widths[column.key] ?? column.width ?? 145;
+  const pinnedOffset = (index: number) => sheet === "income" && index < 3
+    ? columns.slice(0, index).reduce((total, column) => total + width(column), 0)
+    : undefined;
   const moveResize = (event: PointerEvent<HTMLDivElement>) => {
     if (drag.current) resize(drag.current.key, drag.current.width + event.clientX - drag.current.x);
   };
@@ -405,27 +408,27 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
         {message && <p role={errorCount || dirtyCount ? "alert" : "status"} className="mt-2 text-sm text-rose-700">{message}</p>}
       </header>
       <div role="region" aria-label="Editable grid" tabIndex={0} className="min-h-0 flex-1 overflow-auto">
-        <table className="table-fixed border-separate border-spacing-0 text-left text-sm" aria-label={`${sheet === "income" ? "Booking income" : sheet === "expense" ? "Expenses" : "Additional income"} grid`} style={{ width: 90 + columns.reduce((total, column) => total + width(column), 0) }}>
-          <colgroup><col style={{ width: 90 }} />{columns.map((column) => <col key={column.key} style={{ width: width(column) }} />)}</colgroup>
+        <table className="table-fixed border-separate border-spacing-0 text-left text-sm" aria-label={`${sheet === "income" ? "Booking income" : sheet === "expense" ? "Expenses" : "Additional income"} grid`} style={{ width: (sheet === "income" ? 0 : 90) + columns.reduce((total, column) => total + width(column), 0) }}>
+          <colgroup>{sheet !== "income" && <col style={{ width: 90 }} />}{columns.map((column) => <col key={column.key} style={{ width: width(column) }} />)}</colgroup>
           <thead className="sticky top-0 z-20 bg-slate-100">
-            <tr><th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">Row</th>
-              {columns.map((column) => <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} className="relative border-b border-r border-slate-300 bg-slate-100 p-2 pr-4 align-top">
+            <tr>{sheet !== "income" && <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">Row</th>}
+              {columns.map((column, index) => <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} style={{ left: pinnedOffset(index) }} className={`${pinnedOffset(index) !== undefined ? "sticky z-30" : "relative"} border-b border-r border-slate-300 bg-slate-100 p-2 pr-4 align-top`}>
                 <button type="button" className="text-left font-semibold" onClick={() => { setSort({ key: column.key, desc: sort?.key === column.key && !sort.desc }); setPage(0); }}>{column.label}{sort?.key === column.key ? sort.desc ? " ↓" : " ↑" : ""}</button>
                 <div role="separator" aria-label={`Resize ${column.label} column`} aria-orientation="vertical" aria-valuemin={90} aria-valuemax={600} aria-valuenow={width(column)} tabIndex={0} style={{ touchAction: "none" }} className="absolute inset-y-0 right-0 w-3 cursor-col-resize border-r border-slate-300 focus-visible:outline focus-visible:outline-teal-600"
                   onKeyDown={(event) => keyboardResize(event, column)} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { key: column.key, x: event.clientX, width: width(column) }; }} onPointerMove={moveResize} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} />
               </th>)}</tr>
           </thead>
           <tbody>{visible.map((row, index) => <tr key={row.key} className="bg-white">
-            <th scope="row" className={`sticky left-0 z-10 border-b border-r border-slate-300 p-2 text-xs ${row.error ? "bg-rose-100 text-rose-800" : rowDirty(row) ? "bg-amber-50" : "bg-slate-50"}`}>
+            {sheet !== "income" && <th scope="row" className={`sticky left-0 z-10 border-b border-r border-slate-300 p-2 text-xs ${row.error ? "bg-rose-100 text-rose-800" : rowDirty(row) ? "bg-amber-50" : "bg-slate-50"}`}>
               {page * PAGE_SIZE + index + 1}<span className="block font-normal">{row.saving ? "Saving" : row.error ? "Error" : rowDirty(row) ? "Unsaved" : "Saved"}</span>{row.error && <span role="alert" className="block break-words">{row.error}</span>}
-            </th>
-            {columns.map((column) => {
+            </th>}
+            {columns.map((column, columnIndex) => {
               const readOnly = column.readOnly || (column.recordedOnly && row.booking?.source !== "recorded") || (column.overlapOnly && !row.booking?.possibleRecordedOverlap);
               const value = readOnly ? display(row, column, rooms) : row.values[column.key] || "";
               const label = `${column.label} for ${rowLabel(row)}`;
               const cellClass = `h-full min-h-10 w-full border-0 bg-transparent px-2 py-2 text-left outline-none focus:bg-teal-50 focus:ring-2 focus:ring-inset focus:ring-teal-600 ${row.values[column.key] !== row.saved[column.key] ? "bg-amber-50" : ""}`;
               const common = { "aria-label": label, value, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => change(row, column.key, event.target.value), onBlur: () => { if (row.saving || row.values[column.key] !== row.saved[column.key]) void saveRow(row); } };
-              return <td key={column.key} className={`border-b border-r border-slate-200 align-top ${readOnly ? "bg-slate-50 px-2 py-2 text-slate-600 [overflow-wrap:anywhere]" : ""}`}>
+              return <td key={column.key} style={{ left: pinnedOffset(columnIndex) }} className={`${pinnedOffset(columnIndex) !== undefined ? "sticky z-10" : ""} border-b border-r border-slate-200 align-top ${readOnly ? "bg-slate-50 px-2 py-2 text-slate-600 [overflow-wrap:anywhere]" : "bg-white"}`}>
                 {column.key === "possibleBookings" && row.booking ? row.booking.source === "recorded" ? <PnlBookingMatches matches={possibleBookingMatches({ source: row.booking.source, reference: row.values.reference, roomId: row.values.roomId, checkIn: row.values.date, checkOut: display(row, { key: "checkOut", label: "Check-out" }, rooms) }, bookings)} /> : "—"
                   : readOnly ? value || "—" : column.kind === "room" ? <select {...common} className={cellClass}><option value="">Unassigned</option>{value && !rooms.some((room) => room._id === value) && <option value={value}>Removed room</option>}{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select>
                   : column.kind === "payment" ? <select {...common} className={cellClass}><option value="unknown">Not specified</option><option value="paid">Paid</option><option value="pending">Pending</option></select>
@@ -433,6 +436,9 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
                   : ["description", "guestName", "notes", "guestDetails", "email", "payee"].includes(column.key)
                     ? <textarea {...common} rows={2} className={`${cellClass} resize-none [overflow-wrap:anywhere]`} onKeyDown={enterCell} />
                     : <input {...common} type={column.kind === "date" ? "date" : "text"} inputMode={column.kind === "money" ? "decimal" : column.kind === "number" ? "numeric" : undefined} className={cellClass} onKeyDown={enterCell} />}
+                {sheet === "income" && columnIndex === 0 && (row.saving || row.error || rowDirty(row)) && <span className={`block px-2 pb-1 text-xs ${row.error ? "text-rose-800" : "text-slate-600"}`}>
+                  {row.saving ? "Saving" : row.error ? "Error" : "Unsaved"}{row.error && <span role="alert" className="block break-words">{row.error}</span>}
+                </span>}
               </td>;
             })}
           </tr>)}</tbody>

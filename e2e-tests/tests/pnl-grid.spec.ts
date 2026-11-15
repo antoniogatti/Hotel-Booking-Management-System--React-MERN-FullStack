@@ -247,8 +247,36 @@ test("income starts with stay keys and proposes site and booking.com matches wit
   await expect(referenceRow).not.toContainText("B-123");
   await page.getByRole("button", { name: "Open full-screen editor" }).click();
   const editor = page.getByRole("dialog");
-  expect((await editor.getByRole("columnheader").allTextContents()).slice(0, 5)).toEqual(["Row", "Room", "Check-in", "Check-out", "Guest"]);
+  expect((await editor.getByRole("columnheader").allTextContents()).slice(0, 4)).toEqual(["Room", "Check-in", "Check-out", "Guest"]);
   const gridRow = editor.getByLabel("Guest for Recorded guest").locator("xpath=ancestor::tr");
+  const region = editor.getByRole("region", { name: "Editable grid" });
+  const grid = editor.getByRole("table", { name: "Booking income grid" });
+  const checkPinnedColumns = async (offsets: number[]) => {
+    const positions = await grid.evaluate((table) => {
+      const region = table.parentElement!;
+      return {
+        left: region.getBoundingClientRect().left,
+        headers: Array.from(table.querySelectorAll("thead th")).slice(0, 3).map((cell) => cell.getBoundingClientRect().left),
+        cells: Array.from(table.querySelectorAll("tbody tr:first-child td")).slice(0, 3).map((cell) => cell.getBoundingClientRect().left),
+        scrollLeft: region.scrollLeft,
+      };
+    });
+    expect(positions.scrollLeft).toBeGreaterThan(500);
+    for (let index = 0; index < offsets.length; index++) {
+      expect(positions.headers[index] - positions.left).toBeCloseTo(offsets[index], 0);
+      expect(positions.cells[index] - positions.left).toBeCloseTo(offsets[index], 0);
+    }
+  };
+  await region.evaluate((element) => { element.scrollLeft = 1000; });
+  await checkPinnedColumns([0, 180, 325]);
+  await editor.getByRole("separator", { name: "Resize Room column" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await region.evaluate((element) => { element.scrollLeft = 1000; });
+  await checkPinnedColumns([0, 196, 341]);
+  await editor.getByRole("separator", { name: "Resize Check-in column" }).focus();
+  await page.keyboard.press("ArrowRight");
+  await region.evaluate((element) => { element.scrollLeft = 1000; });
+  await checkPinnedColumns([0, 196, 357]);
   await expect(gridRow).toContainText("Check-out matches");
   await expect(gridRow).toContainText("Check-out differs");
   await editor.getByLabel("Nights for Recorded guest").fill("4");
