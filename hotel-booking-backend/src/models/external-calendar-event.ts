@@ -1,4 +1,5 @@
 import mongoose, { Document } from "mongoose";
+import pnlBookingDetailsSchema, { PnlBookingDetails } from "./pnl-booking-details";
 
 export type ExternalCalendarEventSource = "booking_com";
 export type ExternalCalendarEventStatus = "active" | "inactive";
@@ -22,6 +23,7 @@ export interface IExternalCalendarEvent extends Document {
   city?: string;
   country?: string;
   nationality?: string;
+  pnlIncome?: PnlBookingDetails;
   specialRequests?: string;
   dtStamp?: Date;
   checkInInfo?: {
@@ -112,6 +114,7 @@ const externalCalendarEventSchema = new mongoose.Schema(
     city: { type: String, default: "" },
     country: { type: String, default: "" },
     nationality: { type: String, default: "" },
+    pnlIncome: { type: pnlBookingDetailsSchema, default: undefined, select: false },
     specialRequests: { type: String, default: "" },
     dtStamp: { type: Date },
     checkInInfo: {

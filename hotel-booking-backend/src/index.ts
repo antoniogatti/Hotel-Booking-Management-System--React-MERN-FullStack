@@ -16,13 +16,13 @@ import businessInsightsRoutes from "./routes/business-insights";
 import contactRoutes from "./routes/contact";
 import selfCheckinRoutes from "./routes/self-checkin";
 import bookingComSyncRoutes from "./routes/booking-com-sync";
-import oneNoteRoutes from "./routes/onenote";
 import schedulerMonitorRoutes from "./routes/scheduler-monitor";
 import mcpRoutes from "./routes/mcp";
 import whatsappWebhookRoutes from "./routes/whatsapp-webhook";
 import waInboxRoutes from "./routes/wa-inbox";
 import telemetryRoutes from "./routes/telemetry";
 import trafficInsightsRoutes from "./routes/traffic-insights";
+import pnlRoutes from "./routes/pnl";
 import swaggerUi from "swagger-ui-express";
 import { specs } from "./swagger";
 import helmet from "helmet";
@@ -31,7 +31,6 @@ import compression from "compression";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { startBookingComSyncScheduler } from "./lib/booking-com-ical";
 import { startBookingComApiScheduler } from "./lib/booking-com-api";
-import { startBookingEnrichmentScheduler } from "./lib/booking-enrichment-scheduler";
 import { logError, logInfo, logWarn } from "./lib/logger";
 import { initializeTelemetry } from "./lib/telemetry";
 
@@ -133,7 +132,6 @@ const connectDB = async () => {
     });
     startBookingComSyncScheduler();
     startBookingComApiScheduler();
-    startBookingEnrichmentScheduler();
   } catch (error) {
     logError("MongoDB connection failed", error);
     process.exit(1);
@@ -342,9 +340,9 @@ app.use("/api/health", healthRoutes);
 app.use("/api/business-insights", businessInsightsRoutes);
 app.use("/api/contact", contactRoutes);
 app.use("/api/self-checkin", selfCheckinRoutes);
-app.use("/api/onenote", oneNoteRoutes);
 app.use("/api/telemetry", telemetryRoutes);
 app.use("/api/traffic-insights", trafficInsightsRoutes);
+app.use("/api/pnl", pnlRoutes);
 
 // Swagger API Documentation
 const swaggerEnabled = !isProduction || process.env.ENABLE_SWAGGER === "true";

@@ -24,7 +24,7 @@ router.get("/", verifyToken, async (req: Request, res: Response) => {
         // Create response object with hotel and booking data
         const hotelWithUserBookings = {
           ...hotel.toObject(),
-          bookings: [booking.toObject()],
+          bookings: [booking.toJSON()],
         };
 
         return hotelWithUserBookings;

@@ -62,7 +62,7 @@ const statusBadgeClassName = (status: apiClient.SchedulerRunRow["status"]) => {
 const SchedulerMonitor = () => {
   const [selectedDate, setSelectedDate] = useState<string>(toDateInputValue());
 
-  const { data, isLoading } = useQuery(
+  const { data, isLoading, isError } = useQuery(
     ["bookingEnrichmentSchedulerRuns", selectedDate],
     () => apiClient.fetchBookingEnrichmentSchedulerRuns(selectedDate),
     {
@@ -74,15 +74,15 @@ const SchedulerMonitor = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Scheduler Monitor</h1>
-          <p className="text-gray-600">
-            Monitor Booking Enrichment scheduler runs by day with concise success and failure details.
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Scheduler Monitor</h1>
+          <p className="mt-2 text-sm text-slate-600">
+            Review historical booking enrichment runs. This scheduler is inactive and no new runs will occur.
           </p>
         </div>
-        <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2">
-          <CalendarDays className="h-4 w-4 text-gray-500" />
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+          <CalendarDays className="h-4 w-4 text-slate-500" />
           <input
             type="date"
             className="text-sm text-gray-900"
@@ -93,10 +93,10 @@ const SchedulerMonitor = () => {
         </div>
       </div>
 
-      <Card>
+      <Card className="border-slate-200 shadow-none">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <ShieldCheck className="h-5 w-5 text-primary-600" />
+          <CardTitle className="flex items-center gap-2 text-xl text-slate-900">
+            <ShieldCheck className="h-5 w-5 text-slate-700" />
             Booking Enrichment Scheduler
           </CardTitle>
           <CardDescription>
@@ -104,23 +104,23 @@ const SchedulerMonitor = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-gray-600">Total runs</p>
             <p className="text-xl font-semibold text-gray-900">{runs.length}</p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-gray-600">Success</p>
             <p className="text-xl font-semibold text-emerald-700">
               {runs.filter((run) => run.status === "success").length}
             </p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-gray-600">Failed</p>
             <p className="text-xl font-semibold text-rose-700">
               {runs.filter((run) => run.status === "failed").length}
             </p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-gray-600">Skipped</p>
             <p className="text-xl font-semibold text-amber-700">
               {runs.filter((run) => run.status === "skipped").length}
@@ -129,7 +129,7 @@ const SchedulerMonitor = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className="border-slate-200 shadow-none">
         <CardHeader>
           <CardTitle className="text-xl">Run history</CardTitle>
           <CardDescription>
@@ -139,12 +139,14 @@ const SchedulerMonitor = () => {
         <CardContent>
           {isLoading ? (
             <p className="text-sm text-gray-600">Loading scheduler runs...</p>
+          ) : isError ? (
+            <p className="text-sm text-rose-700">Unable to load scheduler history.</p>
           ) : runs.length === 0 ? (
             <p className="text-sm text-gray-600">No scheduler logs available for this day.</p>
           ) : (
             <div className="space-y-3">
               {runs.map((run) => (
-                <div key={run._id} className="rounded-lg border border-gray-200 bg-white p-4">
+                <div key={run._id} className="rounded-xl border border-slate-200 bg-white p-4">
                   <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                       <div className="flex flex-wrap items-center gap-2">
@@ -159,45 +161,10 @@ const SchedulerMonitor = () => {
                         </span>
                         <span>Duration: {formatDuration(run.durationMs)}</span>
                         <span>Processed: {run.processed}</span>
-                        <span>OneNote: {run.syncedOneNote}</span>
-                        <span>Excel: {run.syncedExcel}</span>
                         <span>Names: {run.enrichedNames}</span>
                         <span>Errors: {run.errors}</span>
                       </div>
 
-                      {run.status === "failed" && (
-                        <p className="mt-2 text-sm text-rose-700">
-                          Error {run.errorCode || "UnknownError"}: {run.errorMessage || run.reason || "Unknown failure"}
-                        </p>
-                      )}
-
-                      {run.errors > 0 && (run.errorDetails || []).length > 0 && (
-                        <details className="mt-3 rounded-md border border-rose-200 bg-rose-50/50 p-3">
-                          <summary className="cursor-pointer text-sm font-medium text-rose-800">
-                            Relevant errors ({run.errorDetails?.length || 0})
-                          </summary>
-                          <div className="mt-2 space-y-2 text-sm text-rose-900">
-                            {(run.errorDetails || []).map((detail, index) => (
-                              <div key={`${run._id}-error-${index}`} className="rounded border border-rose-200 bg-white p-2">
-                                <p>
-                                  <span className="font-semibold">{detail.code}</span>: {detail.message}
-                                </p>
-                                {(detail.externalEventId || detail.hotelId) && (
-                                  <p className="mt-1 text-xs text-rose-700">
-                                    {detail.externalEventId ? `event ${detail.externalEventId}` : ""}
-                                    {detail.externalEventId && detail.hotelId ? " | " : ""}
-                                    {detail.hotelId ? `hotel ${detail.hotelId}` : ""}
-                                  </p>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </details>
-                      )}
-
-                      {run.status === "skipped" && run.reason && (
-                        <p className="mt-2 text-sm text-amber-700">Skipped: {run.reason}</p>
-                      )}
                     </div>
                   </div>
                 </div>

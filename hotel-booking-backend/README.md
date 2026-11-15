@@ -42,6 +42,52 @@ This backend serves as the **core API engine** for a comprehensive hotel booking
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
+### Traffic Insights
+
+Set `APPLICATIONINSIGHTS_APP_ID` to the Application Insights application ID (or
+include `ApplicationId` in `APPLICATIONINSIGHTS_CONNECTION_STRING`). For query
+authentication, either set `APPLICATIONINSIGHTS_API_KEY` with read access or
+leave it unset to use Azure Default Credential. Locally, sign in with `az login`;
+in Azure, enable a managed identity and grant it permission to read telemetry
+from the Application Insights resource and its backing Log Analytics workspace.
+The Monitoring Reader role provides the required read access when assigned at
+the appropriate resource scope. Configure these settings and role assignments
+on the deployed backend separately.
+
+### P&L management
+
+The admin-only P&L pages combine independently recorded income, booking values,
+and manually entered income and expenses. Booking references, guest details and stay dates are read
+from the existing local booking and active Booking.com event records. The entire booking value is attributed to the
+check-in month. These figures are estimates, not evidence that a guest has paid.
+Only confirmed, arrived or completed local bookings and active imported bookings
+with positive EUR values are included. Unconfirmed bookings, unavailable values,
+unconfirmed currencies and potentially duplicated room/date stays are shown for
+review and excluded from totals. Potential overlaps with recorded income are
+flagged and excluded until an administrator explicitly includes them. Records
+with the same room and date are flagged for review rather than silently merged.
+
+The income page shows country, city, guest identifier, stay length, guest count,
+guest ages/details, gross value, amount before tourist tax and price per night.
+Dates and counts come from bookings where available. Admins can add reporting-only
+overrides and track whether an invoice is required, pending or created, including
+its number. A created invoice requires a number. Overrides do not change the
+underlying booking; a gross EUR override is included in P&L totals. Missing tax
+information is not estimated. Unit price is the amount before tourist tax divided
+by the number of nights, rounded to cents.
+
+Manual amounts are stored as integer euro cents. Paid, pending, and unspecified
+payment statuses are included, and shared/unassigned entries are not allocated to individual
+rooms. Enter only non-booking income manually to avoid double counting.
+
+The local `scripts\prepare-pnl-import.ps1` utility validates a source workbook and
+performs a read-only dry run by default. From the backend directory, supply
+`-Workbook`, `-EnvironmentFile` and the expected `-Database`. Review its counts,
+room mappings and possible overlaps before approving a write. To apply the same
+unchanged snapshot, repeat the command with `-ApplySnapshot` set to the dry-run
+hash. The importer refuses conflicting recorded income or expenses in the
+affected years and does not overwrite previously imported or edited records.
+
 ---
 
 ## 🚀 Quick Start

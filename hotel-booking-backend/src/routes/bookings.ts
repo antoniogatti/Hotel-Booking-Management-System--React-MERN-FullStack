@@ -19,15 +19,10 @@ import {
   sendBookingDecisionEmails,
   sendCheckInNotificationEmail,
 } from "../lib/contact-mail";
-import { getValidMicrosoftGraphAccessToken } from "../lib/microsoft-graph-auth";
-import { syncBookingFromExcel } from "../lib/excel-booking-sync";
-import { syncBookingFromOneNote } from "../lib/onenote-booking-sync";
-import { applyOneNoteSyncToRecord } from "../lib/onenote-booking-apply";
 import { body, param, query, validationResult } from "express-validator";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
-
-
+import { checkInInfoForResponse } from "../lib/booking-check-in-response";
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -213,9 +208,7 @@ const toImportedEventResponse = (event: any, hotel?: any) => ({
   checkOut: event.endDate,
   totalCost: Number(event.totalCost || 0),
   specialRequests: event.specialRequests || "",
-  checkInInfo: event.checkInInfo,
-  excelSync: event.excelSync,
-  oneNoteSync: event.oneNoteSync,
+  checkInInfo: checkInInfoForResponse(event.toObject()),
   status: "imported",
   source: BOOKING_COM_SOURCE,
   sourceLabel: "Booking.com",
@@ -225,110 +218,6 @@ const toImportedEventResponse = (event: any, hotel?: any) => ({
   createdAt: event.createdAt,
   updatedAt: event.updatedAt,
 });
-
-const applyExcelSyncToRecord = (params: {
-  record: any;
-  matchedRow: {
-    rowNumber: number;
-    guestName: string;
-    room: string;
-    date: string;
-    country: string;
-    city: string;
-    pax?: number;
-    totalPrice?: number;
-    unitPrice?: number;
-    netPrice?: number;
-    paymentVia: string;
-    invoiceNumber: string;
-    identifier: string;
-    raw: Record<string, string | number | null>;
-  };
-  syncWorkbook: {
-    itemId?: string;
-    sheetName?: string;
-  };
-  guestName: {
-    firstName: string;
-    lastName: string;
-  };
-  existingCheckInInfo?: any;
-  fallback: {
-    phone?: string;
-    email?: string;
-    nationality?: string;
-    arrivalTime?: string;
-  };
-}) => {
-  const { record, matchedRow, syncWorkbook, guestName, existingCheckInInfo, fallback } = params;
-  const previousTotalCost = Number(record.totalCost || 0);
-
-  if (guestName.firstName) {
-    record.firstName = guestName.firstName;
-  }
-  if (guestName.lastName) {
-    record.lastName = guestName.lastName;
-  }
-  if (matchedRow.city) {
-    record.city = matchedRow.city;
-  }
-  if (matchedRow.country) {
-    record.country = matchedRow.country;
-    record.nationality = matchedRow.country;
-  }
-  if (typeof matchedRow.pax === "number" && matchedRow.pax > 0) {
-    record.adultCount = matchedRow.pax;
-    record.childCount = 0;
-  }
-  if (typeof matchedRow.totalPrice === "number" && matchedRow.totalPrice > 0) {
-    record.totalCost = matchedRow.totalPrice;
-  }
-
-  record.checkInInfo = {
-    arrivalTime: existingCheckInInfo?.arrivalTime || fallback.arrivalTime || "",
-    phone: existingCheckInInfo?.phone || fallback.phone || "",
-    email: existingCheckInInfo?.email || fallback.email || "",
-    nationality: existingCheckInInfo?.nationality || fallback.nationality || matchedRow.country || "",
-    bookingChannel: existingCheckInInfo?.bookingChannel || "",
-    paymentDetails: matchedRow.paymentVia || existingCheckInInfo?.paymentDetails || "",
-    specialNotes: existingCheckInInfo?.specialNotes || "",
-    breakfast: existingCheckInInfo?.breakfast,
-    documents: existingCheckInInfo?.documents || [],
-    cityTax: existingCheckInInfo?.cityTax || 0,
-    checkedInAt: existingCheckInInfo?.checkedInAt,
-  };
-
-  record.excelSync = {
-    lastSyncedAt: new Date(),
-    sheetName: syncWorkbook.sheetName,
-    workbookItemId: syncWorkbook.itemId,
-    matchedRowNumber: matchedRow.rowNumber,
-    matchedRoom: matchedRow.room,
-    matchedDate: new Date(`${matchedRow.date}T00:00:00.000Z`),
-    guestName: matchedRow.guestName,
-    invoiceNumber: matchedRow.invoiceNumber,
-    identifier: matchedRow.identifier,
-    paymentVia: matchedRow.paymentVia,
-    pax: matchedRow.pax,
-    totalPrice: matchedRow.totalPrice,
-    unitPrice: matchedRow.unitPrice,
-    netPrice: matchedRow.netPrice,
-    city: matchedRow.city,
-    country: matchedRow.country,
-    raw: matchedRow.raw,
-  };
-
-  const priceChanged =
-    typeof matchedRow.totalPrice === "number" &&
-    matchedRow.totalPrice > 0 &&
-    previousTotalCost > 0 &&
-    Number(previousTotalCost.toFixed(2)) !== Number(matchedRow.totalPrice.toFixed(2));
-
-  return {
-    priceChanged,
-    previousTotalCost,
-  };
-};
 
 // List rooms available for bookings management (admin: all, owner: own rooms)
 router.get(
@@ -875,7 +764,7 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
       return res.status(403).json({ message: "Access denied" });
     }
 
-    const bookingObject = booking.toObject();
+    const bookingObject = booking.toJSON();
     res.status(200).json({
       ...bookingObject,
       hotelName: hotel.name,
@@ -888,289 +777,6 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
     res.status(500).json({ message: "Unable to fetch booking" });
   }
 });
-
-router.post(
-  "/:id/sync-excel",
-  verifyToken,
-  requireRole("hotel_owner", "admin"),
-  async (req: Request, res: Response) => {
-    try {
-      let booking = await Booking.findById(req.params.id);
-      let importedEvent: any = null;
-
-      if (!booking) {
-        importedEvent = await ExternalCalendarEvent.findById(req.params.id);
-      }
-
-      if (!booking && !importedEvent) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
-
-      const targetHotelId = String(booking ? booking.hotelId : importedEvent.hotelId);
-      const accessCheck = await getAccessibleHotel(targetHotelId, req);
-      if (accessCheck.error) {
-        return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
-      }
-
-      const user = await User.findById(req.userId);
-      if (!user) {
-        return res.status(401).json({ message: "unauthorized" });
-      }
-
-      let graphAccessToken: string | null = null;
-      try {
-        graphAccessToken = await getValidMicrosoftGraphAccessToken(user);
-      } catch (tokenError) {
-        logError("Unable to refresh Microsoft Graph token", tokenError, {
-          route: "bookings.sync-excel",
-          bookingId: req.params.id,
-          actorId: req.userId,
-        });
-        return res.status(401).json({
-          message: "Microsoft Graph access expired. Sign in with Microsoft again to continue Excel sync.",
-        });
-      }
-
-      if (!graphAccessToken) {
-        return res.status(409).json({
-          message: "Microsoft Graph access is not connected for this account. Sign in with Microsoft again and grant Files.Read access.",
-        });
-      }
-
-      const syncResult = await syncBookingFromExcel({
-        accessToken: graphAccessToken,
-        booking: booking
-          ? booking
-          : {
-              firstName: importedEvent.firstName || "",
-              lastName: importedEvent.lastName || "",
-              checkIn: importedEvent.startDate,
-            },
-        hotel: {
-          name: accessCheck.hotel?.name,
-          slug: accessCheck.hotel?.slug,
-        },
-      });
-
-      if (!syncResult.matched) {
-        return res.status(409).json(syncResult);
-      }
-
-      const matchedRow = syncResult.row;
-      const targetRecord = booking || importedEvent;
-      const applyResult = applyExcelSyncToRecord({
-        record: targetRecord,
-        matchedRow,
-        syncWorkbook: syncResult.workbook,
-        guestName: syncResult.guestName,
-        existingCheckInInfo: targetRecord.checkInInfo,
-        fallback: {
-          phone: targetRecord.phone,
-          email: targetRecord.email,
-          nationality: targetRecord.nationality,
-          arrivalTime: booking?.arrivalTime,
-        },
-      });
-
-      await targetRecord.save();
-
-      await recordAuditEvent({
-        action: "booking.excel-sync.completed",
-        entityType: booking ? "booking" : "external_booking",
-        entityId: String(targetRecord._id),
-        hotelId: String(targetHotelId),
-        actorId: req.userId,
-        actorRole: req.userRole,
-        req,
-        metadata: {
-          reservationNumber: booking?.reservationNumber || importedEvent?.externalUid,
-          matchedRowNumber: matchedRow.rowNumber,
-          matchedRoom: matchedRow.room,
-          matchedDate: matchedRow.date,
-          priceChanged: applyResult.priceChanged,
-          previousTotalCost: applyResult.previousTotalCost,
-          newTotalCost: matchedRow.totalPrice,
-        },
-      });
-
-      return res.status(200).json({
-        message: "Excel booking data synced successfully",
-        booking: booking ? booking : toImportedEventResponse(importedEvent, accessCheck.hotel),
-        matchedRow: {
-          rowNumber: matchedRow.rowNumber,
-          guestName: matchedRow.guestName,
-          room: matchedRow.room,
-          date: matchedRow.date,
-          paymentVia: matchedRow.paymentVia,
-          totalPrice: matchedRow.totalPrice,
-        },
-        warning: applyResult.priceChanged
-          ? `Excel total price replaced the stored value (${applyResult.previousTotalCost} -> ${matchedRow.totalPrice}).`
-          : undefined,
-      });
-    } catch (error) {
-      logError("Unable to sync booking from Excel", error, {
-        route: "bookings.sync-excel",
-        bookingId: req.params.id,
-        actorId: req.userId,
-      });
-      return res.status(500).json({ message: "Unable to sync booking from Excel" });
-    }
-  }
-);
-
-router.post(
-  "/:id/sync-onenote",
-  verifyToken,
-  requireRole("hotel_owner", "admin"),
-  async (req: Request, res: Response) => {
-    try {
-      let booking = await Booking.findById(req.params.id);
-      let importedEvent: any = null;
-
-      if (!booking) {
-        importedEvent = await ExternalCalendarEvent.findById(req.params.id);
-      }
-
-      if (!booking && !importedEvent) {
-        return res.status(404).json({ message: "Booking not found" });
-      }
-
-      const targetHotelId = String(booking ? booking.hotelId : importedEvent.hotelId);
-      const accessCheck = await getAccessibleHotel(targetHotelId, req);
-      if (accessCheck.error) {
-        return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
-      }
-
-      const user = await User.findById(req.userId);
-      if (!user) {
-        return res.status(401).json({ message: "unauthorized" });
-      }
-
-      let graphAccessToken: string | null = null;
-      try {
-        graphAccessToken = await getValidMicrosoftGraphAccessToken(user);
-      } catch (tokenError) {
-        logError("Unable to refresh Microsoft Graph token", tokenError, {
-          route: "bookings.sync-onenote",
-          bookingId: req.params.id,
-          actorId: req.userId,
-        });
-        // we'll attempt to fallback to an automation user below
-      }
-
-      if (!graphAccessToken) {
-        try {
-          const preferredEmail = String(process.env.BOOKING_ENRICHMENT_SYNC_USER_EMAIL || "")
-            .trim()
-            .toLowerCase();
-
-          let automationUser: any = null;
-          if (preferredEmail) {
-            automationUser = await User.findOne({
-              email: preferredEmail,
-              "microsoftGraphAuth.accessTokenCiphertext": { $exists: true, $ne: "" },
-            });
-          }
-
-          if (!automationUser) {
-            automationUser = await User.findOne({
-              role: { $in: ["admin", "hotel_owner"] },
-              "microsoftGraphAuth.accessTokenCiphertext": { $exists: true, $ne: "" },
-            }).sort({ updatedAt: -1 });
-          }
-
-          if (automationUser) {
-            graphAccessToken = await getValidMicrosoftGraphAccessToken(automationUser);
-            // log that we're using automation user token for this sync
-            console.log(`Using automation user ${automationUser.email} for OneNote sync (actor ${req.userId})`);
-          }
-        } catch (fallbackError) {
-          logError("Automation user fallback failed for OneNote sync", fallbackError, {
-            route: "bookings.sync-onenote",
-            bookingId: req.params.id,
-            actorId: req.userId,
-          });
-        }
-      }
-
-      if (!graphAccessToken) {
-        return res.status(409).json({
-          message: "Microsoft Graph access is not connected for this account. Sign in with Microsoft again and grant Notes.Read access.",
-        });
-      }
-
-      const targetRecord = booking || importedEvent;
-      const syncResult = await syncBookingFromOneNote({
-        accessToken: graphAccessToken,
-        booking: {
-          firstName: targetRecord.firstName || "",
-          lastName: targetRecord.lastName || "",
-          phone: targetRecord.phone || "",
-          adultCount: targetRecord.adultCount,
-          childCount: targetRecord.childCount,
-          checkIn: booking ? booking.checkIn : importedEvent.startDate,
-          checkOut: booking ? booking.checkOut : importedEvent.endDate,
-        },
-        hotel: {
-          name: accessCheck.hotel?.name,
-          slug: accessCheck.hotel?.slug,
-        },
-      });
-
-      if (!syncResult.matched) {
-        return res.status(409).json(syncResult);
-      }
-
-      applyOneNoteSyncToRecord({
-        record: targetRecord,
-        matchedPage: syncResult.page,
-        guestName: syncResult.guestName,
-        fallback: {
-          phone: targetRecord.phone,
-          email: targetRecord.email,
-          nationality: targetRecord.nationality,
-        },
-      });
-
-      await targetRecord.save();
-
-      await recordAuditEvent({
-        action: "booking.onenote-sync.completed",
-        entityType: booking ? "booking" : "external_booking",
-        entityId: String(targetRecord._id),
-        hotelId: String(targetHotelId),
-        actorId: req.userId,
-        actorRole: req.userRole,
-        req,
-        metadata: {
-          reservationNumber: booking?.reservationNumber || importedEvent?.externalUid,
-          matchedPageId: syncResult.page.pageId,
-          matchedPageTitle: syncResult.page.title,
-          matchedSectionName: syncResult.page.sectionName,
-          bookingSource: syncResult.page.parsed.bookingSource,
-        },
-      });
-
-      return res.status(200).json({
-        message: "OneNote booking data synced successfully",
-        booking: booking ? booking : toImportedEventResponse(importedEvent, accessCheck.hotel),
-        matchedPage: {
-          pageId: syncResult.page.pageId,
-          title: syncResult.page.title,
-          sectionName: syncResult.page.sectionName,
-        },
-      });
-    } catch (error) {
-      logError("Unable to sync booking from OneNote", error, {
-        route: "bookings.sync-onenote",
-        bookingId: req.params.id,
-        actorId: req.userId,
-      });
-      return res.status(500).json({ message: "Unable to sync booking from OneNote" });
-    }
-  }
-);
 
 router.put(
   "/:id",
@@ -2240,8 +1846,6 @@ router.get(
   }
 );
 
-
-
 // Close a booking (set closedAt) for both local and imported bookings
 router.patch(
   "/:id/close",
@@ -2351,5 +1955,4 @@ router.patch(
 );
 
 export default router;
-
 

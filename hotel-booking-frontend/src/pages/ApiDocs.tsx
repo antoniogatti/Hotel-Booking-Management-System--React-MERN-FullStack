@@ -143,14 +143,14 @@ const ApiDocs = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-[#f5f6f8] py-8">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
+          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
             API Documentation
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+          <p className="max-w-3xl text-sm text-slate-600">
             Comprehensive documentation for the Palazzo Pinto API. Explore
             endpoints, understand authentication, and integrate with our
             services.
@@ -173,10 +173,10 @@ const ApiDocs = () => {
         </div>
 
         {/* Swagger UI Link */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+        <div className="mb-8 rounded-xl border border-slate-200 bg-white p-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">
+              <h3 className="text-lg font-semibold text-slate-900 mb-2">
                 Interactive API Documentation
               </h3>
               <p className="text-blue-700">

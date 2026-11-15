@@ -45,6 +45,7 @@ router.get(
       return res.status(200).json({
         date: dateKey,
         timeZone: SCHEDULER_TIME_ZONE,
+        active: false,
         message: runs.length === 0 ? "No scheduler logs available for this day." : undefined,
         runs: runs.map((run) => ({
           _id: String(run._id),
@@ -54,19 +55,8 @@ router.get(
           finishedAt: run.finishedAt,
           durationMs: run.durationMs,
           processed: run.processed,
-          syncedOneNote: run.syncedOneNote,
-          syncedExcel: run.syncedExcel,
           enrichedNames: run.enrichedNames,
           errors: run.errorCount,
-          errorDetails: (run.errorDetails || []).map((detail) => ({
-            code: detail.code,
-            message: detail.message,
-            externalEventId: detail.externalEventId || undefined,
-            hotelId: detail.hotelId || undefined,
-          })),
-          reason: run.reason || undefined,
-          errorCode: run.errorCode || undefined,
-          errorMessage: run.errorMessage || undefined,
         })),
       });
     } catch (error) {

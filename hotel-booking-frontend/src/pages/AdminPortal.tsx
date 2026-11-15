@@ -1,17 +1,9 @@
-import { Link, NavLink } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useQuery } from "react-query";
 import {
-  Activity,
-  ArrowRight,
-  BarChart3,
   BedDouble,
-  Building2,
-  CalendarDays,
   CalendarClock,
-  ClipboardCheck,
   Clock3,
-  FileCheck2,
-  LayoutDashboard,
   RefreshCw,
   Shield,
 } from "lucide-react";
@@ -64,20 +56,6 @@ const getGuestName = (row: apiClient.UpcomingCheckInRow) => {
 const getChannelLabel = (row: apiClient.UpcomingCheckInRow) =>
   row.sourceLabel || (row.source === "local" ? "Direct" : "Imported");
 
-const adminNavClass = ({ isActive }: { isActive: boolean }) =>
-  `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-    isActive
-      ? "bg-white/10 text-white"
-      : "text-slate-400 hover:bg-white/5 hover:text-white"
-  }`;
-
-const mobileNavClass = ({ isActive }: { isActive: boolean }) =>
-  `shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${
-    isActive
-      ? "bg-slate-900 text-white"
-      : "border border-slate-200 bg-white text-slate-600"
-  }`;
-
 const AdminPortal = () => {
   const { userRole } = useAppContext();
 
@@ -94,100 +72,19 @@ const AdminPortal = () => {
     () => apiClient.fetchUpcomingCheckIns({ days: 7 })
   );
 
+  const traffic = useQuery(
+    ["traffic-insights-dashboard", 7],
+    () => apiClient.fetchTrafficInsightsDashboard(7),
+    { enabled: userRole === "admin", retry: false }
+  );
+
   const syncSummary = upcomingData?.summary.sync;
   const syncTone = syncSummary?.issueRooms ? "text-amber-700" : "text-emerald-700";
   const todayRows = (upcomingData?.rows || []).filter((row) => isToday(row.checkIn));
   const previewRows = upcomingData?.rows.slice(0, 5) || [];
 
   return (
-    <div className="min-h-screen bg-[#f5f6f8] text-slate-900">
-      <div className="mx-auto flex min-h-screen max-w-[1680px] items-start">
-        <aside className="sticky top-[104px] hidden h-[calc(100vh-104px)] w-60 shrink-0 flex-col bg-[#111827] px-4 py-6 lg:flex">
-          <div className="mb-8 flex items-center gap-3 px-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 text-white">
-              <Building2 className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">Palazzo Pinto</p>
-              <p className="text-xs text-slate-400">Property workspace</p>
-            </div>
-          </div>
-
-          <p className="mb-2 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Workspace
-          </p>
-          <nav aria-label="Admin navigation" className="space-y-1">
-            <NavLink to="/admin-portal" end className={adminNavClass}>
-              <LayoutDashboard className="h-4 w-4" />
-              Overview
-            </NavLink>
-            <NavLink to="/booking-dashboard" className={adminNavClass}>
-              <BarChart3 className="h-4 w-4" />
-              Bookings & analytics
-            </NavLink>
-            <NavLink to="/admin-portal/check-in" className={adminNavClass}>
-              <ClipboardCheck className="h-4 w-4" />
-              Check-in desk
-            </NavLink>
-            <NavLink to="/admin-portal/self-checkins" className={adminNavClass}>
-              <FileCheck2 className="h-4 w-4" />
-              Self check-in
-            </NavLink>
-            {userRole === "admin" && (
-              <NavLink to="/manage-bookings" className={adminNavClass}>
-                <CalendarDays className="h-4 w-4" />
-                Room calendar
-              </NavLink>
-            )}
-          </nav>
-
-          {userRole === "admin" && (
-            <>
-              <p className="mb-2 mt-8 px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                Administration
-              </p>
-              <nav aria-label="Administration" className="space-y-1">
-                <NavLink to="/booking-com-sync" className={adminNavClass}>
-                  <RefreshCw className="h-4 w-4" />
-                  Sync center
-                </NavLink>
-                <NavLink to="/scheduler-monitor" className={adminNavClass}>
-                  <Clock3 className="h-4 w-4" />
-                  Scheduler
-                </NavLink>
-                <NavLink to="/traffic-insights" className={adminNavClass}>
-                  <Activity className="h-4 w-4" />
-                  Traffic insights
-                </NavLink>
-              </nav>
-            </>
-          )}
-
-          <div className="mt-auto border-t border-white/10 px-3 pt-5">
-            <p className="text-xs font-medium text-slate-300">Palazzo Pinto B&B</p>
-            <p className="mt-1 text-[11px] text-slate-500">Admin workspace</p>
-          </div>
-        </aside>
-
-        <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 sm:py-8 lg:px-9">
-        <nav aria-label="Admin navigation" className="mb-6 flex gap-2 overflow-x-auto pb-1 lg:hidden">
-          <NavLink to="/admin-portal" end className={mobileNavClass}>
-            Overview
-          </NavLink>
-          <NavLink to="/booking-dashboard" className={mobileNavClass}>
-            Bookings
-          </NavLink>
-          <NavLink to="/admin-portal/check-in" className={mobileNavClass}>
-            Check-in
-          </NavLink>
-          {userRole === "admin" && (
-            <NavLink to="/manage-bookings" className={mobileNavClass}>
-              Room calendar
-            </NavLink>
-          )}
-        </nav>
-
-        <div className="space-y-6">
+    <div className="space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-9">
         <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -226,6 +123,42 @@ const AdminPortal = () => {
             </div>
           </div>
         </section>
+
+        {userRole === "admin" && (
+          <section aria-labelledby="traffic-overview-heading" className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <h2 id="traffic-overview-heading" className="text-xl font-semibold text-slate-900">Traffic insights</h2>
+                <p className="mt-1 text-sm text-slate-500">Public website and API activity over the last 24 hours.</p>
+              </div>
+              <Link to="/traffic-insights" className="text-sm font-semibold text-teal-700 hover:text-teal-800">
+                View traffic dashboard
+              </Link>
+            </div>
+            {traffic.isLoading ? (
+              <p role="status" className="mt-5 text-sm text-slate-500">Loading traffic insights...</p>
+            ) : traffic.isError ? (
+              <div role="alert" className="mt-5 flex flex-wrap items-center gap-3 text-sm text-rose-700">
+                <span>Unable to load traffic insights. Check the traffic dashboard for details.</span>
+                <Button variant="outline" size="sm" onClick={() => traffic.refetch()}>Retry traffic insights</Button>
+              </div>
+            ) : traffic.data && (
+              <dl className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+                {[
+                  ["Page views", traffic.data.metrics.pageViews24h],
+                  ["Unique visitors", traffic.data.metrics.uniqueVisitors24h],
+                  ["API requests", traffic.data.metrics.requestCount24h],
+                  ["Failed requests", traffic.data.metrics.failedRequests24h],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-xl bg-slate-50 p-4">
+                    <dt className="text-sm text-slate-600">{label}</dt>
+                    <dd className="mt-1 text-2xl font-semibold text-slate-900">{value.toLocaleString()}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+          </section>
+        )}
 
         <section aria-label="Operations metrics" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Link to="/booking-com-sync#sync-errors" className="block transition-transform hover:-translate-y-0.5">
@@ -382,7 +315,7 @@ const AdminPortal = () => {
           </Card>
         </section>
 
-        <section className="grid gap-5 xl:grid-cols-[1.2fr_0.8fr]">
+        <section>
           <Card className="border border-slate-200 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between space-y-0">
               <div>
@@ -434,102 +367,7 @@ const AdminPortal = () => {
             </CardContent>
           </Card>
 
-          <Card className="border border-slate-200 shadow-none">
-            <CardHeader>
-              <CardTitle className="text-xl text-slate-900">Sections</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Link
-                to="/admin-portal/check-in"
-                className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">Check-In Desk</p>
-                  <p className="text-sm text-slate-600">Upcoming arrivals, WhatsApp, email, and check-in actions.</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-slate-500" />
-              </Link>
-
-              <Link
-                to="/admin-portal/self-checkins"
-                className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">Self Check-In Submissions</p>
-                  <p className="text-sm text-slate-600">Review guest self-check-in forms and uploaded ID files.</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-slate-500" />
-              </Link>
-
-              {userRole === "admin" && (
-                <Link
-                  to="/manage-bookings"
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <div>
-                    <p className="font-semibold text-slate-900">Room Calendar</p>
-                    <p className="text-sm text-slate-600">Open the Booking.com-style calendar view for each room.</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-slate-500" />
-                </Link>
-              )}
-
-              {userRole === "admin" && (
-                <Link
-                  to="/booking-com-sync"
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <div>
-                    <p className="font-semibold text-slate-900">Sync Center</p>
-                    <p className="text-sm text-slate-600">Review Booking.com sync health and last sync times.</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-slate-500" />
-                </Link>
-              )}
-
-              {userRole === "admin" && (
-                <Link
-                  to="/scheduler-monitor"
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <div>
-                    <p className="font-semibold text-slate-900">Scheduler Monitor</p>
-                    <p className="text-sm text-slate-600">Review enrichment scheduler runs with concise error codes.</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-slate-500" />
-                </Link>
-              )}
-
-              {userRole === "admin" && (
-                <Link
-                  to="/traffic-insights"
-                  className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
-                >
-                  <div>
-                    <p className="font-semibold text-slate-900">Traffic Insights</p>
-                    <p className="text-sm text-slate-600">Live visitor, device, API success-failure, and geo traffic telemetry.</p>
-                  </div>
-                  <ArrowRight className="h-4 w-4 text-slate-500" />
-                </Link>
-              )}
-
-              <Link
-                to="/booking-dashboard"
-                className="flex items-center justify-between rounded-xl border border-slate-200 px-4 py-4 transition hover:border-slate-300 hover:bg-slate-50"
-              >
-                <div>
-                  <p className="font-semibold text-slate-900">Dashboard</p>
-                  <p className="text-sm text-slate-600">Existing booking analytics and occupancy trends.</p>
-                </div>
-                <ArrowRight className="h-4 w-4 text-slate-500" />
-              </Link>
-
-            </CardContent>
-          </Card>
         </section>
-      </div>
-      </main>
-      </div>
     </div>
   );
 };

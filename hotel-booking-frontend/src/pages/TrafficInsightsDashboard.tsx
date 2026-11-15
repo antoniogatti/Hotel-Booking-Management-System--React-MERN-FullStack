@@ -40,7 +40,7 @@ const resolveErrorMessage = (error: unknown) => {
     return message;
   }
 
-  return "Verify backend Application Insights app id and API key, then retry.";
+  return "Verify the Application Insights app ID and API key or Azure identity read access, then retry.";
 };
 
 interface TrafficInsightsData {
@@ -132,10 +132,10 @@ const TrafficInsightsDashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl rounded-3xl border border-slate-200 bg-white p-12 text-center shadow-sm">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-teal-50">
-            <RefreshCw className="h-6 w-6 animate-spin text-teal-700" />
+      <div className="min-h-screen bg-[#f5f6f8] px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl rounded-2xl border border-slate-200 bg-white p-12 text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+            <RefreshCw className="h-6 w-6 animate-spin text-slate-700" />
           </div>
           <h2 className="text-lg font-semibold text-slate-900">Loading live traffic telemetry</h2>
           <p className="mt-2 text-sm text-slate-600">
@@ -148,15 +148,15 @@ const TrafficInsightsDashboard = () => {
 
   if (error || !data) {
     return (
-      <div className="min-h-screen bg-slate-50 px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl rounded-3xl border border-rose-200 bg-rose-50 p-10 text-center">
+      <div className="min-h-screen bg-[#f5f6f8] px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-10 text-center">
           <p className="text-lg font-semibold text-rose-700">Unable to load traffic insights</p>
           <p className="mt-2 text-sm text-rose-600">
             {errorMessage}
           </p>
           <button
             onClick={() => refetch()}
-            className="mt-4 rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+            className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
           >
             Retry
           </button>
@@ -168,16 +168,16 @@ const TrafficInsightsDashboard = () => {
   const failedRate = formatPercent(data.metrics.failedRequests24h, data.metrics.requestCount24h);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_right,_rgba(20,184,166,0.14),_transparent_42%),linear-gradient(180deg,#f8fbfb_0%,#edf4f5_100%)] px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#f5f6f8] px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+        <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <p className="inline-flex items-center gap-2 rounded-full bg-teal-50 px-3 py-1 text-sm font-semibold text-teal-700">
+              <p className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                 <Globe className="h-4 w-4" />
                 Traffic Insights
               </p>
-              <h1 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">Live public traffic dashboard</h1>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Live public traffic dashboard</h1>
               <p className="mt-2 max-w-3xl text-sm text-slate-600">
                 Dedicated telemetry view for visitor traffic, device sessions, API status, and global IP-based activity.
               </p>

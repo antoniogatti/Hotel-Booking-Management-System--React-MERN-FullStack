@@ -46,11 +46,8 @@ const THREAD_PAGE_SIZE = 30;
 const POLL_MS = 8_000;
 const MAX_POLL_MS = 60_000;
 
-// WhatsApp-style doodle wallpaper (original artwork, tiled)
 const CHAT_WALLPAPER: React.CSSProperties = {
-  backgroundColor: "#cfe3df",
-  backgroundImage: "url('/common/wa-doodle.svg')",
-  backgroundSize: "260px 260px",
+  backgroundColor: "#f8fafc",
 };
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
@@ -72,7 +69,7 @@ const ConvoItem = ({ convo, active, disabled, contacts, onClick }: ConvoItemProp
       onClick={onClick}
       disabled={disabled}
       className={`w-full text-left px-4 py-3 border-b border-gray-100 transition-colors
-        ${active ? "bg-[#dcfce7] border-l-4 border-l-[#25D366]" : "hover:bg-[#f0fdf4]"}
+        ${active ? "bg-slate-100 border-l-4 border-l-slate-700" : "hover:bg-slate-50"}
         ${disabled && !active ? "opacity-60 cursor-default" : ""}
       `}
     >
@@ -95,7 +92,7 @@ const ConvoItem = ({ convo, active, disabled, contacts, onClick }: ConvoItemProp
           <span className="text-[10px] bg-orange-400 text-white px-1 rounded shrink-0">draft</span>
         )}
         {!convo.hasPending && convo.lastMessage?.role === "assistant" && (
-          <span className="text-[10px] bg-[#25D366] text-white px-1 rounded shrink-0">Sofia</span>
+          <span className="text-[10px] bg-slate-600 text-white px-1 rounded shrink-0">Sofia</span>
         )}
         <p className={`text-xs truncate ${convo.unread ? "text-gray-800 font-medium" : "text-gray-500"}`}>{preview}</p>
       </div>
@@ -105,14 +102,14 @@ const ConvoItem = ({ convo, active, disabled, contacts, onClick }: ConvoItemProp
 
 // ─── Message status ticks ─────────────────────────────────────────────────────
 
-const Ticks = ({ status }: { status?: "sent" | "delivered" | "read" }) => {
+const Ticks = ({ status, onDark = false }: { status?: "sent" | "delivered" | "read"; onDark?: boolean }) => {
   if (!status) return null;
+  const color = status === "read" ? (onDark ? "#7dd3fc" : "#0369a1") : (onDark ? "rgba(255,255,255,0.8)" : "#64748b");
   if (status === "sent") return (
     <svg viewBox="0 0 16 11" className="inline h-3 w-3 ml-1 align-middle" fill="none">
-      <path d="M1 5.5L5 9.5L15 1" stroke="rgba(255,255,255,0.7)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <path d="M1 5.5L5 9.5L15 1" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
     </svg>
   );
-  const color = status === "read" ? "#53bdeb" : "rgba(255,255,255,0.7)";
   return (
     <svg viewBox="0 0 20 11" className="inline h-3 w-4 ml-1 align-middle" fill="none">
       <path d="M1 5.5L5 9.5L13 1" stroke={color} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -211,7 +208,7 @@ const AudioBubble = ({ msg, isUser }: { msg: WAMessage; isUser: boolean }) => {
     <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-2`}>
       <div
         className={`flex items-center gap-2 px-3 py-2.5 rounded-2xl ${isUser ? "bg-white shadow-sm rounded-tl-sm border border-gray-100" : "rounded-tr-sm"}`}
-        style={{ minWidth: 200, maxWidth: 280, ...(isUser ? {} : { backgroundColor: "#25D366" }) }}
+        style={{ minWidth: 200, maxWidth: 280, ...(isUser ? {} : { backgroundColor: "#334155" }) }}
       >
         <audio
           ref={audioRef}
@@ -222,7 +219,7 @@ const AudioBubble = ({ msg, isUser }: { msg: WAMessage; isUser: boolean }) => {
         />
         <button
           onClick={toggle}
-          className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${isUser ? "bg-[#25D366]" : "bg-white/20"}`}
+          className={`h-10 w-10 rounded-full flex items-center justify-center shrink-0 ${isUser ? "bg-slate-700" : "bg-white/20"}`}
           aria-label={playing ? "Pause" : "Play"}
         >
           {playing ? (
@@ -247,7 +244,7 @@ const AudioBubble = ({ msg, isUser }: { msg: WAMessage; isUser: boolean }) => {
                   width: 2,
                   height: h,
                   backgroundColor: isUser
-                    ? (filled ? "#25D366" : "#d1d5db")
+                    ? (filled ? "#475569" : "#d1d5db")
                     : (filled ? "white" : "rgba(255,255,255,0.35)"),
                 }}
               />
@@ -260,7 +257,7 @@ const AudioBubble = ({ msg, isUser }: { msg: WAMessage; isUser: boolean }) => {
             {playing || currentTime > 0 ? fmt(currentTime) : fmt(dur)}
           </span>
           {!isUser && (
-            <span className="flex"><Ticks status={msg.status} /></span>
+            <span className="flex"><Ticks status={msg.status} onDark /></span>
           )}
         </div>
       </div>
@@ -290,7 +287,7 @@ const ImageBubble = ({ msg, isUser }: { msg: WAMessage; isUser: boolean }) => {
             />
           </button>
           {msg.caption && (
-            <p className={`text-xs mt-1 px-1 ${isUser ? "text-gray-600" : "text-white/80"}`}>{msg.caption}</p>
+            <p className="text-xs mt-1 px-1 text-slate-600">{msg.caption}</p>
           )}
           <p className={`text-[10px] text-gray-400 mt-0.5 flex items-center gap-0.5 ${isUser ? "justify-start ml-1" : "justify-end mr-1"}`}>
             <span>{formatDate(msg.ts)} {formatTime(msg.ts)}</span>
@@ -328,15 +325,15 @@ const Bubble = ({ msg }: BubbleProps) => {
     <div className={`flex ${isUser ? "justify-start" : "justify-end"} mb-2`}>
       <div className="max-w-[75%]">
         {!isUser && (
-          <span className="text-[10px] text-[#25D366] font-semibold ml-1 block text-right">{label}</span>
+          <span className="text-[10px] text-slate-600 font-semibold ml-1 block text-right">{label}</span>
         )}
         <div
           className={`px-3 py-2 rounded-2xl text-sm leading-relaxed ${
             isUser
-              ? "bg-white shadow-sm text-gray-800 rounded-tl-sm"
+              ? "bg-white border border-slate-200 text-slate-800 rounded-tl-sm"
               : "text-white rounded-tr-sm"
           }`}
-          style={isUser ? {} : { backgroundColor: "#25D366" }}
+          style={isUser ? {} : { backgroundColor: "#334155" }}
         >
           {parseWhatsAppText(msg.content)}
         </div>
@@ -422,8 +419,7 @@ const PendingCard = ({ pending, onApprove, onDiscard }: PendingCardProps) => {
         <button
           onClick={handleApprove}
           disabled={!edited.trim() || approving || discarding}
-          className="flex-[2] py-1.5 rounded-lg text-sm text-white font-semibold disabled:opacity-40 transition-colors"
-          style={{ backgroundColor: "#25D366" }}
+          className="flex-[2] py-1.5 rounded-lg bg-slate-900 text-sm text-white font-semibold hover:bg-slate-800 disabled:opacity-40 transition-colors"
         >
           {approving ? "Sending…" : "Send"}
         </button>
@@ -441,7 +437,7 @@ const ConvoSkeleton = () => (
 
 const BubbleSkeleton =({ right }: { right?: boolean }) => (
   <div className={`flex ${right ? "justify-end" : "justify-start"} mb-2`}>
-    <div className={`h-8 rounded-2xl animate-pulse ${right ? "bg-[#25D366]/30 w-48" : "bg-gray-200 w-40"}`} />
+    <div className={`h-8 rounded-2xl animate-pulse ${right ? "bg-slate-300 w-48" : "bg-gray-200 w-40"}`} />
   </div>
 );
 
@@ -469,10 +465,10 @@ const NewChatModal = ({ onClose, onStart, contacts }: NewChatModalProps) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 space-y-4"
+        className="bg-white rounded-2xl border border-slate-200 shadow-xl w-full max-w-sm p-6 space-y-4"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="text-lg font-bold text-[#2b4463]">New conversation</h2>
+        <h2 className="text-lg font-semibold text-slate-900">New conversation</h2>
         <div className="space-y-3">
           <div>
             <label className="text-xs font-medium text-gray-500 mb-1 block">Phone number (with country code)</label>
@@ -481,7 +477,7 @@ const NewChatModal = ({ onClose, onStart, contacts }: NewChatModalProps) => {
               value={rawPhone}
               onChange={(e) => setRawPhone(e.target.value)}
               placeholder="e.g. 393358246145 or +39 335 824 6145"
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
               autoFocus
               onKeyDown={(e) => e.key === "Enter" && handleStart()}
             />
@@ -493,7 +489,7 @@ const NewChatModal = ({ onClose, onStart, contacts }: NewChatModalProps) => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Guest name"
-              className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
               onKeyDown={(e) => e.key === "Enter" && handleStart()}
             />
           </div>
@@ -508,8 +504,7 @@ const NewChatModal = ({ onClose, onStart, contacts }: NewChatModalProps) => {
           <button
             onClick={handleStart}
             disabled={normalise(rawPhone).length < 8}
-            className="flex-1 rounded-xl py-2 text-sm text-white font-semibold disabled:opacity-40"
-            style={{ backgroundColor: "#25D366" }}
+            className="flex-1 rounded-lg bg-slate-900 py-2 text-sm text-white font-semibold hover:bg-slate-800 disabled:opacity-40"
           >
             Open chat
           </button>
@@ -936,13 +931,12 @@ const WAInbox = () => {
   // ── Conversation list panel ──────────────────────────────────────────────────
   const listPanel = (
     <div className={`bg-white flex flex-col overflow-hidden border-r border-gray-200 md:w-1/3 md:flex ${mobileShowList ? "flex w-full" : "hidden md:flex"}`}>
-      <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase tracking-wide flex items-center gap-2">
+      <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-500 uppercase tracking-wide flex items-center gap-2">
         <span>Active conversations</span>
         <span className="ml-auto h-2 w-2 rounded-full bg-[#25D366] animate-pulse" title="Live" />
         <button
           onClick={() => setShowNewChat(true)}
-          className="ml-2 h-6 w-6 rounded-full flex items-center justify-center text-white text-base leading-none hover:opacity-90 transition-opacity"
-          style={{ backgroundColor: "#25D366" }}
+          className="ml-2 h-6 w-6 rounded-md bg-slate-900 flex items-center justify-center text-white text-base leading-none hover:bg-slate-800 transition-colors"
           title="New conversation"
           aria-label="New conversation"
         >
@@ -994,44 +988,44 @@ const WAInbox = () => {
   const isAuto = activePhone ? (autoByPhone.get(activePhone) ?? false) : false;
 
   const threadPanel = (
-    <div className={`flex-1 flex flex-col bg-[#cfe3df] overflow-hidden md:flex ${!mobileShowList ? "flex w-full" : "hidden md:flex"}`}>
+    <div className={`flex-1 flex flex-col bg-slate-50 overflow-hidden md:flex ${!mobileShowList ? "flex w-full" : "hidden md:flex"}`}>
       {activePhone ? (
         <>
           {/* Header */}
           <div className="shrink-0">
-            <div className="px-4 py-3 bg-[#25D366] text-white flex items-center gap-3">
-              <button onClick={handleBack} className="md:hidden mr-1 text-white/90 hover:text-white" aria-label="Back">
+            <div className="px-4 py-3 bg-white border-b border-slate-200 text-slate-900 flex items-center gap-3">
+              <button onClick={handleBack} className="md:hidden mr-1 text-slate-600 hover:text-slate-900" aria-label="Back">
                 <svg viewBox="0 0 24 24" className="h-5 w-5 fill-current">
                   <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z" />
                 </svg>
               </button>
-              <div className="h-9 w-9 rounded-full bg-white/20 flex items-center justify-center text-sm font-bold shrink-0">
+              <div className="h-9 w-9 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-sm font-semibold shrink-0">
                 {(activeName ?? formatPhone(activePhone)).slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-sm truncate">
                   {activeName ?? formatPhone(activePhone)}
                 </p>
-                <p className="text-xs text-white/80">
+                <p className="text-xs text-slate-500">
                   {loadingThread ? "Loading…" : activeName ? formatPhone(activePhone) : "Active · Sofia is monitoring"}
                 </p>
               </div>
-              <span className="h-2 w-2 rounded-full bg-white/60 animate-pulse shrink-0" title="Live polling" />
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse shrink-0" title="Live polling" />
               {/* Auto/draft toggle */}
               <button
                 onClick={() => void handleToggleAuto()}
                 title={isAuto ? "Auto ON — Sofia sends immediately. Click for draft mode." : "Draft mode — Sofia drafts, you approve. Click for auto."}
                 className={`shrink-0 text-xs rounded-full px-2.5 py-1 font-semibold border transition-colors ${
                   isAuto
-                    ? "bg-white text-[#25D366] border-white"
-                    : "bg-white/10 text-white/80 border-white/30 hover:bg-white/20"
+                    ? "bg-slate-900 text-white border-slate-900"
+                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                 }`}
               >
                 {isAuto ? "Auto" : "Draft"}
               </button>
               <button
                 onClick={() => { setShowContactForm((v) => !v); setContactName(activeName ?? ""); }}
-                className="shrink-0 text-xs text-white/80 hover:text-white border border-white/30 rounded px-2 py-1 transition-colors"
+                className="shrink-0 text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded px-2 py-1 transition-colors"
               >
                 {activeName ? "Edit" : "+ Contact"}
               </button>
@@ -1044,15 +1038,14 @@ const WAInbox = () => {
                   value={contactName}
                   onChange={(e) => setContactName(e.target.value)}
                   placeholder="Contact name"
-                  className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366]"
+                  className="flex-1 border border-slate-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500"
                   onKeyDown={(e) => e.key === "Enter" && void handleSaveContact()}
                   autoFocus
                 />
                 <button
                   onClick={() => void handleSaveContact()}
                   disabled={!contactName.trim() || savingContact}
-                  className="text-sm px-3 py-1.5 rounded-lg text-white font-medium disabled:opacity-40 transition-colors"
-                  style={{ backgroundColor: "#25D366" }}
+                  className="text-sm px-3 py-1.5 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-800 disabled:opacity-40 transition-colors"
                 >
                   {savingContact ? "Saving…" : "Save"}
                 </button>
@@ -1080,7 +1073,7 @@ const WAInbox = () => {
                 <p>Couldn't load this conversation.</p>
                 <button
                   onClick={() => setThreadReloadKey((k) => k + 1)}
-                  className="px-3 py-1 rounded-full bg-white shadow-sm text-[#25D366] font-medium"
+                  className="px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50"
                 >
                   Retry
                 </button>
@@ -1131,13 +1124,12 @@ const WAInbox = () => {
               onKeyDown={handleKeyDown}
               placeholder="Type a manual reply… (Enter to send, Shift+Enter for newline)"
               rows={2}
-              className="flex-1 resize-none border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#25D366] focus:border-transparent"
+              className="flex-1 resize-none border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent"
             />
             <button
               onClick={() => void handleSend()}
               disabled={!reply.trim() || sending}
-              className="h-10 w-10 rounded-full flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
-              style={{ backgroundColor: reply.trim() && !sending ? "#25D366" : "#9ca3af" }}
+              className="h-10 w-10 rounded-lg bg-slate-900 hover:bg-slate-800 flex items-center justify-center shrink-0 transition-colors disabled:opacity-40"
               aria-label="Send"
             >
               {sending ? (
@@ -1177,12 +1169,12 @@ const WAInbox = () => {
         contacts={contacts}
       />
     )}
-    <div className="flex flex-col h-[calc(100vh-130px)]">
-      <div className={`px-6 py-4 border-b border-gray-200 bg-white shrink-0 ${!mobileShowList ? "hidden md:block" : ""}`}>
+    <div className="flex flex-col h-[calc(100vh-130px)] overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className={`px-6 py-4 border-b border-slate-200 bg-white shrink-0 ${!mobileShowList ? "hidden md:block" : ""}`}>
         <div className="flex items-center gap-2">
-          <FaWhatsapp className="h-6 w-6 text-[#25D366]" />
-          <h1 className="text-xl font-bold text-[#2b4463]">Sofia Inbox</h1>
-          <span className="ml-2 text-xs bg-[#f0fdf4] text-[#25D366] border border-[#bbf7d0] px-2 py-0.5 rounded-full font-medium">
+          <FaWhatsapp className="h-6 w-6 text-slate-700" />
+          <h1 className="text-xl font-semibold tracking-tight text-slate-950">Sofia Inbox</h1>
+          <span className="ml-2 text-xs bg-slate-50 text-slate-600 border border-slate-200 px-2 py-0.5 rounded-full font-medium">
             {totalConvos || conversations.length} conversation{(totalConvos || conversations.length) !== 1 ? "s" : ""}
           </span>
           {unreadCount > 0 && (

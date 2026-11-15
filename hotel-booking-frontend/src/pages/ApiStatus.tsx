@@ -177,12 +177,12 @@ const ApiStatus = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-[#f5f6f8] py-8">
       <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">API Status</h1>
-          <p className="text-xl text-gray-600">
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
+          <h1 className="mb-2 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">API Status</h1>
+          <p className="text-sm text-slate-600">
             Real-time monitoring of the Palazzo Pinto API health and performance
           </p>
         </div>

@@ -3,8 +3,10 @@ import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
 import { logError } from "../lib/logger";
 import { isTelemetryInitialized, sendTestEvent } from "../lib/telemetry";
+import { DefaultAzureCredential } from "@azure/identity";
 
 const router = express.Router();
+const azureCredential = new DefaultAzureCredential();
 
 const defaultPublicApiPrefixes = [
   "/api/health",
@@ -94,18 +96,25 @@ type AppInsightsQueryResponse = {
   tables?: AppInsightsTable[];
 };
 
-const runAppInsightsQuery = async (appId: string, apiKey: string, query: string) => {
+const runAppInsightsQuery = async (
+  appId: string,
+  authHeader: { name: string; value: string },
+  query: string
+) => {
   const url = `https://api.applicationinsights.io/v1/apps/${encodeURIComponent(appId)}/query`;
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-api-key": apiKey,
+      [authHeader.name]: authHeader.value,
     },
     body: JSON.stringify({ query }),
   });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(`App Insights query denied (${response.status}). Verify the API key or Azure identity has read access to the Application Insights resource and workspace.`);
+    }
     const body = await response.text();
     throw new Error(`App Insights query failed (${response.status}): ${body.slice(0, 400)}`);
   }
@@ -166,18 +175,10 @@ router.get(
     const appId = getAppInsightsAppId();
     const apiKey = getAppInsightsApiKey();
 
-    if (!appId || !apiKey) {
-      const missingConfig: string[] = [];
-      if (!appId) {
-        missingConfig.push("APPLICATIONINSIGHTS_APP_ID (or ApplicationId in APPLICATIONINSIGHTS_CONNECTION_STRING)");
-      }
-      if (!apiKey) {
-        missingConfig.push("APPLICATIONINSIGHTS_API_KEY");
-      }
-
+    if (!appId) {
       return res.status(500).json({
         message: "Traffic Insights is not configured on backend environment variables.",
-        details: `Missing: ${missingConfig.join(", ")}`,
+        details: "Missing APPLICATIONINSIGHTS_APP_ID (or ApplicationId in APPLICATIONINSIGHTS_CONNECTION_STRING).",
       });
     }
 
@@ -191,6 +192,24 @@ router.get(
       .join(" or ");
 
     try {
+      let authHeader: { name: string; value: string };
+      if (apiKey) {
+        authHeader = { name: "x-api-key", value: apiKey };
+      } else {
+        try {
+          const token = await azureCredential.getToken("https://api.applicationinsights.io/.default");
+          if (!token?.token) {
+            throw new Error("Azure credential did not return a token.");
+          }
+          authHeader = { name: "Authorization", value: `Bearer ${token.token}` };
+        } catch (error) {
+          logError("Failed to authenticate Application Insights queries", error);
+          return res.status(500).json({
+            message: "Unable to authenticate Traffic Insights.",
+            details: "Sign in with Azure CLI locally or configure a managed identity with Application Insights read access, or set APPLICATIONINSIGHTS_API_KEY.",
+          });
+        }
+      }
       const [
         trafficRows,
         pageRows,
@@ -201,32 +220,32 @@ router.get(
       ] = await Promise.all([
         runAppInsightsQuery(
           appId,
-          apiKey,
+          authHeader,
           `customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(${days}d)\n| summarize pageCount = count() by day = bin(timestamp, 1d)\n| order by day asc`
         ),
         runAppInsightsQuery(
           appId,
-          apiKey,
+          authHeader,
           `customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(${days}d)\n| extend pagePath = tostring(customDimensions[\"path\"])\n| summarize viewCount = count() by pagePath\n| sort by viewCount desc\n| take 8`
         ),
         runAppInsightsQuery(
           appId,
-          apiKey,
+          authHeader,
           `requests\n| where timestamp >= ago(${days}d)\n| where ${prefixFilter}\n| summarize successCount = countif(success == true), failedCount = countif(success == false), avgDurationMs = avg(duration) by endpoint = url\n| sort by failedCount desc\n| take 12`
         ),
         runAppInsightsQuery(
           appId,
-          apiKey,
+          authHeader,
           `customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(${days}d)\n| extend country = tostring(customDimensions[\"country\"]), city = tostring(customDimensions[\"city\"]), latitude = todouble(customDimensions[\"latitude\"]), longitude = todouble(customDimensions[\"longitude\"])\n| where isnotempty(country) and isnotempty(city)\n| summarize hitCount = count(), lastSeen = max(timestamp), latitude = any(latitude), longitude = any(longitude) by country, city\n| sort by hitCount desc\n| take 100`
         ),
         runAppInsightsQuery(
           appId,
-          apiKey,
-          `let publicPageEvents = customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(24h);\nlet publicRequests = requests\n| where timestamp >= ago(24h)\n| where ${prefixFilter};\npublicPageEvents\n| summarize pageCount24h = count(), uniqueVisitors24h = dcount(tostring(customDimensions[\"ip\"]))\n| join kind=fullouter (publicRequests | summarize requestCount24h = count(), failedRequests24h = countif(success == false), avgApiDurationMs24h = avg(duration)) on $left.pageCount24h == $right.requestCount24h\n| project pageCount24h = coalesce(pageCount24h, 0), uniqueVisitors24h = coalesce(uniqueVisitors24h, 0), requestCount24h = coalesce(requestCount24h, 0), failedRequests24h = coalesce(failedRequests24h, 0), avgApiDurationMs24h = coalesce(avgApiDurationMs24h, 0.0)`
+          authHeader,
+          `let publicPageEvents = customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(24h);\nlet publicRequests = requests\n| where timestamp >= ago(24h)\n| where ${prefixFilter};\npublicPageEvents\n| summarize pageCount24h = count(), uniqueVisitors24h = dcount(tostring(customDimensions[\"ip\"]))\n| extend joinKey = 1\n| join kind=inner (publicRequests | summarize requestCount24h = count(), failedRequests24h = countif(success == false), avgApiDurationMs24h = avg(duration) | extend joinKey = 1) on joinKey\n| project pageCount24h, uniqueVisitors24h, requestCount24h, failedRequests24h, avgApiDurationMs24h = iff(isfinite(avgApiDurationMs24h), avgApiDurationMs24h, 0.0)`
         ),
         runAppInsightsQuery(
           appId,
-          apiKey,
+          authHeader,
           `customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(${days}d)\n| project userAgent = tostring(customDimensions[\"userAgent\"]), sessionId = operation_Id\n| summarize sessions = dcount(sessionId) by userAgent`
         ),
       ]);
@@ -259,7 +278,10 @@ router.get(
         }))
         .filter((row) => Number.isFinite(row.latitude) && Number.isFinite(row.longitude));
 
-      const metricsRow = summaryRows[0] || [0, 0, 0, 0, 0];
+      const metricsRow = summaryRows[0];
+      if (!metricsRow || metricsRow.length < 5) {
+        throw new Error("Application Insights did not return the 24-hour summary.");
+      }
       const metrics = {
         pageViews24h: Number(metricsRow[0] || 0),
         uniqueVisitors24h: Number(metricsRow[1] || 0),

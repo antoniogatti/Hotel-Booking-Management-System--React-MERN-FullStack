@@ -30,13 +30,13 @@ const STATUS_STYLES: Record<BookingCalendarDayStatus, string> = {
   Available: "bg-white text-slate-600 border-slate-200",
   Requested: "bg-[#f4c542] text-[#5b4300] border-[#f0bf2f]",
   Booked: "bg-[#4a6fae] text-white border-[#4a6fae]",
-  Imported: "bg-[#3f67a8] text-white border-[#3f67a8]",
+  Imported: "bg-[#0f766e] text-white border-[#0f766e]",
   Closed: "bg-[#e86a6a] text-white border-[#e86a6a]",
 };
 
 const BAR_STYLES = {
   booked: "bg-[#4a6fae] text-white shadow-[inset_0_-1px_0_rgba(255,255,255,0.15)]",
-  imported: "bg-[#3f67a8] text-white shadow-[inset_0_-1px_0_rgba(255,255,255,0.12)]",
+  imported: "bg-[#0f766e] text-white shadow-[inset_0_-1px_0_rgba(255,255,255,0.12)]",
   requested: "bg-[#f4c542] text-[#5b4300] shadow-[inset_0_-1px_0_rgba(255,255,255,0.18)]",
 } as const;
 
@@ -405,16 +405,16 @@ const ManageBookings = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold text-gray-900">Manage Bookings</h1>
-        <p className="text-gray-600">Booking.com-style room calendar and request handling by room.</p>
+    <div className="space-y-6 rounded-2xl bg-[#f5f6f8] p-4 text-slate-900 sm:p-6">
+      <div className="flex flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
+        <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Manage Bookings</h1>
+        <p className="text-sm text-slate-600">Booking.com-style room calendar and request handling by room.</p>
       </div>
 
-      <Card className="border-gray-200 bg-white shadow-sm">
+      <Card className="border border-slate-200 bg-white shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-xl">
-            <Building2 className="h-5 w-5 text-primary-600" />
+            <Building2 className="h-5 w-5 text-slate-700" />
             Room Scope
           </CardTitle>
         </CardHeader>
@@ -460,36 +460,37 @@ const ManageBookings = () => {
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-        <Card className="border-[#e5e7eb] bg-white shadow-sm">
+        <Card className="border border-slate-200 bg-white shadow-none">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600">Current Month</p>
-            <p className="text-lg font-bold text-gray-900">{toMonthLabel(selectedMonth)}</p>
+            <p className="text-lg font-semibold text-slate-900">{toMonthLabel(selectedMonth)}</p>
           </CardContent>
         </Card>
-        <Card className="border-[#e5e7eb] bg-white shadow-sm">
+        <Card className="border border-slate-200 bg-white shadow-none">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600">Requested</p>
             <p className="text-lg font-bold text-[#b07d00]">{requestedCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-[#e5e7eb] bg-white shadow-sm">
+        <Card className="border border-slate-200 bg-white shadow-none">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600">Booked</p>
             <p className="text-lg font-bold text-[#4a6fae]">{bookedCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-[#e5e7eb] bg-white shadow-sm">
+        <Card className="border border-slate-200 bg-white shadow-none">
           <CardContent className="p-4">
             <p className="text-sm text-gray-600">Imported</p>
-            <p className="text-lg font-bold text-[#3f67a8]">{importedCount}</p>
+            <p className="text-lg font-bold text-[#0f766e]">{importedCount}</p>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border-[#e5e7eb] bg-white shadow-sm">
+      <Card className="border border-slate-200 bg-white shadow-none">
         <CardContent className="flex flex-wrap items-center gap-3 p-4">
           <Button
             variant={viewMode === "calendar" ? "default" : "secondary"}
+            className={viewMode === "calendar" ? "bg-slate-900 hover:bg-slate-800" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}
             onClick={() => setViewMode("calendar")}
           >
             <CalendarDays className="mr-2 h-4 w-4" />
@@ -497,6 +498,7 @@ const ManageBookings = () => {
           </Button>
           <Button
             variant={viewMode === "table" ? "default" : "secondary"}
+            className={viewMode === "table" ? "bg-slate-900 hover:bg-slate-800" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}
             onClick={() => setViewMode("table")}
           >
             <Table2 className="mr-2 h-4 w-4" />
@@ -509,7 +511,7 @@ const ManageBookings = () => {
               Booked
             </span>
             <span className="flex items-center gap-2">
-              <span className="h-3 w-10 rounded-full bg-[#3f67a8]" />
+              <span className="h-3 w-10 rounded-full bg-[#0f766e]" />
               Imported
             </span>
             <span className="flex items-center gap-2">
@@ -526,7 +528,7 @@ const ManageBookings = () => {
 
       {viewMode === "calendar" ? (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-          <Card className="border-[#e5e7eb] bg-white shadow-sm xl:col-span-2">
+          <Card className="border border-slate-200 bg-white shadow-none xl:col-span-2">
             <CardHeader>
               <CardTitle>{calendarData?.room?.name || "Room Calendar"}</CardTitle>
             </CardHeader>
@@ -662,7 +664,7 @@ const ManageBookings = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-[#e5e7eb] bg-white shadow-sm">
+          <Card className="border border-slate-200 bg-white shadow-none">
             <CardHeader>
               <CardTitle>Day Control</CardTitle>
             </CardHeader>
@@ -752,7 +754,7 @@ const ManageBookings = () => {
                             <Badge className={STATUS_STYLES[booking.status]}>{booking.status}</Badge>
                           </div>
                           {booking.sourceLabel && (
-                            <p className="mt-1 text-xs font-medium text-[#3f67a8]">Source: {booking.sourceLabel}</p>
+                            <p className="mt-1 text-xs font-medium text-[#0f766e]">Source: {booking.sourceLabel}</p>
                           )}
                           <p className="mt-1 text-xs text-gray-700">{booking.email || (booking.isImported ? "No guest email added yet" : "")}</p>
                           {booking.phone && <p className="text-xs text-gray-700">{booking.phone}</p>}
@@ -776,7 +778,7 @@ const ManageBookings = () => {
                             <div className="mt-2">
                               <Button
                                 size="sm"
-                                className="h-8 w-full"
+                                className="h-8 w-full bg-slate-900 hover:bg-slate-800"
                                 onClick={() =>
                                   navigate(`/hotel/${selectedRoomId}/check-in/${booking._id}`)
                                 }
@@ -791,7 +793,7 @@ const ManageBookings = () => {
                             <div className="mt-2 flex items-center gap-2">
                               <Button
                                 size="sm"
-                                className="h-8"
+                                className="h-8 bg-slate-900 hover:bg-slate-800"
                                 onClick={() => handleConfirm(booking._id)}
                                 disabled={bookingDecisionMutation.isLoading}
                               >
@@ -815,7 +817,7 @@ const ManageBookings = () => {
                             <div className="mt-2">
                               <Button
                                 size="sm"
-                                className="h-8 w-full"
+                                className="h-8 w-full bg-slate-900 hover:bg-slate-800"
                                 onClick={() =>
                                   navigate(`/hotel/${selectedRoomId}/check-in/${booking._id}`)
                                 }
@@ -844,7 +846,7 @@ const ManageBookings = () => {
           </Card>
         </div>
       ) : (
-        <Card className="border-[#e5e7eb] bg-white shadow-sm">
+        <Card className="border border-slate-200 bg-white shadow-none">
           <CardHeader>
             <CardTitle>Booking Requests and Reservations</CardTitle>
           </CardHeader>
@@ -912,7 +914,7 @@ const ManageBookings = () => {
                             <div className="flex items-center gap-2">
                               <Button
                                 size="sm"
-                                className="h-8"
+                                className="h-8 bg-slate-900 hover:bg-slate-800"
                                 onClick={() => handleConfirm(booking._id)}
                                 disabled={bookingDecisionMutation.isLoading}
                               >

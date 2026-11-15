@@ -1,4 +1,5 @@
 import React from "react";
+import { cn } from "../../lib/utils";
 
 interface BadgeProps {
   children: React.ReactNode;
@@ -19,7 +20,7 @@ const Badge: React.FC<BadgeProps> = ({
     outline: "border border-gray-300 text-gray-700 bg-white",
   };
 
-  const classes = `${baseClasses} ${variantClasses[variant]} ${className}`;
+  const classes = cn(baseClasses, variantClasses[variant], className);
 
   return <span className={classes}>{children}</span>;
 };

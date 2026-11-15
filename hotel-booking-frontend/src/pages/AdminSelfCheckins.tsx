@@ -53,18 +53,18 @@ const AdminSelfCheckins = () => {
   const items = data?.items || [];
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#f5f6f8] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
           <Link to="/admin-portal" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-800">
             <ArrowLeft className="h-4 w-4" />
             Back to Admin Portal
           </Link>
-          <h1 className="text-3xl font-bold text-slate-900">Self Check-In Submissions</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Self Check-In Submissions</h1>
           <p className="mt-2 text-sm text-slate-600">Table view of all guest self check-in submissions.</p>
         </div>
 
-        <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200 sm:p-6">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-6">
           {isLoading ? (
             <p className="text-sm text-slate-500">Loading submissions...</p>
           ) : items.length === 0 ? (
@@ -73,14 +73,14 @@ const AdminSelfCheckins = () => {
             <>
               <div className="space-y-3 md:hidden">
                 {items.map((item) => (
-                  <article key={item._id} className="rounded-2xl border border-slate-200 p-4">
+                  <article key={item._id} className="rounded-xl border border-slate-200 p-4">
                     <p className="text-sm text-slate-500">{formatDateTime(item.createdAt)}</p>
                     <p className="mt-1 text-lg font-semibold text-slate-900">{item.fullName}</p>
                     <p className="text-sm text-slate-600">Breakfast: {item.breakfastTime}</p>
                     <p className="text-sm text-slate-600">Guests: {item.guests.length}</p>
                     <Link
                       to={`/admin-portal/self-checkins/${item._id}`}
-                      className="mt-3 inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1.5 text-sm text-white"
+                      className="mt-3 inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-800"
                     >
                       <Eye className="h-4 w-4" />
                       Open details
@@ -89,7 +89,7 @@ const AdminSelfCheckins = () => {
                       type="button"
                       onClick={() => onDelete(item._id)}
                       disabled={deleteMutation.isLoading}
-                      className="ml-2 mt-3 inline-flex items-center gap-2 rounded-full border border-rose-300 px-3 py-1.5 text-sm text-rose-700 disabled:opacity-50"
+                      className="ml-2 mt-3 inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-1.5 text-sm text-rose-700 hover:bg-rose-50 disabled:opacity-50"
                     >
                       <Trash2 className="h-4 w-4" />
                       Delete
@@ -110,9 +110,9 @@ const AdminSelfCheckins = () => {
                       <th className="px-3 py-3">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-slate-100 text-slate-600">
                     {items.map((item) => (
-                      <tr key={item._id}>
+                      <tr key={item._id} className="hover:bg-slate-50/80">
                         <td className="px-3 py-3">{formatDateTime(item.createdAt)}</td>
                         <td className="px-3 py-3 font-medium text-slate-900">{item.fullName}</td>
                         <td className="px-3 py-3">{item.breakfastTime}</td>
@@ -122,7 +122,7 @@ const AdminSelfCheckins = () => {
                           <div className="flex items-center gap-2">
                             <Link
                               to={`/admin-portal/self-checkins/${item._id}`}
-                              className="inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1.5 text-xs text-white"
+                              className="inline-flex items-center gap-2 rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
                             >
                               <Eye className="h-3.5 w-3.5" />
                               Open
@@ -131,7 +131,7 @@ const AdminSelfCheckins = () => {
                               type="button"
                               onClick={() => onDelete(item._id)}
                               disabled={deleteMutation.isLoading}
-                              className="inline-flex items-center gap-2 rounded-full border border-rose-300 px-3 py-1.5 text-xs text-rose-700 disabled:opacity-50"
+                              className="inline-flex items-center gap-2 rounded-md border border-rose-200 px-3 py-1.5 text-xs text-rose-700 hover:bg-rose-50 disabled:opacity-50"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                               Delete

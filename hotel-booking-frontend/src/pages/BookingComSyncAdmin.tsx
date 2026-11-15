@@ -303,16 +303,17 @@ const BookingComSyncAdmin = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+      <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7 md:flex-row md:items-start md:justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Booking.com Sync</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Booking.com Sync</h1>
+          <p className="mt-2 text-sm text-slate-600">
             Configure room feed URLs, review sync state, and trigger imports before checking room calendars.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
+            className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
             onClick={() => syncMutation.mutate({})}
             disabled={syncMutation.isLoading || roomsLoading}
           >
@@ -320,7 +321,7 @@ const BookingComSyncAdmin = () => {
             Sync All Rooms
           </Button>
           <Link to="/manage-bookings">
-            <Button>
+            <Button className="bg-slate-900 hover:bg-slate-800">
               <CalendarClock className="mr-2 h-4 w-4" />
               Open Manage Bookings
             </Button>
@@ -328,10 +329,10 @@ const BookingComSyncAdmin = () => {
         </div>
       </div>
 
-      <Card>
+      <Card className="border-slate-200 shadow-none">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-xl">
-            <Settings2 className="h-5 w-5 text-primary-600" />
+          <CardTitle className="flex items-center gap-2 text-xl text-slate-900">
+            <Settings2 className="h-5 w-5 text-slate-700" />
             Control Panel
           </CardTitle>
           <CardDescription>
@@ -339,28 +340,28 @@ const BookingComSyncAdmin = () => {
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 md:grid-cols-3">
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-gray-600">Sync cadence</p>
             <p className="text-lg font-semibold text-gray-900">Every 2 hours</p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-gray-600">Configured rooms</p>
             <p className="text-lg font-semibold text-gray-900">{rooms?.length || 0}</p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
             <p className="text-sm text-gray-600">Manual action</p>
             <p className="text-lg font-semibold text-gray-900">Sync now available</p>
           </div>
-          <div className="rounded-lg border border-gray-200 bg-white p-4 md:col-span-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 md:col-span-3">
             <p className="text-sm text-gray-600">Export behavior</p>
-            <p className="text-lg font-semibold text-gray-900">
+            <p className="text-sm font-medium text-slate-900">
               Booking.com pulls our iCal feed. Imported Booking.com blocks are excluded to avoid sync loops.
             </p>
           </div>
         </CardContent>
       </Card>
 
-      <Card id="sync-errors">
+      <Card id="sync-errors" className="border-slate-200 shadow-none">
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-xl">Sync Errors and History</CardTitle>
@@ -380,6 +381,7 @@ const BookingComSyncAdmin = () => {
               <Button
                 type="button"
                 variant="secondary"
+                className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 onClick={() => setErrorsExpanded((current) => !current)}
               >
                 {errorsExpanded ? (
@@ -435,7 +437,7 @@ const BookingComSyncAdmin = () => {
           const exportFeedUrl = getExportFeedUrl(room);
 
           return (
-            <Card key={room._id}>
+            <Card key={room._id} className="border-slate-200 shadow-none">
               <CardHeader className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <CardTitle className="text-xl">{room.name}</CardTitle>
@@ -501,6 +503,7 @@ const BookingComSyncAdmin = () => {
                         <Button
                           type="button"
                           variant="default"
+                          className="bg-slate-900 hover:bg-slate-800"
                           onClick={() => handleGenerateExportUrl(room._id)}
                           disabled={regenerateExportTokenMutation.isLoading}
                         >
@@ -510,6 +513,7 @@ const BookingComSyncAdmin = () => {
                         <Button
                           type="button"
                           variant="secondary"
+                          className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           onClick={() => copyToClipboard(exportFeedUrl)}
                           disabled={!exportFeedUrl}
                         >
@@ -535,7 +539,7 @@ const BookingComSyncAdmin = () => {
                     <p>Last sync: {formatDateTime(room.bookingComIcal?.lastSyncAt)}</p>
                     <p>Error: {room.bookingComIcal?.lastSyncError || "None"}</p>
                   </div>
-                  <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+                  <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-sm font-semibold text-gray-800">Booking.com via Beds24 (two-way)</p>
                       <Badge className={statusClassName(room.bookingComApi?.lastSyncStatus)}>
@@ -595,6 +599,7 @@ const BookingComSyncAdmin = () => {
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
+                        className="bg-slate-900 hover:bg-slate-800"
                         onClick={() =>
                           apiDraft &&
                           saveApiConfigMutation.mutate({
@@ -613,6 +618,7 @@ const BookingComSyncAdmin = () => {
                       <Button
                         type="button"
                         variant="secondary"
+                        className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                         onClick={() => apiSyncMutation.mutate({ hotelId: room._id })}
                         disabled={apiSyncMutation.isLoading || !room.bookingComApi?.enabled}
                       >
@@ -624,6 +630,7 @@ const BookingComSyncAdmin = () => {
                 </div>
                 <div className="flex flex-wrap gap-2 lg:flex-col lg:items-stretch">
                   <Button
+                    className="bg-slate-900 hover:bg-slate-800"
                     onClick={() => handleSave(room._id)}
                     disabled={saveConfigMutation.isLoading}
                   >
@@ -632,6 +639,7 @@ const BookingComSyncAdmin = () => {
                   </Button>
                   <Button
                     variant="secondary"
+                    className="border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                     onClick={() => syncMutation.mutate({ hotelId: room._id })}
                     disabled={syncMutation.isLoading || !draft?.syncEnabled}
                   >

@@ -27,6 +27,7 @@
   "author": "Arnob Mahmud",
   "license": "ISC",
   "dependencies": {
+    "@azure/identity": "^4.14.1",
     "applicationinsights": "^3.15.1",
     "axios": "^1.21.0",
     "bcryptjs": "^2.4.3",

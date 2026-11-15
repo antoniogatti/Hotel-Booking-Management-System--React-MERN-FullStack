@@ -344,21 +344,120 @@ export const updateBookingDetails = async (
   return response.data;
 };
 
-export const syncBookingFromExcel = async (bookingId: string) => {
-  const response = await axiosInstance.post(`/api/bookings/${bookingId}/sync-excel`);
-  return response.data;
-};
-
-export const syncBookingFromOneNote = async (bookingId: string) => {
-  const response = await axiosInstance.post(`/api/bookings/${bookingId}/sync-onenote`);
-  return response.data;
-};
-
 export const fetchBookingManagementRooms = async (): Promise<
   BookingManagementRoomType[]
 > => {
   const response = await axiosInstance.get("/api/bookings/rooms");
   return response.data;
+};
+
+export type PnlEntryInput = {
+  type: "income" | "expense";
+  date: string;
+  amountCents: number;
+  category: string;
+  description: string;
+  roomId: string | null;
+  status: "paid" | "pending" | "unknown";
+  nights?: number | null;
+  guestCount?: number | null;
+  numberOfNights?: number | null;
+  payee?: string;
+  reference?: string;
+  invoice?: string;
+  notes?: string;
+};
+
+export type PnlEntry = PnlEntryInput & { _id: string };
+
+export type PnlBookingDetails = {
+  country?: string;
+  city?: string;
+  identifier?: string;
+  guestDetails?: string;
+  guestCount?: number;
+  grossAmountCents?: number;
+  netAmountCents?: number;
+  unitAmountCents?: number;
+  invoiceRequired?: boolean;
+  invoiceCreated?: boolean;
+  invoiceNumber?: string;
+  paymentMethod?: string;
+  taxQuarter?: string;
+  includePossibleOverlap?: boolean;
+  excludeFromTotals?: boolean;
+};
+
+export type PnlBooking = {
+  id: string;
+  reference: string;
+  source: "local" | "booking_com" | "recorded";
+  roomId: string;
+  roomName?: string;
+  checkIn: string;
+  checkOut: string;
+  status: string;
+  guestName: string;
+  email: string;
+  phone: string;
+  nationality: string;
+  adults?: number;
+  children?: number;
+  country: string;
+  city: string;
+  identifier: string;
+  guestDetails: string;
+  guestCount: number | null;
+  nights: number | null;
+  netAmountCents: number | null;
+  unitAmountCents: number | null;
+  invoiceRequired: boolean | null;
+  invoiceCreated: boolean | null;
+  invoiceNumber: string;
+  paymentMethod: string;
+  taxQuarter: string;
+  overrides: PnlBookingDetails;
+  amountCents: number | null;
+  currency: string;
+  reason: string;
+  possibleRecordedOverlap?: boolean;
+  possibleRepeatedRecord?: boolean;
+};
+
+export type PnlRecordedIdentity = {
+  reference: string;
+  guestName: string;
+  phone: string;
+  email: string;
+  roomId: string;
+  roomName: string;
+  date: string;
+  nights: number | null;
+};
+
+export const savePnlBookingDetails = async (booking: PnlBooking, details: PnlBookingDetails, identity?: PnlRecordedIdentity): Promise<void> => {
+  await axiosInstance.put(`/api/pnl/bookings/${booking.source}/${booking.id}`, booking.source === "recorded" ? { ...identity, details } : details);
+};
+
+export const fetchPnlBookings = async (year: number): Promise<PnlBooking[]> => {
+  const response = await axiosInstance.get<{ bookings: PnlBooking[] }>(`/api/pnl/bookings?year=${year}`);
+  return response.data.bookings;
+};
+
+export const fetchPnlEntries = async (year: number): Promise<PnlEntry[]> => {
+  const response = await axiosInstance.get<{ entries: PnlEntry[] }>(`/api/pnl/entries?year=${year}`);
+  return response.data.entries;
+};
+
+export const savePnlEntry = async (entry: PnlEntryInput, id?: string): Promise<PnlEntry> => {
+  const response = id
+    ? await axiosInstance.put<PnlEntry>(`/api/pnl/entries/${id}`, entry)
+    : await axiosInstance.post<PnlEntry>("/api/pnl/entries", entry);
+  return response.data;
+};
+
+export const deletePnlEntry = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/api/pnl/entries/${id}`);
 };
 
 export const fetchRoomBookingCalendar = async (
@@ -827,6 +926,18 @@ export const trackPublicPageView = async (payload: PublicPageViewPayload) => {
   } as any);
 };
 
+export const trackClientError = async (payload: {
+  message: string;
+  source?: string;
+  stack?: string;
+  path?: string;
+}) => {
+  await axiosInstance.post("/api/telemetry/client-error", payload, {
+    withCredentials: false,
+    skipAuth: true,
+  } as any);
+};
+
 export const fetchTrafficInsightsDashboard = async (
   days = 7
 ): Promise<TrafficInsightsDashboardResponse> => {
@@ -887,24 +998,14 @@ export type SchedulerRunRow = {
   finishedAt: string;
   durationMs: number;
   processed: number;
-  syncedOneNote: number;
-  syncedExcel: number;
   enrichedNames: number;
   errors: number;
-  errorDetails?: Array<{
-    code: string;
-    message: string;
-    externalEventId?: string;
-    hotelId?: string;
-  }>;
-  reason?: string;
-  errorCode?: string;
-  errorMessage?: string;
 };
 
 export type SchedulerMonitorResponse = {
   date: string;
   timeZone: string;
+  active: false;
   message?: string;
   runs: SchedulerRunRow[];
 };

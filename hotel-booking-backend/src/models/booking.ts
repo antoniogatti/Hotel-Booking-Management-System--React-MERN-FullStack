@@ -1,4 +1,6 @@
 import mongoose, { Document } from "mongoose";
+import { checkInInfoForResponse } from "../lib/booking-check-in-response";
+import pnlBookingDetailsSchema, { PnlBookingDetails } from "./pnl-booking-details";
 
 export interface IBooking extends Document {
   _id: mongoose.Types.ObjectId;
@@ -65,7 +67,7 @@ export interface IBooking extends Document {
     room?: string;
     guestName?: string;
     arrivalNote?: string;
-    nationality?: string;
+      nationality?: string;
     phone?: string;
     whatsapp?: string;
     nights?: number;
@@ -80,6 +82,7 @@ export interface IBooking extends Document {
   country?: string;
   arrivalTime?: "Morning" | "Afternoon" | "Evening" | "Night";
   nationality?: string;
+  pnlIncome?: PnlBookingDetails;
   /** If set, this booking is closed and should not appear in check-in desk */
   closedAt?: Date;
 }
@@ -119,6 +122,7 @@ const bookingSchema = new mongoose.Schema(
       enum: ["Morning", "Afternoon", "Evening", "Night"],
     },
     nationality: { type: String },
+    pnlIncome: { type: pnlBookingDetailsSchema, default: undefined, select: false },
     // Booking closed logic
     closedAt: { type: Date },
     // Check-in Information
@@ -180,6 +184,15 @@ const bookingSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: {
+      transform: (_doc, result) => {
+        result.checkInInfo = checkInInfoForResponse(result);
+        delete result.excelSync;
+        delete result.oneNoteSync;
+        delete result.pnlIncome;
+        return result;
+      },
+    },
   }
 );
 

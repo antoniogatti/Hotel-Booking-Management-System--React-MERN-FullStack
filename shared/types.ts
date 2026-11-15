@@ -159,44 +159,7 @@ export type BookingType = {
     cityTax?: number;
     checkedInAt?: Date;
   };
-  excelSync?: {
-    lastSyncedAt?: Date;
-    sheetName?: string;
-    workbookItemId?: string;
-    matchedRowNumber?: number;
-    matchedRoom?: string;
-    matchedDate?: Date;
-    guestName?: string;
-    invoiceNumber?: string;
-    identifier?: string;
-    paymentVia?: string;
-    pax?: number;
-    totalPrice?: number;
-    unitPrice?: number;
-    netPrice?: number;
-    city?: string;
-    country?: string;
-    raw?: Record<string, string | number | null>;
-  };
-  oneNoteSync?: {
-    lastSyncedAt?: Date;
-    matchedPageId?: string;
-    matchedPageTitle?: string;
-    matchedSectionName?: string;
-    room?: string;
-    guestName?: string;
-    arrivalNote?: string;
-    nationality?: string;
-    phone?: string;
-    whatsapp?: string;
-    nights?: number;
-    checkOutNote?: string;
-    bookingSource?: string;
-    paymentNote?: string;
-    amountDueEUR?: number;
-    notes?: string;
-    rawLines?: string[];
-  };
+
   /** If set, this booking is closed and should not appear in check-in desk */
   closedAt?: Date;
   createdAt?: Date;

@@ -4,9 +4,7 @@ import { useMutation, useQuery } from "react-query";
 import {
   ArrowLeft,
   Calendar,
-  ChevronDown,
   Euro,
-  FileText,
   Globe,
   Mail,
   MapPin,
@@ -63,27 +61,7 @@ type BookingDetails = {
     documents?: string[];
     checkedInAt?: string;
   };
-  excelSync?: {
-    paymentVia?: string;
-  };
-  oneNoteSync?: {
-    lastSyncedAt?: string;
-    matchedPageTitle?: string;
-    matchedSectionName?: string;
-    room?: string;
-    guestName?: string;
-    arrivalNote?: string;
-    nationality?: string;
-    phone?: string;
-    whatsapp?: string;
-    nights?: number;
-    checkOutNote?: string;
-    bookingSource?: string;
-    paymentNote?: string;
-    amountDueEUR?: number;
-    notes?: string;
-    rawLines?: string[];
-  };
+
 };
 
 type CheckInFormData = {
@@ -159,31 +137,12 @@ const withCurrentOption = (options: string[], currentValue: string) => {
   return [currentValue, ...options];
 };
 
-const formatSyncDate = (value?: string) => {
-  if (!value) {
-    return "Not synced yet";
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "Not synced yet";
-  }
-
-  return date.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
-
 const isValidEmail = (email: string) => /\S+@\S+\.\S+/.test(email);
 
 const BookingCheckIn = () => {
   const { bookingId } = useParams<{ bookingId: string }>();
   const navigate = useNavigate();
   const { showToast } = useAppContext();
-  const [isOneNoteOpen, setIsOneNoteOpen] = useState(false);
 
   const [formData, setFormData] = useState<CheckInFormData>({
     firstName: "",
@@ -225,8 +184,6 @@ const BookingCheckIn = () => {
   useEffect(() => {
     if (!booking) return;
 
-    const oneNoteArrivalTime = extractTimeValue(booking.oneNoteSync?.arrivalNote);
-
     setFormData((prev) => ({
       ...prev,
       firstName: booking.firstName || "",
@@ -236,24 +193,19 @@ const BookingCheckIn = () => {
       specialRequests: booking.specialRequests || "",
       arrivalTime:
         extractTimeValue(booking.checkInInfo?.arrivalTime) ||
-        oneNoteArrivalTime ||
         extractTimeValue(booking.arrivalTime) ||
         prev.arrivalTime,
-      phone: booking.checkInInfo?.phone || booking.phone || booking.oneNoteSync?.phone || "",
+      phone: booking.checkInInfo?.phone || booking.phone || "",
       email: booking.checkInInfo?.email || booking.email || "",
       nationality:
         booking.checkInInfo?.nationality ||
         booking.nationality ||
-        booking.oneNoteSync?.nationality ||
         "",
       bookingChannel:
         booking.checkInInfo?.bookingChannel ||
-        booking.oneNoteSync?.bookingSource ||
         (booking.source === "booking_com" ? "Booking.com" : prev.bookingChannel),
       paymentDetails:
         booking.checkInInfo?.paymentDetails ||
-        booking.oneNoteSync?.paymentNote ||
-        booking.excelSync?.paymentVia ||
         prev.paymentDetails,
       specialNotes: booking.checkInInfo?.specialNotes || "",
       breakfastTime: booking.checkInInfo?.breakfast?.time || "",
@@ -301,26 +253,25 @@ const BookingCheckIn = () => {
     }
   );
 
-
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-600">Loading booking details...</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f6f8]">
+        <p className="text-slate-600">Loading booking details...</p>
       </div>
     );
   }
 
   if (!booking) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-gray-600">Booking not found</p>
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f6f8]">
+        <p className="text-slate-600">Booking not found</p>
       </div>
     );
   }
 
   if (booking.closedAt) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-screen items-center justify-center bg-[#f5f6f8]">
         <p className="text-red-600 font-semibold">This booking is closed and cannot be checked in.</p>
       </div>
     );
@@ -345,10 +296,10 @@ const BookingCheckIn = () => {
   const paymentOptions = withCurrentOption(PAYMENT_OPTIONS, formData.paymentDetails);
   const nationalityOptions = withCurrentOption(NATIONALITY_OPTIONS, formData.nationality);
   const inputClass =
-    "mt-1 w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500";
+    "mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-slate-400";
   const selectClass = inputClass;
-  const labelClass = "text-sm font-semibold text-gray-700";
-  const detailBlockClass = "rounded-2xl bg-slate-50 p-4";
+  const labelClass = "text-sm font-medium text-slate-700";
+  const detailBlockClass = "rounded-xl border border-slate-200 bg-slate-50 p-4";
 
   const missingRequiredFields: string[] = [];
   if (isImportedBooking && !formData.firstName.trim()) missingRequiredFields.push("guest first name");
@@ -368,28 +319,30 @@ const BookingCheckIn = () => {
   const isFormValid = missingRequiredFields.length === 0;
 
   return (
+    <div className="min-h-screen bg-[#f5f6f8] text-slate-900">
     <div className="mx-auto max-w-6xl space-y-4 px-3 py-4 sm:space-y-6 sm:px-4 md:px-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:gap-4 sm:p-7">
         <Button
           variant="secondary"
           size="sm"
           onClick={() => navigate(-1)}
-          className="h-10 w-10 rounded-full p-0"
+          className="h-10 w-10 rounded-lg border border-slate-200 bg-white p-0 text-slate-700 hover:bg-slate-50"
+          aria-label="Go back"
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold leading-tight text-gray-900 sm:text-3xl">
+          <h1 className="text-2xl font-semibold leading-tight tracking-tight text-slate-950 sm:text-3xl">
             Guest Check-in{hotelName ? ` - ${hotelName}` : ""}
           </h1>
-          <p className="break-all text-sm text-gray-600 sm:text-base">Ref: {booking.reservationNumber || "N/A"}</p>
+          <p className="break-all text-sm text-slate-600 sm:text-base">Ref: {booking.reservationNumber || "N/A"}</p>
         </div>
       </div>
 
-      <Card className="overflow-hidden rounded-3xl border-slate-200 shadow-sm">
+      <Card className="overflow-hidden border border-slate-200 shadow-none">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-primary-600" />
+            <Calendar className="h-5 w-5 text-slate-600" />
             Booking Summary
           </CardTitle>
         </CardHeader>
@@ -438,91 +391,14 @@ const BookingCheckIn = () => {
         </CardContent>
       </Card>
 
-      {(booking.oneNoteSync || booking.excelSync) && (
-        <Card className="overflow-hidden rounded-3xl border-slate-200 shadow-sm">
-          <CardHeader className="pb-4">
-            <button
-              type="button"
-              onClick={() => setIsOneNoteOpen((current) => !current)}
-              className="flex w-full items-center justify-between gap-4 text-left"
-              aria-expanded={isOneNoteOpen}
-            >
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-cyan-600" />
-                  OneNote Details
-                </CardTitle>
-                <p className="mt-2 text-sm text-gray-600">
-                  Synced notes and extracted booking details used to prefill the check-in form.
-                </p>
-              </div>
-              <ChevronDown
-                className={`h-5 w-5 shrink-0 text-slate-500 transition-transform ${isOneNoteOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-          </CardHeader>
-          {isOneNoteOpen && (
-            <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <div className={detailBlockClass}>
-                <p className="text-sm text-gray-600">Last OneNote Sync</p>
-                <p className="font-semibold text-gray-900">{formatSyncDate(booking.oneNoteSync?.lastSyncedAt)}</p>
-              </div>
-              <div className={detailBlockClass}>
-                <p className="text-sm text-gray-600">Matched Page</p>
-                <p className="font-semibold text-gray-900">{booking.oneNoteSync?.matchedPageTitle || "-"}</p>
-              </div>
-              <div className={detailBlockClass}>
-                <p className="text-sm text-gray-600">Arrival</p>
-                <p className="font-semibold text-gray-900">{booking.oneNoteSync?.arrivalNote || booking.checkInInfo?.arrivalTime || "-"}</p>
-              </div>
-              <div className={detailBlockClass}>
-                <p className="text-sm text-gray-600">Nationality</p>
-                <p className="font-semibold text-gray-900">{booking.oneNoteSync?.nationality || booking.nationality || "-"}</p>
-              </div>
-              <div className={detailBlockClass}>
-                <p className="text-sm text-gray-600">Booking Channel</p>
-                <p className="font-semibold text-gray-900">{booking.oneNoteSync?.bookingSource || booking.checkInInfo?.bookingChannel || booking.sourceLabel || "-"}</p>
-              </div>
-              <div className={detailBlockClass}>
-                <p className="text-sm text-gray-600">Payment</p>
-                <p className="font-semibold text-gray-900">
-                  {booking.oneNoteSync?.paymentNote || booking.excelSync?.paymentVia || booking.checkInInfo?.paymentDetails || "-"}
-                </p>
-              </div>
-              <div className={detailBlockClass}>
-                <p className="text-sm text-gray-600">Phone / WhatsApp</p>
-                <p className="font-semibold break-words text-gray-900">
-                  {booking.oneNoteSync?.phone || booking.phone || "-"}
-                  {booking.oneNoteSync?.whatsapp ? ` · ${booking.oneNoteSync.whatsapp}` : ""}
-                </p>
-              </div>
-              <div className={detailBlockClass}>
-                <p className="text-sm text-gray-600">Amount Due</p>
-                <p className="font-semibold text-gray-900">
-                  {typeof booking.oneNoteSync?.amountDueEUR === "number"
-                    ? `EUR ${booking.oneNoteSync.amountDueEUR.toFixed(2)}`
-                    : `EUR ${currentTotalCost.toFixed(2)}`}
-                </p>
-              </div>
-              {booking.oneNoteSync?.notes && (
-                <div className="rounded-2xl bg-slate-50 p-4 sm:col-span-2">
-                  <p className="text-sm text-gray-600">Notes</p>
-                  <p className="whitespace-pre-wrap text-gray-800">{booking.oneNoteSync.notes}</p>
-                </div>
-              )}
-            </CardContent>
-          )}
-        </Card>
-      )}
-
-      <Card className="overflow-hidden rounded-3xl border-slate-200 shadow-sm">
+      <Card className="overflow-hidden border border-slate-200 shadow-none">
         <CardHeader>
           <CardTitle>Check-in Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {isImportedBooking && (
-            <div className="grid grid-cols-1 gap-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 sm:grid-cols-2">
-              <div className="text-sm leading-6 text-blue-900 sm:col-span-2">
+            <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+              <div className="text-sm leading-6 text-slate-700 sm:col-span-2">
                 This reservation was imported from Booking.com. The guest-name fields below are intentionally separate from the import source so you can enter the real guest details manually.
               </div>
               <div>
@@ -601,7 +477,7 @@ const BookingCheckIn = () => {
                   href={whatsappHref}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-1 inline-block text-xs text-primary-600"
+                  className="mt-1 inline-block text-xs font-medium text-teal-700 hover:text-teal-800"
                 >
                   Open WhatsApp
                 </a>
@@ -623,7 +499,7 @@ const BookingCheckIn = () => {
               {formData.email && (
                 <a
                   href={`mailto:${formData.email}?subject=${mailSubject}`}
-                  className="mt-1 inline-block text-xs text-primary-600"
+                  className="mt-1 inline-block text-xs font-medium text-teal-700 hover:text-teal-800"
                 >
                   Send Email
                 </a>
@@ -686,7 +562,7 @@ const BookingCheckIn = () => {
           </div>
 
           {supportsBreakfast ? (
-            <div className="space-y-4 rounded-2xl border border-amber-100 bg-amber-50/70 p-4">
+            <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div>
                 <label className={labelClass}>Breakfast Time</label>
                 <input
@@ -730,7 +606,7 @@ const BookingCheckIn = () => {
                   />
                 </div>
               </div>
-              <p className="text-xs text-amber-800">
+              <p className="text-xs text-slate-600">
                 Total breakfasts selected: {breakfastTotal} / {guestCount} guests.
               </p>
             </div>
@@ -749,7 +625,7 @@ const BookingCheckIn = () => {
         </CardContent>
       </Card>
 
-      <Card className="overflow-hidden rounded-3xl border-slate-200 shadow-sm">
+      <Card className="overflow-hidden border border-slate-200 shadow-none">
         <CardHeader>
           <CardTitle>Guest Documents</CardTitle>
         </CardHeader>
@@ -769,9 +645,9 @@ const BookingCheckIn = () => {
                     </a>
                     <Button
                       type="button"
-                      variant="destructive"
+                      variant="outline"
                       size="sm"
-                      className="mt-2 w-full"
+                      className="mt-2 w-full border-rose-200 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
                       onClick={() =>
                         setExistingDocuments((prev) => prev.filter((item) => item !== url))
                       }
@@ -795,11 +671,11 @@ const BookingCheckIn = () => {
       </Card>
 
       <div className="flex flex-col-reverse gap-3 sm:flex-row">
-        <Button variant="secondary" className="w-full sm:flex-1" onClick={() => navigate(-1)}>
+        <Button variant="secondary" className="w-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 sm:flex-1" onClick={() => navigate(-1)}>
           Cancel
         </Button>
         <Button
-          className="w-full sm:flex-1"
+          className="w-full bg-slate-900 hover:bg-slate-800 sm:flex-1"
           onClick={() => {
             if (!isFormValid) {
               showToast({
@@ -822,6 +698,7 @@ const BookingCheckIn = () => {
           Required fields: {missingRequiredFields.join(", ")}.
         </p>
       )}
+    </div>
     </div>
   );
 };

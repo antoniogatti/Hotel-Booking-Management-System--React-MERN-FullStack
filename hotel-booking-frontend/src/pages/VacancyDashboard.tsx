@@ -150,10 +150,10 @@ const VacancyDashboard = () => {
   const months = Array.from({ length: 12 }, (_, i) => i + 1);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4">
+    <div className="min-h-screen bg-[#f5f6f8] py-8 px-4 text-slate-900">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
           <button
             onClick={() => navigate(-1)}
             className="flex items-center gap-2 text-teal-600 hover:text-teal-700 font-semibold mb-4 transition"
@@ -163,10 +163,10 @@ const VacancyDashboard = () => {
           </button>
 
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg">
-              <TrendingDown className="h-8 w-8 text-white" />
+            <div className="rounded-xl bg-slate-100 p-3">
+              <TrendingDown className="h-7 w-7 text-slate-700" />
             </div>
-            <h1 className="text-4xl font-bold text-gray-900">
+            <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
               Vacancy Management Dashboard
             </h1>
           </div>
@@ -176,7 +176,7 @@ const VacancyDashboard = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-none p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Year Filter */}
@@ -254,79 +254,79 @@ const VacancyDashboard = () => {
             {/* Key Metrics */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
               {/* Vacancy Rate Card */}
-              <Card className="border-0 shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 text-white">
+              <Card className="overflow-hidden border border-slate-200 shadow-none">
+                <div className="bg-white p-6 text-slate-900">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <p className="text-emerald-100 text-sm font-medium uppercase tracking-wide">
+                      <p className="text-slate-500 text-sm font-medium uppercase tracking-wide">
                         Vacancy Rate
                       </p>
-                      <p className="text-4xl font-bold mt-2">
+                      <p className="text-3xl font-bold mt-2">
                         {dashboardData.occupancy.vacancyPercentage}%
                       </p>
                     </div>
-                    <TrendingDown className="h-12 w-12 opacity-30" />
+                    <TrendingDown className="h-5 w-5 text-emerald-700" />
                   </div>
-                  <p className="text-emerald-100 text-sm">
+                  <p className="text-slate-600 text-sm">
                     {dashboardData.occupancy.remainingNights} sellable nights still open
                   </p>
                 </div>
               </Card>
 
               {/* Available Nights Card */}
-              <Card className="border-0 shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white">
+              <Card className="overflow-hidden border border-slate-200 shadow-none">
+                <div className="bg-white p-6 text-slate-900">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <p className="text-blue-100 text-sm font-medium uppercase tracking-wide">
+                      <p className="text-slate-500 text-sm font-medium uppercase tracking-wide">
                         Available Slots
                       </p>
-                      <p className="text-4xl font-bold mt-2">
+                      <p className="text-3xl font-bold mt-2">
                         {dashboardData.occupancy.remainingNights}
                       </p>
                     </div>
-                    <Calendar className="h-12 w-12 opacity-30" />
+                    <Calendar className="h-5 w-5 text-slate-600" />
                   </div>
-                  <p className="text-blue-100 text-sm">
+                  <p className="text-slate-600 text-sm">
                     Out of {dashboardData.occupancy.sellableNights} sellable nights
                   </p>
                 </div>
               </Card>
 
               {/* Marketing Target Card */}
-              <Card className="border-0 shadow-lg overflow-hidden">
-                <div className="bg-gradient-to-r from-orange-500 to-orange-600 p-6 text-white">
+              <Card className="overflow-hidden border border-slate-200 shadow-none">
+                <div className="bg-white p-6 text-slate-900">
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <p className="text-orange-100 text-sm font-medium uppercase tracking-wide">
+                      <p className="text-slate-500 text-sm font-medium uppercase tracking-wide">
                         Marketing Priority
                       </p>
-                      <p className="text-4xl font-bold mt-2">
+                      <p className="text-3xl font-bold mt-2">
                         {dashboardData.occupancy.vacancyPercentage}
                         %
                       </p>
                     </div>
-                    <Target className="h-12 w-12 opacity-30" />
+                    <Target className="h-5 w-5 text-slate-600" />
                   </div>
-                  <p className="text-orange-100 text-sm">
+                  <p className="text-slate-600 text-sm">
                     Focus on filling these gaps
                   </p>
                 </div>
               </Card>
             </div>
 
-            <Card className="border-0 shadow-lg overflow-hidden mb-8">
-              <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 p-6 text-white">
+            <Card className="mb-8 overflow-hidden border border-slate-200 shadow-none">
+              <div className="bg-white p-6 text-slate-900">
                 <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                   <div>
-                    <p className="text-slate-300 text-sm font-medium uppercase tracking-wide">
+                    <p className="text-slate-500 text-sm font-medium uppercase tracking-wide">
                       Closed Nights
                     </p>
                     <p className="text-4xl font-bold mt-2">
                       {dashboardData.occupancy.closedNights}
                     </p>
                   </div>
-                  <div className="text-sm text-slate-200 space-y-1">
+                  <div className="text-sm text-slate-600 space-y-1">
                     <p>Gross room-nights: {dashboardData.occupancy.grossNights}</p>
                     <p>Sellable room-nights: {dashboardData.occupancy.sellableNights}</p>
                     <p>Booked room-nights: {dashboardData.occupancy.bookedNights}</p>
@@ -339,7 +339,7 @@ const VacancyDashboard = () => {
             {Object.keys(monthGroups).length > 0 ? (
               <div className="space-y-6">
                 {Object.entries(monthGroups).map(([monthKey, dates]) => (
-                  <Card key={monthKey} className="border-0 shadow-lg">
+                  <Card key={monthKey} className="border border-slate-200 shadow-none">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Calendar className="h-5 w-5 text-emerald-600" />
@@ -351,12 +351,12 @@ const VacancyDashboard = () => {
                         {dates.map((date, idx) => (
                           <div
                             key={idx}
-                            className="p-3 border-2 border-emerald-200 bg-emerald-50 rounded-lg text-center hover:bg-emerald-100 transition cursor-pointer"
+                            className="p-3 border border-slate-200 bg-slate-50 rounded-lg text-center"
                           >
-                            <p className="text-sm font-bold text-emerald-900">
+                            <p className="text-sm font-semibold text-slate-900">
                               {date.getDate()}
                             </p>
-                            <p className="text-xs text-emerald-700">
+                            <p className="text-xs text-slate-600">
                               {date.toLocaleDateString("en-US", { weekday: "short" })}
                             </p>
                           </div>
@@ -378,17 +378,17 @@ const VacancyDashboard = () => {
             )}
 
             {/* Marketing Insights */}
-            <Card className="border-0 shadow-lg mt-8 bg-gradient-to-r from-purple-50 to-indigo-50">
+            <Card className="mt-8 border border-slate-200 bg-white shadow-none">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <AlertCircle className="h-5 w-5 text-purple-600" />
+                  <AlertCircle className="h-5 w-5 text-slate-600" />
                   Marketing Recommendations
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-purple-600 text-white text-sm font-bold">
+                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-100 text-slate-700 text-sm font-semibold">
                       1
                     </div>
                   </div>
@@ -401,7 +401,7 @@ const VacancyDashboard = () => {
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-purple-600 text-white text-sm font-bold">
+                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-100 text-slate-700 text-sm font-semibold">
                       2
                     </div>
                   </div>
@@ -414,7 +414,7 @@ const VacancyDashboard = () => {
                 </div>
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0">
-                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-purple-600 text-white text-sm font-bold">
+                    <div className="flex items-center justify-center h-8 w-8 rounded-full bg-slate-100 text-slate-700 text-sm font-semibold">
                       3
                     </div>
                   </div>
@@ -429,7 +429,7 @@ const VacancyDashboard = () => {
             </Card>
           </>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-none p-12 text-center">
             <p className="text-gray-600">No data available for the selected period</p>
           </div>
         )}

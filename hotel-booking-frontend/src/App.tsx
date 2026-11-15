@@ -42,11 +42,13 @@ import AdminSelfCheckins from "./pages/AdminSelfCheckins";
 import AdminSelfCheckinDetail from "./pages/AdminSelfCheckinDetail";
 import SchedulerMonitor from "./pages/SchedulerMonitor";
 import TrafficInsightsDashboard from "./pages/TrafficInsightsDashboard";
+import PnlOverview from "./pages/PnlOverview";
+import PnlEntries from "./pages/PnlEntries";
 import WAInbox from "./pages/WAInbox";
 import SelfCheckin from "./pages/SelfCheckin";
 import { siteConfig } from "./config/siteConfig";
 import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
-import { trackPublicPageView } from "./api-client";
+import { trackClientError, trackPublicPageView } from "./api-client";
 
 const BRAND_NAME = "Palazzo Pinto B&B";
 
@@ -94,6 +96,9 @@ const getPageTitle = (pathname: string): string => {
   if (pathname === "/booking-com-sync") return `${BRAND_NAME} | Booking.com Sync`;
   if (pathname === "/scheduler-monitor") return `${BRAND_NAME} | Scheduler Monitor`;
   if (pathname === "/traffic-insights") return `${BRAND_NAME} | Traffic Insights`;
+  if (pathname === "/pnl") return `${BRAND_NAME} | P&L Overview`;
+  if (pathname === "/pnl/income") return `${BRAND_NAME} | Income`;
+  if (pathname === "/pnl/expenses") return `${BRAND_NAME} | Expenses`;
   if (pathname === "/wa-inbox") return `${BRAND_NAME} | WhatsApp Inbox`;
   if (pathname === "/manage-bookings") return `${BRAND_NAME} | Manage Bookings`;
   if (pathname.startsWith("/hotel/") && pathname.endsWith("/booking")) {
@@ -164,12 +169,48 @@ const PublicPageTrafficTracker = () => {
   return null;
 };
 
+const ClientErrorReporter = () => {
+  useEffect(() => {
+    const report = (message: string, source: string, stack?: string) => {
+      void trackClientError({
+        message: message.slice(0, 500),
+        source: source.slice(0, 300),
+        stack: stack?.slice(0, 4000),
+        path: window.location.pathname,
+      }).catch(() => {
+        // Never let error reporting cause further errors.
+      });
+    };
+
+    const onError = (event: ErrorEvent) =>
+      report(event.message || "Unknown error", event.filename || "window.onerror", event.error?.stack);
+    const onRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason;
+      report(
+        reason?.message || String(reason || "Unhandled rejection"),
+        "unhandledrejection",
+        reason?.stack
+      );
+    };
+
+    window.addEventListener("error", onError);
+    window.addEventListener("unhandledrejection", onRejection);
+    return () => {
+      window.removeEventListener("error", onError);
+      window.removeEventListener("unhandledrejection", onRejection);
+    };
+  }, []);
+
+  return null;
+};
+
 const App = () => {
   const { isLoggedIn, isOwnerOrAdmin, userRole } = useAppContext();
   return (
     <Router>
       <PageTitleManager />
       <PublicPageTrafficTracker />
+      <ClientErrorReporter />
       <ScrollToTop />
       <Routes>
         <Route
@@ -218,7 +259,7 @@ const App = () => {
           path="/api-docs"
           element={
             userRole === "admin" ? (
-              <Layout>
+              <Layout admin>
                 <ApiDocs />
               </Layout>
             ) : (
@@ -230,7 +271,7 @@ const App = () => {
           path="/api-status"
           element={
             userRole === "admin" ? (
-              <Layout>
+              <Layout admin>
                 <ApiStatus />
               </Layout>
             ) : (
@@ -290,7 +331,7 @@ const App = () => {
           path="/business-insights"
           element={
             userRole === "admin" ? (
-              <Layout>
+              <Layout admin>
                 <AnalyticsDashboard />
               </Layout>
             ) : (
@@ -323,7 +364,7 @@ const App = () => {
           path="/my-hotels"
           element={
             isOwnerOrAdmin ? (
-              <Layout>
+              <Layout admin>
                 <MyHotels />
               </Layout>
             ) : (
@@ -335,7 +376,7 @@ const App = () => {
           path="/admin-portal"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <AdminPortal />
               </Layout>
             ) : (
@@ -347,7 +388,7 @@ const App = () => {
           path="/admin-portal/check-in"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <AdminPortalCheckIns />
               </Layout>
             ) : (
@@ -359,7 +400,7 @@ const App = () => {
           path="/admin-portal/self-checkins"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <AdminSelfCheckins />
               </Layout>
             ) : (
@@ -371,7 +412,7 @@ const App = () => {
           path="/admin-portal/self-checkins/:id"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <AdminSelfCheckinDetail />
               </Layout>
             ) : (
@@ -383,7 +424,7 @@ const App = () => {
           path="/booking-dashboard"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <BookingDashboard />
               </Layout>
             ) : (
@@ -395,7 +436,7 @@ const App = () => {
           path="/vacancy-management"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <VacancyDashboard />
               </Layout>
             ) : (
@@ -407,7 +448,7 @@ const App = () => {
           path="/booking/:bookingId"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <BookingDetails />
               </Layout>
             ) : (
@@ -419,7 +460,7 @@ const App = () => {
           path="/booking-com-sync"
           element={
             userRole === "admin" ? (
-              <Layout>
+              <Layout admin>
                 <BookingComSyncAdmin />
               </Layout>
             ) : (
@@ -431,7 +472,7 @@ const App = () => {
           path="/scheduler-monitor"
           element={
             userRole === "admin" ? (
-              <Layout>
+              <Layout admin>
                 <SchedulerMonitor />
               </Layout>
             ) : (
@@ -443,7 +484,7 @@ const App = () => {
           path="/traffic-insights"
           element={
             userRole === "admin" ? (
-              <Layout>
+              <Layout admin>
                 <TrafficInsightsDashboard />
               </Layout>
             ) : (
@@ -451,11 +492,14 @@ const App = () => {
             )
           }
         />
+        <Route path="/pnl" element={userRole === "admin" ? <Layout admin><PnlOverview /></Layout> : <Navigate to="/" />} />
+        <Route path="/pnl/income" element={userRole === "admin" ? <Layout admin><PnlEntries key="income" type="income" /></Layout> : <Navigate to="/" />} />
+        <Route path="/pnl/expenses" element={userRole === "admin" ? <Layout admin><PnlEntries key="expense" type="expense" /></Layout> : <Navigate to="/" />} />
         <Route
           path="/manage-bookings"
           element={
             userRole === "admin" ? (
-              <Layout>
+              <Layout admin>
                 <ManageBookings />
               </Layout>
             ) : (
@@ -467,7 +511,7 @@ const App = () => {
           path="/wa-inbox"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <WAInbox />
               </Layout>
             ) : (
@@ -488,7 +532,7 @@ const App = () => {
           path="/hotel/:hotelId/check-in/:bookingId"
           element={
             userRole === "admin" || userRole === "hotel_owner" ? (
-              <Layout>
+              <Layout admin>
                 <BookingCheckIn />
               </Layout>
             ) : (
@@ -513,7 +557,7 @@ const App = () => {
                 <Route
                   path="/add-hotel"
                   element={
-                    <Layout>
+                    <Layout admin>
                       <AddHotel />
                     </Layout>
                   }
@@ -521,7 +565,7 @@ const App = () => {
                 <Route
                   path="/edit-hotel/:hotelId"
                   element={
-                    <Layout>
+                    <Layout admin>
                       <EditHotel />
                     </Layout>
                   }

@@ -112,7 +112,7 @@ const MyHotels = () => {
           </p>
           <Link
             to="/add-hotel"
-            className="inline-flex items-center bg-[#ea836c] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#db755f] transition-colors"
+            className="inline-flex items-center rounded-lg bg-slate-900 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-800"
           >
             <Plus className="w-5 h-5 mr-2" />
             Add Your First Hotel
@@ -123,18 +123,18 @@ const MyHotels = () => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:p-7">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Hotels</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">My Hotels</h1>
           <p className="text-gray-600 mt-1">
             Manage your hotel listings and bookings
           </p>
         </div>
         <Link
           to="/add-hotel"
-          className="inline-flex items-center bg-gradient-to-r from-primary-600 to-primary-700 text-white px-6 py-3 rounded-xl font-semibold hover:from-primary-700 hover:to-primary-800 transform hover:scale-105 transition-all duration-200 shadow-medium"
+          className="inline-flex items-center rounded-lg bg-slate-900 px-6 py-3 font-semibold text-white transition-colors hover:bg-slate-800"
         >
           <Plus className="w-5 h-5 mr-2" />
           Add Hotel
@@ -143,7 +143,7 @@ const MyHotels = () => {
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-2xl p-6 shadow-soft border border-gray-100">
+        <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Hotels</p>
@@ -151,13 +151,13 @@ const MyHotels = () => {
                 {hotelData.length}
               </p>
             </div>
-            <div className="bg-primary-100 p-3 rounded-xl">
-              <Building2 className="w-6 h-6 text-primary-600" />
+            <div className="rounded-xl bg-slate-100 p-3">
+              <Building2 className="w-6 h-6 text-slate-700" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-soft border border-gray-100">
+        <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">
@@ -176,7 +176,7 @@ const MyHotels = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 shadow-soft border border-gray-100">
+        <div className="rounded-xl border border-slate-200 bg-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
@@ -201,7 +201,7 @@ const MyHotels = () => {
           <div
             key={hotel._id}
             data-testid="hotel-card"
-            className="bg-white rounded-2xl shadow-soft hover:shadow-large transition-all duration-300 border border-gray-100 overflow-hidden group flex flex-col h-full"
+            className="group flex h-full flex-col overflow-hidden rounded-xl border border-slate-200 bg-white transition-shadow hover:shadow-md"
           >
             {/* Hotel Image */}
             <div className="relative h-48 overflow-hidden">
@@ -299,14 +299,14 @@ const MyHotels = () => {
               <div className="flex space-x-3">
                 <Link
                   to={`/edit-hotel/${hotel._id}`}
-                  className="flex-1 bg-[#ea836c] text-white py-3 px-4 rounded-xl font-semibold hover:bg-[#db755f] transition-colors text-center flex items-center justify-center"
+                  className="flex flex-1 items-center justify-center rounded-lg bg-slate-900 px-4 py-3 text-center font-semibold text-white transition-colors hover:bg-slate-800"
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Hotel
                 </Link>
                 <Link
                   to={`/detail/${hotel._id}`}
-                  className="flex-1 bg-white border-2 border-[#aab09a] text-[#2b4463] py-3 px-4 rounded-xl font-semibold hover:bg-[#f8fbf3] transition-colors text-center flex items-center justify-center"
+                  className="flex flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-3 text-center font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                 >
                   <Eye className="w-4 h-4 mr-2" />
                   View Details

@@ -266,16 +266,16 @@ const BookingDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 py-8 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#f5f6f8] py-8 px-4 text-slate-900 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-3 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg shadow-lg">
-              <BarChart3 className="h-7 w-7 text-white" />
+            <div className="rounded-xl bg-slate-100 p-3">
+              <BarChart3 className="h-7 w-7 text-slate-700" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold text-gray-900">Dashboard</h1>
+              <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Dashboard</h1>
               <p className="text-gray-600 text-sm mt-1">
                 Real-time analytics and occupancy insights
               </p>
@@ -284,7 +284,7 @@ const BookingDashboard = () => {
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+        <div className="bg-white rounded-xl border border-slate-200 shadow-none p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Year Filter */}
@@ -363,11 +363,11 @@ const BookingDashboard = () => {
         </div>
 
         {!isLoading && dashboardData && occupancyChartData.length > 0 && (
-          <Card className="border-0 shadow-lg mb-8">
+          <Card className="mb-8 border border-slate-200 shadow-none">
             <CardHeader>
               <CardTitle className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-br from-cyan-500 to-teal-600 rounded-lg">
-                  <TrendingUp className="h-5 w-5 text-white" />
+                <div className="rounded-lg bg-slate-100 p-2">
+                  <TrendingUp className="h-5 w-5 text-slate-700" />
                 </div>
                 Occupancy by Room
               </CardTitle>
@@ -420,29 +420,29 @@ const BookingDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-8">
               {/* Occupancy Card */}
               {dashboardData.occupancy && (
-                <Card className="border-0 shadow-lg overflow-hidden">
-                  <div className="bg-gradient-to-r from-teal-500 via-teal-600 to-teal-700 p-8 text-white">
+                <Card className="overflow-hidden border border-slate-200 shadow-none">
+                  <div className="bg-white p-6 text-slate-900">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-teal-100 font-medium mb-2 text-sm uppercase tracking-wide">
+                        <p className="text-slate-500 font-medium mb-2 text-sm uppercase tracking-wide">
                           Occupancy Rate
                         </p>
-                        <p className="text-5xl font-bold mb-2">
+                        <p className="text-3xl font-bold mb-2">
                           {dashboardData.occupancy.percentage}%
                         </p>
-                        <p className="text-teal-100 text-sm">
+                        <p className="text-slate-600 text-sm">
                           {dashboardData.occupancy.bookedNights} of{" "}
                           {dashboardData.occupancy.sellableNights} sellable nights booked
                         </p>
                       </div>
-                      <div className="relative w-40 h-40 flex-shrink-0">
+                      <div className="relative w-24 h-24 flex-shrink-0">
                         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
                           <circle
                             cx="60"
                             cy="60"
                             r="50"
                             fill="none"
-                            stroke="rgba(255,255,255,0.2)"
+                            stroke="#e2e8f0"
                             strokeWidth="10"
                           />
                           <circle
@@ -450,7 +450,7 @@ const BookingDashboard = () => {
                             cy="60"
                             r="50"
                             fill="none"
-                            stroke="white"
+                            stroke="#0f766e"
                             strokeWidth="10"
                             strokeDasharray={`${
                               3.14 * 100 * (dashboardData.occupancy.percentage / 100)
@@ -459,7 +459,7 @@ const BookingDashboard = () => {
                           />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          <span className="text-3xl font-bold text-white">
+                          <span className="text-lg font-semibold text-slate-900">
                             {dashboardData.occupancy.percentage}%
                           </span>
                         </div>
@@ -481,31 +481,31 @@ const BookingDashboard = () => {
                       },
                     })
                   }
-                  className="cursor-pointer transition-transform duration-300 hover:scale-105"
+                  className="cursor-pointer transition-transform hover:-translate-y-0.5"
                 >
-                  <Card className="border-0 shadow-lg overflow-hidden h-full">
-                    <div className="bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700 p-8 text-white">
+                  <Card className="h-full overflow-hidden border border-slate-200 shadow-none transition-shadow hover:shadow-md">
+                    <div className="bg-white p-6 text-slate-900">
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="text-emerald-100 font-medium mb-2 text-sm uppercase tracking-wide">
+                          <p className="text-slate-500 font-medium mb-2 text-sm uppercase tracking-wide">
                             Vacancy Rate
                           </p>
-                          <p className="text-5xl font-bold mb-2">
+                          <p className="text-3xl font-bold mb-2">
                             {dashboardData.occupancy.vacancyPercentage}%
                           </p>
-                          <p className="text-emerald-100 text-sm">
+                          <p className="text-slate-600 text-sm">
                             {dashboardData.occupancy.remainingNights} of{" "}
                             {dashboardData.occupancy.sellableNights} sellable nights open
                           </p>
                         </div>
-                        <div className="relative w-40 h-40 flex-shrink-0">
+                        <div className="relative w-24 h-24 flex-shrink-0">
                           <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
                             <circle
                               cx="60"
                               cy="60"
                               r="50"
                               fill="none"
-                              stroke="rgba(255,255,255,0.2)"
+                              stroke="#e2e8f0"
                               strokeWidth="10"
                             />
                             <circle
@@ -513,7 +513,7 @@ const BookingDashboard = () => {
                               cy="60"
                               r="50"
                               fill="none"
-                              stroke="white"
+                              stroke="#0f766e"
                               strokeWidth="10"
                               strokeDasharray={`${
                                 3.14 *
@@ -524,7 +524,7 @@ const BookingDashboard = () => {
                             />
                           </svg>
                           <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <span className="text-3xl font-bold text-white">
+                            <span className="text-lg font-semibold text-slate-900">
                               {dashboardData.occupancy.vacancyPercentage}%
                             </span>
                           </div>
@@ -537,11 +537,11 @@ const BookingDashboard = () => {
 
               {/* Top 5 Nationalities */}
               {dashboardData.topNationalities && dashboardData.topNationalities.length > 0 && (
-                <Card className="border-0 shadow-lg">
+                <Card className="border border-slate-200 shadow-none">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-3">
-                      <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg">
-                        <Globe className="h-5 w-5 text-white" />
+                      <div className="rounded-lg bg-slate-100 p-2">
+                        <Globe className="h-5 w-5 text-slate-700" />
                       </div>
                       Top 5 Guest Nationalities
                     </CardTitle>
@@ -552,20 +552,20 @@ const BookingDashboard = () => {
                         <div key={idx}>
                           <div className="flex justify-between items-center mb-2">
                             <div className="flex items-center gap-3">
-                              <span className="text-lg font-bold text-indigo-600">
+                              <span className="text-lg font-semibold text-slate-500">
                                 #{idx + 1}
                               </span>
                               <span className="font-semibold text-gray-800">
                                 {item.nationality}
                               </span>
                             </div>
-                            <span className="px-3 py-1 bg-indigo-100 text-indigo-700 font-bold rounded-full text-sm">
+                            <span className="px-3 py-1 bg-slate-100 text-slate-700 font-semibold rounded-full text-sm">
                               {item.count} bookings
                             </span>
                           </div>
                           <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                             <div
-                              className="bg-gradient-to-r from-indigo-400 to-indigo-600 h-3 rounded-full transition-all duration-500"
+                              className="bg-slate-500 h-3 rounded-full transition-all duration-500"
                               style={{
                                 width: `${
                                   (item.count / dashboardData.topNationalities[0].count) * 100
@@ -582,18 +582,18 @@ const BookingDashboard = () => {
             </div>
 
             {dashboardData.occupancy && (
-              <Card className="border-0 shadow-lg mb-8 overflow-hidden">
-                <div className="bg-gradient-to-r from-slate-700 via-slate-800 to-slate-900 p-6 text-white">
+              <Card className="mb-8 overflow-hidden border border-slate-200 shadow-none">
+                <div className="bg-white p-6 text-slate-900">
                   <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                     <div>
-                      <p className="text-slate-300 font-medium mb-2 text-sm uppercase tracking-wide">
+                      <p className="text-slate-500 font-medium mb-2 text-sm uppercase tracking-wide">
                         Closed Nights
                       </p>
                       <p className="text-4xl font-bold">
                         {dashboardData.occupancy.closedNights}
                       </p>
                     </div>
-                    <div className="text-sm text-slate-200 space-y-1">
+                    <div className="text-sm text-slate-600 space-y-1">
                       <p>
                         Gross room-nights: {dashboardData.occupancy.grossNights}
                       </p>
@@ -622,18 +622,18 @@ const BookingDashboard = () => {
                     onClick={() =>
                       setSelectedStatus(isSelected ? "" : status)
                     }
-                    className={`cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                      isSelected ? "ring-2 ring-offset-2 ring-teal-500" : ""
+                    className={`cursor-pointer transition-transform hover:-translate-y-0.5 ${
+                      isSelected ? "rounded-xl ring-2 ring-offset-2 ring-slate-500" : ""
                     }`}
                   >
-                    <Card className={`border-2 shadow-lg h-full hover:shadow-xl ${
-                      isSelected ? "border-teal-500" : `border-transparent ${config.lightBg}`
+                    <Card className={`h-full border bg-white shadow-none transition-shadow hover:shadow-md ${
+                      isSelected ? "border-slate-500" : "border-slate-200"
                     }`}>
                       <CardContent className="pt-6">
                         <div
-                          className={`rounded-xl p-4 mb-4 bg-gradient-to-br ${config.color} shadow-md`}
+                          className={`inline-flex rounded-lg p-2 mb-4 ${config.lightBg} ${config.textColor}`}
                         >
-                          <Icon className="h-8 w-8 text-white" />
+                          <Icon className="h-5 w-5" />
                         </div>
                         <p className={`text-sm font-semibold ${config.textColor} mb-1 uppercase tracking-wide`}>
                           {config.label}
@@ -650,11 +650,11 @@ const BookingDashboard = () => {
 
             {/* Bookings Table - Shows when status selected */}
             {selectedStatus && dashboardData.bookings.length > 0 && (
-              <Card className="border-0 shadow-lg">
+              <Card className="border border-slate-200 shadow-none">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg">
-                      <CheckCircle2 className="h-5 w-5 text-white" />
+                    <div className="rounded-lg bg-slate-100 p-2">
+                      <CheckCircle2 className="h-5 w-5 text-slate-700" />
                     </div>
                     Booking Details -{" "}
                     {statusConfig[selectedStatus as keyof typeof statusConfig].label}
@@ -913,7 +913,7 @@ const BookingDashboard = () => {
             )}
 
             {selectedStatus && dashboardData.bookings.length === 0 && (
-              <Card className="border-0 shadow-lg">
+              <Card className="border border-slate-200 shadow-none">
                 <CardContent className="py-12 text-center">
                   <p className="text-gray-600">
                     No bookings found for{" "}
@@ -936,7 +936,7 @@ const BookingDashboard = () => {
             )}
           </>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-none p-12 text-center">
             <p className="text-gray-600">No data available for the selected period</p>
           </div>
         )}

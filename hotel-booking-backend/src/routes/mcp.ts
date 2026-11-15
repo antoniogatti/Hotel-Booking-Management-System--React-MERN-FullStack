@@ -382,7 +382,7 @@ router.post("/execute", verifyMcpToken, async (req: Request, res: Response) => {
         if (bookingId) query._id = bookingId;
         if (bookingRef) query.reservationNumber = bookingRef;
 
-        const booking = await Booking.findOne(query).lean();
+        const booking = await Booking.findOne(query).select("-oneNoteSync -excelSync -pnlIncome").lean();
         if (!booking) {
           return res.status(404).json({ verified: false, message: "booking not found" });
         }

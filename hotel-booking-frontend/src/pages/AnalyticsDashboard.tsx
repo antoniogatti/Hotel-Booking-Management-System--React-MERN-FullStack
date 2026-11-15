@@ -202,12 +202,12 @@ const AnalyticsDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-[#f5f6f8] py-8">
       <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="mb-2 text-3xl font-semibold tracking-tight text-slate-950">
               Business Insights Dashboard
             </h1>
             <p className="text-gray-600">
@@ -216,7 +216,7 @@ const AnalyticsDashboard = () => {
           </div>
           <button
             onClick={() => refetch()}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center rounded-lg bg-slate-900 px-4 py-2 text-white transition-colors hover:bg-slate-800"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh Data

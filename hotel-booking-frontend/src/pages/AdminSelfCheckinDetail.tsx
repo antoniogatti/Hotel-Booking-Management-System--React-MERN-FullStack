@@ -104,19 +104,19 @@ const AdminSelfCheckinDetail = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[#f5f6f8] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-6">
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6">
           <Link to="/admin-portal/self-checkins" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-800">
             <ArrowLeft className="h-4 w-4" />
             Back to submissions
           </Link>
-          <h1 className="text-3xl font-bold text-slate-900">Self Check-In Details</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950">Self Check-In Details</h1>
           <button
             type="button"
             onClick={onDelete}
             disabled={deleteMutation.isLoading}
-            className="mt-4 inline-flex items-center gap-2 rounded-full border border-rose-300 px-4 py-2 text-sm font-semibold text-rose-700 disabled:opacity-50"
+            className="mt-4 inline-flex items-center gap-2 rounded-md border border-rose-200 px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-50 disabled:opacity-50"
           >
             <Trash2 className="h-4 w-4" />
             {deleteMutation.isLoading ? "Deleting..." : "Delete submission"}
@@ -124,15 +124,15 @@ const AdminSelfCheckinDetail = () => {
         </div>
 
         {isLoading || !data ? (
-          <div className="rounded-3xl bg-white p-6 text-sm text-slate-500 shadow-sm ring-1 ring-slate-200">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
             Loading details...
           </div>
         ) : (
           <>
-            <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6">
               <p className="text-xs uppercase tracking-wide text-slate-500">Submitted</p>
               <p className="text-sm text-slate-700">{formatDateTime(data.createdAt)}</p>
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div className="mt-4 grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
                 <p><strong>Primary guest:</strong> {data.fullName}</p>
                 <p><strong>Nights:</strong> {data.numberOfNights}</p>
                 <p><strong>Breakfast time:</strong> {data.breakfastTime}</p>
@@ -142,9 +142,9 @@ const AdminSelfCheckinDetail = () => {
 
             <div className="space-y-4">
               {data.guests.map((guest, index) => (
-                <article key={`${guest.givenName}-${guest.familyName}-${index}`} className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-slate-200">
+                <article key={`${guest.givenName}-${guest.familyName}-${index}`} className="rounded-2xl border border-slate-200 bg-white p-6">
                   <h2 className="text-lg font-semibold text-slate-900">Guest {index + 1}</h2>
-                  <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="mt-3 grid grid-cols-1 gap-3 text-sm text-slate-700 sm:grid-cols-2">
                     <p><strong>Name:</strong> {guest.givenName} {guest.familyName}</p>
                     <p><strong>Breakfast:</strong> {guest.breakfastChoice}</p>
                     <p><strong>Document type:</strong> {guest.documentType}</p>
@@ -160,14 +160,14 @@ const AdminSelfCheckinDetail = () => {
                         {guest.documents.map((doc) => (
                           <div
                             key={doc.gridFsId}
-                            className="w-full rounded-2xl border border-slate-300 px-2.5 py-2 sm:w-auto"
+                            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 sm:w-auto"
                           >
                             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
                               <span className="block min-w-0 flex-1 truncate text-sm">{doc.filename}</span>
                               <div className="flex shrink-0 items-center gap-2">
                                 <button
                                   type="button"
-                                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs"
+                                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                                   onClick={() => viewFile(doc.gridFsId)}
                                   disabled={
                                     fileAction?.fileId === doc.gridFsId && fileAction.action === "view"
@@ -180,7 +180,7 @@ const AdminSelfCheckinDetail = () => {
                                 </button>
                                 <button
                                   type="button"
-                                  className="inline-flex items-center gap-1 rounded-full border border-slate-200 px-2 py-1 text-xs"
+                                  className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                                   onClick={() => downloadFile(doc.gridFsId, doc.filename)}
                                   disabled={
                                     fileAction?.fileId === doc.gridFsId && fileAction.action === "download"
