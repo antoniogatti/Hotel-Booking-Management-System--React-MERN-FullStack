@@ -65,6 +65,11 @@ Booking.com matches based on reference or room and check-in; compare check-out
 and guest details before deciding how to reconcile. These are suggestions only:
 they do not link records or alter totals.
 
+The Registration group includes independent Check-in desk and Self check-in
+checkboxes. They save immediately as P&L booking details, including on recorded
+income, and can be filtered like other columns. They are manual markers only:
+checking them does not send an email or mark a guest checked in.
+
 Select site or Booking.com rows and open Check-in actions to access each
 staff check-in procedure or email guests individually. Desk emails invite
 guests to check in with staff. Self check-in emails require the actual access

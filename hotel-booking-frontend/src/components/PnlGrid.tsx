@@ -26,7 +26,7 @@ type Column = {
   key: string;
   label: string;
   width?: number;
-  kind?: "date" | "money" | "number" | "room" | "payment" | "boolean" | "invoiceStatus";
+  kind?: "date" | "money" | "number" | "room" | "payment" | "boolean" | "invoiceStatus" | "checkbox";
   readOnly?: boolean;
   recordedOnly?: boolean;
   overlapOnly?: boolean;
@@ -49,6 +49,8 @@ const incomeColumns: Column[] = [
   { key: "city", label: "City" },
   { key: "phone", label: "Phone", width: 150, recordedOnly: true },
   { key: "email", label: "Email", width: 200, recordedOnly: true },
+  { key: "checkInDesk", label: "Check-in desk", kind: "checkbox" },
+  { key: "selfCheckIn", label: "Self check-in", kind: "checkbox" },
   { key: "invoiceDate", label: "Invoice date", kind: "date" },
   { key: "invoiceNumber", label: "Invoice number" },
   { key: "invoiceRequired", label: "Invoice required", kind: "boolean" },
@@ -74,7 +76,7 @@ const incomeGroups = [
 ];
 const groupKeys: Record<string, string[]> = {
   stayV2: ["roomId", "date", "checkOut", "guestName", "reference", "source", "grossAmountCents", "nights", "guestCount"],
-  registrationV2: ["identifier", "guestDetails", "country", "city", "phone", "email"],
+  registrationV2: ["identifier", "guestDetails", "country", "city", "phone", "email", "checkInDesk", "selfCheckIn"],
   invoicingV2: ["invoiceDate", "invoiceNumber", "invoiceRequired", "invoiceCreated", "unit", "netAmountCents", "touristTaxCents", "month", "taxQuarter"],
   reviewV2: ["notes", "paymentMethod", "paymentStatus", "sourceAmount", "possibleBookings", "status", "includePossibleOverlap", "excludeFromTotals"],
 };
@@ -127,6 +129,8 @@ function makeBookingRow(booking: api.PnlBooking): GridRow {
     invoiceDate: booking.invoiceDate || "", touristTaxCents: money(booking.touristTaxCents),
     invoiceNumber: booking.invoiceNumber, invoiceRequired: booleanValue(booking.invoiceRequired),
     invoiceCreated: booleanValue(booking.invoiceCreated),
+    checkInDesk: booking.overrides?.checkInDesk ? "yes" : "no",
+    selfCheckIn: booking.overrides?.selfCheckIn ? "yes" : "no",
     includePossibleOverlap: booleanValue(booking.overrides?.includePossibleOverlap),
     excludeFromTotals: booleanValue(booking.overrides?.excludeFromTotals),
   };
@@ -223,6 +227,8 @@ function buildSave(row: GridRow, values: Values, rooms: Room[]) {
   if (changed("invoiceCreated")) details.invoiceCreated = values.invoiceCreated ? values.invoiceCreated === "yes" : undefined;
   if (changed("includePossibleOverlap")) details.includePossibleOverlap = values.includePossibleOverlap ? values.includePossibleOverlap === "yes" : undefined;
   if (changed("excludeFromTotals")) details.excludeFromTotals = values.excludeFromTotals ? values.excludeFromTotals === "yes" : undefined;
+  if (changed("checkInDesk")) details.checkInDesk = values.checkInDesk === "yes";
+  if (changed("selfCheckIn")) details.selfCheckIn = values.selfCheckIn === "yes";
   if (details.invoiceCreated !== undefined && details.invoiceRequired !== true) throw new Error("Set invoice required to Yes before setting its status.");
   if (details.invoiceNumber && details.invoiceRequired === false) throw new Error("Clear the invoice number before selecting No.");
   if (details.invoiceCreated === true && !details.invoiceNumber) throw new Error("Enter an invoice number before marking it created.");
@@ -243,6 +249,7 @@ function buildSave(row: GridRow, values: Values, rooms: Room[]) {
 }
 
 function display(row: GridRow, column: Column, rooms: Room[], bookings: api.PnlBooking[] = []): string {
+  if (column.kind === "checkbox") return row.values[column.key] === "yes" ? "Yes" : "No";
   if (column.key === "month") return row.values.date ? row.values.date.slice(0, 7) : "";
   if (column.key === "source") return row.booking?.source === "local" ? "Site" : row.booking?.source === "booking_com" ? "Booking.com" : "Recorded income";
   if (column.key === "nights" && row.booking) return stringNumber(stayNights(row.values.date, row.values.checkOut));
@@ -556,7 +563,10 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
               const color = sheet === "income" ? incomeLayout.colorTags.find((tag) => tag.id === incomeLayout.columnColors[column.key])?.color : undefined;
               return <td key={column.key} title={readOnly ? "Read-only" : undefined} style={{ left: pinnedOffset(columnIndex), backgroundColor: color ? tint(color, 0.08, readOnly ? 248 : 255) : undefined }} className={`${pinnedOffset(columnIndex) !== undefined ? "sticky z-10" : ""} border-b border-r border-slate-200 align-top ${readOnly ? "bg-slate-50 px-2 py-2 text-slate-600 [overflow-wrap:anywhere]" : "bg-white"}`}>
                 {column.key === "possibleBookings" && row.booking ? row.booking.source === "recorded" ? <PnlBookingMatches matches={possibleBookingMatches({ source: row.booking.source, reference: row.values.reference, roomId: row.values.roomId, checkIn: row.values.date, checkOut: display(row, { key: "checkOut", label: "Check-out" }, rooms) }, bookings)} /> : "—"
-                  : readOnly ? value || "—" : column.kind === "room" ? <select {...common} className={cellClass}><option value="">Unassigned</option>{value && !rooms.some((room) => room._id === value) && <option value={value}>Removed room</option>}{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select>
+                  : readOnly ? value || "—" : column.kind === "checkbox" ? <div className={`flex min-h-10 items-center px-3 ${row.values[column.key] !== row.saved[column.key] ? "bg-amber-50" : ""}`}>
+                    <input type="checkbox" aria-label={label} checked={value === "yes"} onChange={(event) => { change(row, column.key, event.target.checked ? "yes" : "no"); void saveRow(row); }} className="h-4 w-4 accent-teal-700" />
+                  </div>
+                  : column.kind === "room" ? <select {...common} className={cellClass}><option value="">Unassigned</option>{value && !rooms.some((room) => room._id === value) && <option value={value}>Removed room</option>}{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select>
                   : column.kind === "payment" ? <select {...common} className={cellClass}><option value="unknown">Not specified</option><option value="paid">Paid</option><option value="pending">Pending</option></select>
                   : column.kind === "boolean" || column.kind === "invoiceStatus" ? <select {...common} className={cellClass}><option value="">Not specified</option><option value="yes">{column.kind === "boolean" ? "Yes" : "Created"}</option><option value="no">{column.kind === "boolean" ? "No" : "Pending"}</option></select>
                   : ["description", "guestName", "notes", "guestDetails", "email", "payee"].includes(column.key)

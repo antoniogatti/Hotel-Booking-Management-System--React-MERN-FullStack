@@ -150,7 +150,7 @@ const validDate = (value: unknown): value is string => {
 const parseBookingDetails = (body: unknown): PnlBookingDetails | null => {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const input = body as Record<string, unknown>;
-  const fields = ["country", "city", "identifier", "guestDetails", "notes", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "invoiceDate", "touristTaxCents", "paymentMethod", "paymentStatus", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
+  const fields = ["country", "city", "identifier", "guestDetails", "notes", "checkInDesk", "selfCheckIn", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "invoiceDate", "touristTaxCents", "paymentMethod", "paymentStatus", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
   if (Object.keys(input).some((key) => !fields.includes(key))) return null;
   const details: PnlBookingDetails = {};
   for (const key of ["country", "city", "identifier", "guestDetails", "notes", "invoiceNumber", "paymentMethod", "taxQuarter"] as const) {
@@ -175,7 +175,7 @@ const parseBookingDetails = (body: unknown): PnlBookingDetails | null => {
     if (typeof value !== "number" || !Number.isSafeInteger(value) || value < min || value > max) return null;
     details[key] = value;
   }
-  for (const key of ["invoiceRequired", "invoiceCreated", "includePossibleOverlap", "excludeFromTotals"] as const) {
+  for (const key of ["invoiceRequired", "invoiceCreated", "includePossibleOverlap", "excludeFromTotals", "checkInDesk", "selfCheckIn"] as const) {
     const value = input[key];
     if (value === undefined || value === null) continue;
     if (typeof value !== "boolean") return null;

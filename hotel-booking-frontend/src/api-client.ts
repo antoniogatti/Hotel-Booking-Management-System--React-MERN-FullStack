@@ -376,6 +376,8 @@ export type PnlBookingDetails = {
   identifier?: string;
   guestDetails?: string;
   notes?: string;
+  checkInDesk?: boolean;
+  selfCheckIn?: boolean;
   guestCount?: number;
   grossAmountCents?: number;
   netAmountCents?: number;

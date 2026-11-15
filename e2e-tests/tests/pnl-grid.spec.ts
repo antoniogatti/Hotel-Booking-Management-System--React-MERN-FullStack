@@ -119,6 +119,58 @@ test("an uncertain email request is not automatically retried", async ({ page })
   expect(attempts).toBe(1);
 });
 
+test("check-in markers autosave independently, retry failures, and survive reload", async ({ page }) => {
+  const base = {
+    roomId, roomName: "Test room", checkIn: `${year}-01-02`, checkOut: `${year}-01-05`,
+    status: "confirmed", phone: "", country: "", city: "", identifier: "", guestDetails: "", guestCount: 2,
+    nights: 3, amountCents: 10000, currency: "EUR", reason: "", netAmountCents: 9000, unitAmountCents: 3000,
+    invoiceRequired: null, invoiceCreated: null, invoiceNumber: "", paymentMethod: "", taxQuarter: "",
+  };
+  const local = { ...base, id: "507f1f77bcf86cd799439021", reference: "SITE-1", source: "local", guestName: "First Guest", email: "first@example.test" };
+  const recorded = { ...base, id: "a".repeat(64), reference: "REC-1", source: "recorded", guestName: "Recorded Guest", email: "" };
+  const saved: Record<string, Record<string, unknown>> = { [local.id]: {}, [recorded.id]: { grossAmountCents: 10000 } };
+  let fail = false;
+  let requests = 0;
+  await page.route(/\/api\/pnl\/entries(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { entries: [] } }));
+  await page.route(/\/api\/pnl\/bookings(?:\/|\?|$)/, async (route) => {
+    if (route.request().method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (route.request().method() === "PUT") {
+      requests++;
+      const id = route.request().url().split("/").pop()!;
+      const body = route.request().postDataJSON();
+      if (fail) return route.fulfill({ status: 500, headers, json: { message: "Unavailable" } });
+      if (requests === 1) await new Promise((resolve) => setTimeout(resolve, 400));
+      saved[id] = id === recorded.id ? body.details : body;
+      return route.fulfill({ headers, json: { message: "Saved" } });
+    }
+    return route.fulfill({ headers, json: { bookings: [{ ...local, overrides: saved[local.id] }, { ...recorded, overrides: saved[recorded.id] }] } });
+  });
+  await page.goto(`${uiUrl}/pnl/income`);
+  await page.getByRole("button", { name: "Open full-screen editor" }).click();
+  const editor = page.getByRole("dialog", { name: "Income full-screen editor" });
+  await editor.getByLabel("Check-in desk for First Guest").check();
+  await editor.getByLabel("Self check-in for First Guest").check();
+  await expect.poll(() => saved[local.id]).toMatchObject({ checkInDesk: true, selfCheckIn: true });
+  await editor.getByLabel("Self check-in for Recorded Guest").check();
+  await expect.poll(() => saved[recorded.id]).toMatchObject({ grossAmountCents: 10000, selfCheckIn: true });
+  fail = true;
+  await editor.getByLabel("Check-in desk for First Guest").uncheck();
+  await expect(editor.getByRole("alert")).toContainText("Save failed");
+  expect(saved[local.id].checkInDesk).toBe(true);
+  fail = false;
+  await editor.getByRole("button", { name: "Save all" }).click();
+  await expect.poll(() => saved[local.id].checkInDesk).toBe(false);
+  await editor.getByRole("button", { name: "Close editor" }).click();
+  await page.reload();
+  await page.getByRole("button", { name: "Open full-screen editor" }).click();
+  await expect(editor.getByLabel("Check-in desk for First Guest")).not.toBeChecked();
+  await expect(editor.getByLabel("Self check-in for First Guest")).toBeChecked();
+  await expect(editor.getByLabel("Self check-in for Recorded Guest")).toBeChecked();
+  await editor.getByRole("button", { name: "Show value filters" }).click();
+  await editor.getByLabel("Filter Self check-in by value").selectOption(JSON.stringify("Yes"));
+  await expect(editor.getByText("2 rows", { exact: true })).toBeVisible();
+});
+
 test("expense grid autosaves, preserves unsaved values on failure, and retries", async ({ page }) => {
   let entry = {
     _id: "507f1f77bcf86cd799439014", type: "expense", date: `${year}-01-02`,

@@ -281,18 +281,24 @@ test("booking income details and invoice tracking are editable without altering 
   assert.equal((await request(path, { method: "PUT", body: { invoiceDate: "2026-02-30" } })).status, 400);
   assert.equal((await request(path, { method: "PUT", body: { touristTaxCents: -1 } })).status, 400);
   assert.equal((await request(path, { method: "PUT", body: { paymentStatus: "other" } })).status, 400);
+  assert.equal((await request(path, { method: "PUT", body: { checkInDesk: "true" } })).status, 400);
+  assert.equal((await request(path, { method: "PUT", body: { selfCheckIn: 1 } })).status, 400);
   const details = {
     country: "France", city: "Paris", identifier: "PASS-1", guestDetails: "F 44 - M 45",
     notes: "Follow up with guest", guestCount: 2, grossAmountCents: 24000, netAmountCents: 21000,
     invoiceRequired: true, invoiceCreated: false, invoiceDate: "2026-02-20", touristTaxCents: 0, paymentStatus: "pending",
+    checkInDesk: true, selfCheckIn: false,
   };
-  assert.equal(new PnlBookingIncome({ _id: `local:${localId}`, source: "local", bookingId: localId, updatedBy: adminId, details }).validateSync(), undefined);
+  const document = new PnlBookingIncome({ _id: `local:${localId}`, source: "local", bookingId: localId, updatedBy: adminId, details });
+  assert.equal(document.validateSync(), undefined);
+  assert.deepEqual([document.toObject().details.checkInDesk, document.toObject().details.selfCheckIn], [true, false]);
   assert.equal((await request(path, { method: "PUT", body: details })).status, 200);
   let rows = (await (await request("/bookings?year=2026")).json()).bookings;
   let local = rows.find((row) => row.id === localId);
   assert.deepEqual([local.country, local.city, local.identifier, local.guestCount], ["France", "Paris", "PASS-1", 2]);
   assert.equal(local.notes, "Follow up with guest");
   assert.equal(local.overrides.notes, "Follow up with guest");
+  assert.deepEqual([local.overrides.checkInDesk, local.overrides.selfCheckIn], [true, false]);
   assert.deepEqual([local.amountCents, local.netAmountCents, local.unitAmountCents], [24000, 21000, 7000]);
   assert.deepEqual([local.invoiceRequired, local.invoiceCreated], [true, false]);
   assert.deepEqual([local.invoiceDate, local.touristTaxCents, local.paymentStatus], ["2026-02-20", 0, "pending"]);
@@ -333,10 +339,11 @@ test("standalone income is reported, editable and prevents possible booking over
   assert.equal(rows.find((row) => row.reference === "LOCAL-1").reason, "");
   assert.equal(rows.find((row) => row.reference === "LOCAL-1").possibleRecordedOverlap, true);
   const identity = { reference: "", guestName: "Example", phone: "", email: "", roomId, roomName: "", date: "2026-01-02", nights: 3 };
-  assert.equal((await request(`/bookings/recorded/${id}`, { method: "PUT", body: { ...identity, details: { grossAmountCents: 12000, netAmountCents: 11000, invoiceNumber: "INV-UNKNOWN", invoiceDate: "2026-01-06", touristTaxCents: 500, paymentStatus: "paid", notes: "Recorded note" } } })).status, 200);
+  assert.equal((await request(`/bookings/recorded/${id}`, { method: "PUT", body: { ...identity, details: { grossAmountCents: 12000, netAmountCents: 11000, invoiceNumber: "INV-UNKNOWN", invoiceDate: "2026-01-06", touristTaxCents: 500, paymentStatus: "paid", notes: "Recorded note", selfCheckIn: true } } })).status, 200);
   rows = (await (await request("/bookings?year=2026")).json()).bookings;
   assert.equal(rows.find((row) => row.id === id).unitAmountCents, 3667);
   assert.equal(rows.find((row) => row.id === id).notes, "Recorded note");
+  assert.equal(rows.find((row) => row.id === id).overrides.selfCheckIn, true);
   assert.deepEqual(
     [rows.find((row) => row.id === id).invoiceDate, rows.find((row) => row.id === id).touristTaxCents, rows.find((row) => row.id === id).paymentStatus],
     ["2026-01-06", 500, "paid"]

@@ -6,6 +6,8 @@ export type PnlBookingDetails = {
   identifier?: string;
   guestDetails?: string;
   notes?: string;
+  checkInDesk?: boolean;
+  selfCheckIn?: boolean;
   guestCount?: number;
   grossAmountCents?: number;
   netAmountCents?: number;
@@ -29,6 +31,8 @@ const pnlBookingDetailsSchema = new mongoose.Schema<PnlBookingDetails>(
     identifier: { type: String, trim: true, maxlength: 100 },
     guestDetails: { type: String, trim: true, maxlength: 300 },
     notes: { type: String, trim: true, maxlength: 1000 },
+    checkInDesk: { type: Boolean },
+    selfCheckIn: { type: Boolean },
     guestCount: { type: Number, min: 1, max: 1000, validate: Number.isSafeInteger },
     grossAmountCents: { type: Number, min: 1, max: 10000000000, validate: Number.isSafeInteger },
     netAmountCents: { type: Number, min: -10000000000, max: 10000000000, validate: Number.isSafeInteger },
