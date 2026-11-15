@@ -20,7 +20,7 @@ const validYear = (year: string) => /^\d{4}$/.test(year) && Number(year) >= 1900
 const parseGridView = (body: unknown) => {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const input = body as Record<string, unknown>;
-  if (Object.keys(input).some((key) => !["name", "columns", "hiddenGroups", "frozenColumns", "widths"].includes(key))) return null;
+  if (Object.keys(input).some((key) => !["name", "columns", "hiddenGroups", "frozenColumns", "widths", "colorTags", "columnColors", "colorFilter", "columnFilters"].includes(key))) return null;
   const validKeys = (value: unknown, max: number): value is string[] =>
     Array.isArray(value) && value.length <= max &&
     value.every((key) => typeof key === "string" && /^[a-zA-Z][a-zA-Z0-9]{0,49}$/.test(key)) &&
@@ -35,12 +35,39 @@ const parseGridView = (body: unknown) => {
   if (Object.keys(widths).length > 100 || Object.entries(widths).some(([key, value]) =>
     !columns.includes(key) || typeof value !== "number" || !Number.isSafeInteger(value) || value < 90 || value > 600
   )) return null;
-  return { name: input.name.trim(), columns: input.columns, hiddenGroups: input.hiddenGroups, frozenColumns: input.frozenColumns, widths };
+  const tags = input.colorTags ?? [];
+  if (!Array.isArray(tags) || tags.length > 20 || tags.some((tag) =>
+    !tag || typeof tag !== "object" || Array.isArray(tag) ||
+    Object.keys(tag).some((key) => !["id", "name", "color"].includes(key)) ||
+    typeof tag.id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(tag.id) || tag.id === "uncolored" ||
+    typeof tag.name !== "string" || !tag.name.trim() || tag.name.trim().length > 50 ||
+    typeof tag.color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(tag.color)
+  )) return null;
+  const colorTags: { id: string; name: string; color: string }[] = tags.map((tag) => ({ id: tag.id, name: tag.name.trim(), color: tag.color.toLowerCase() }));
+  if (new Set(colorTags.map((tag) => tag.id)).size !== colorTags.length ||
+      new Set(colorTags.map((tag) => tag.name.toLocaleLowerCase())).size !== colorTags.length) return null;
+  const colorIds = new Set(colorTags.map((tag) => tag.id));
+  const columnColors = input.columnColors ?? {};
+  const columnFilters = input.columnFilters ?? {};
+  if (typeof columnColors !== "object" || !columnColors || Array.isArray(columnColors) ||
+      typeof columnFilters !== "object" || !columnFilters || Array.isArray(columnFilters)) return null;
+  if (Object.keys(columnColors).length > 100 || Object.entries(columnColors).some(([key, value]) =>
+    !columns.includes(key) || typeof value !== "string" || !colorIds.has(value)
+  )) return null;
+  if (Object.keys(columnFilters).length > 100 || Object.entries(columnFilters).some(([key, value]) =>
+    !columns.includes(key) || typeof value !== "string" || value.length > 1000
+  )) return null;
+  const colorFilter = input.colorFilter ?? "";
+  if (typeof colorFilter !== "string" || (colorFilter !== "" && colorFilter !== "uncolored" && !colorIds.has(colorFilter))) return null;
+  return { name: input.name.trim(), columns, hiddenGroups: input.hiddenGroups, frozenColumns: input.frozenColumns, widths,
+    colorTags, columnColors, colorFilter, columnFilters };
 };
 
-const gridViewResponse = (view: { _id: unknown; name: string; columns: string[]; hiddenGroups: string[]; frozenColumns: number; widths: unknown }) => ({
+const gridViewResponse = (view: { _id: unknown; name: string; columns: string[]; hiddenGroups: string[]; frozenColumns: number; widths: unknown;
+  colorTags?: unknown; columnColors?: unknown; colorFilter?: string; columnFilters?: unknown }) => ({
   id: String(view._id), name: view.name, columns: view.columns, hiddenGroups: view.hiddenGroups,
-  frozenColumns: view.frozenColumns, widths: view.widths,
+  frozenColumns: view.frozenColumns, widths: view.widths, colorTags: view.colorTags ?? [],
+  columnColors: view.columnColors ?? {}, colorFilter: view.colorFilter ?? "", columnFilters: view.columnFilters ?? {},
 });
 
 router.get("/views", async (req, res) => {

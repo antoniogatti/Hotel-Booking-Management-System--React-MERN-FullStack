@@ -34,7 +34,12 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
   const [error, setError] = useState("");
   const [reload, setReload] = useState(0);
   const dirty = JSON.stringify(layout) !== baseline || (selected !== "" && name !== baselineName);
-  const visibleCount = columns.filter((column) => !layout.hiddenGroups.includes(column.group)).length;
+  const visibleCount = columns.filter((column) => {
+    const color = layout.columnColors[column.key];
+    return !layout.hiddenGroups.includes(column.group) &&
+      (!layout.colorFilter || (layout.colorFilter === "uncolored" ? !color : color === layout.colorFilter));
+  }).length;
+  const usedColors = new Set(Object.values(layout.columnColors));
 
   useEffect(() => { onDirtyChange(dirty); }, [dirty, onDirtyChange]);
   useEffect(() => {
@@ -58,6 +63,10 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
       hiddenGroups: view.hiddenGroups.filter((key) => groups.some((group) => group.id === key)),
       frozenColumns: view.frozenColumns,
       widths: Object.fromEntries(Object.entries(view.widths).filter(([key]) => known.has(key))),
+      colorTags: view.colorTags ?? [],
+      columnColors: Object.fromEntries(Object.entries(view.columnColors ?? {}).filter(([key]) => known.has(key))),
+      colorFilter: view.colorFilter ?? "",
+      columnFilters: Object.fromEntries(Object.entries(view.columnFilters ?? {}).filter(([key]) => known.has(key))),
     };
   };
   const selectView = (id: string) => {
@@ -74,6 +83,11 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
   };
   const save = async (asNew: boolean) => {
     if (!name.trim()) { setError("Enter a name for the view."); return; }
+    const colorNames = layout.colorTags.map((tag) => tag.name.trim().toLocaleLowerCase());
+    if (colorNames.some((value) => !value) || new Set(colorNames).size !== colorNames.length) {
+      setError("Give each color a unique, non-empty name before saving.");
+      return;
+    }
     if (views.some((view) => (asNew || view.id !== selected) && view.name.toLocaleLowerCase() === name.trim().toLocaleLowerCase())) {
       setError("A view with this name already exists. Choose a different name.");
       return;
@@ -121,6 +135,17 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
         {selected && <Button size="sm" variant="outline" disabled={busy} onClick={() => void remove()}>Delete view</Button>}
         <span aria-live="polite" className="text-slate-600">{loading ? "Loading views…" : busy ? "Saving view…" : dirty ? "Unsaved view changes" : "View unchanged"}</span>
       </div>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <label>Filter columns by color <select aria-label="Filter columns by color" value={layout.colorFilter} onChange={(event) => onChange({ ...layout, colorFilter: event.target.value })} className="ml-1 rounded border border-slate-300 bg-white px-2 py-1">
+          <option value="">All colors</option>
+          {columns.some((column) => !layout.columnColors[column.key]) && <option value="uncolored">Uncolored</option>}
+          {layout.colorTags.filter((tag) => usedColors.has(tag.id)).map((tag) => <option key={tag.id} value={tag.id}>{tag.name || "Unnamed color"}</option>)}
+        </select></label>
+        {Object.keys(layout.columnFilters).length > 0 && <span>
+          {Object.keys(layout.columnFilters).length} value filter(s) active (including hidden columns).
+          <button type="button" className="ml-2 underline" onClick={() => onChange({ ...layout, columnFilters: {} })}>Clear value filters</button>
+        </span>}
+      </div>
       {error && <p role="alert" className="mt-1 text-rose-700">{error} {loadFailed && <button type="button" className="underline" onClick={() => setReload((value) => value + 1)}>Retry</button>}</p>}
       <details className="mt-2">
         <summary className="cursor-pointer font-semibold">Configure columns and groups</summary>
@@ -136,13 +161,41 @@ export default function PnlGridViews({ layout, defaultLayout, columns, groups, o
             {Array.from({ length: visibleCount + 1 }, (_, index) => <option key={index} value={index}>{index}</option>)}
           </select></label>
         </div>
-        <p className="mt-2 text-xs text-slate-600">Drag column handles in the grid, or use these buttons to change the order. The first visible columns are frozen.</p>
+        <div className="mt-3 space-y-2">
+          <div className="flex items-center gap-3">
+            <span className="font-medium">Column colors</span>
+            <button type="button" disabled={layout.colorTags.length >= 20} className="rounded border border-slate-300 bg-white px-2 py-1 disabled:opacity-40" onClick={() => {
+              const names = new Set(layout.colorTags.map((tag) => tag.name.trim().toLocaleLowerCase()));
+              let index = 1;
+              while (names.has(`color ${index}`)) index++;
+              const palette = ["#2f80ed", "#27ae60", "#f2994a", "#9b51e0", "#eb5757"];
+              onChange({ ...layout, colorTags: [...layout.colorTags, { id: crypto.randomUUID(), name: `Color ${index}`, color: palette[(index - 1) % palette.length] }] });
+            }}>Add color</button>
+          </div>
+          {layout.colorTags.map((tag, index) => <div key={tag.id} className="flex flex-wrap items-center gap-2">
+            <label>Color name <input aria-label={`Color name ${index + 1}`} maxLength={50} value={tag.name} onChange={(event) => onChange({ ...layout, colorTags: layout.colorTags.map((item) => item.id === tag.id ? { ...item, name: event.target.value } : item) })} onBlur={() => onChange({ ...layout, colorTags: layout.colorTags.map((item) => item.id === tag.id ? { ...item, name: item.name.trim() } : item) })} className="ml-1 rounded border border-slate-300 px-2 py-1" /></label>
+            <label>Color <input aria-label={`Color value ${index + 1}`} type="color" value={tag.color} onChange={(event) => onChange({ ...layout, colorTags: layout.colorTags.map((item) => item.id === tag.id ? { ...item, color: event.target.value } : item) })} className="ml-1 h-8 w-10 align-middle" /></label>
+            <button type="button" aria-label={`Remove color ${tag.name || index + 1}`} className="rounded border border-slate-300 bg-white px-2 py-1" onClick={() => onChange({ ...layout, colorTags: layout.colorTags.filter((item) => item.id !== tag.id), columnColors: Object.fromEntries(Object.entries(layout.columnColors).filter(([, color]) => color !== tag.id)), colorFilter: layout.colorFilter === tag.id ? "" : layout.colorFilter })}>Remove</button>
+          </div>)}
+        </div>
+        <p className="mt-2 text-xs text-slate-600">Assign colors below. Drag column handles in the grid, or use these buttons to change the order. The first visible columns are frozen.</p>
         <ol aria-label="Column order" className="mt-2 flex max-h-40 flex-wrap gap-1 overflow-auto">
           {layout.columns.map((key, index) => {
             const column = columns.find((item) => item.key === key);
             if (!column) return null;
             return <li key={key} className="flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-1">
               <span>{column.label}</span>
+              <select aria-label={`Color for ${column.label}`} value={layout.columnColors[column.key] || ""} onChange={(event) => {
+                const columnColors = { ...layout.columnColors };
+                if (event.target.value) columnColors[key] = event.target.value;
+                else delete columnColors[key];
+                const colorFilter = layout.colorFilter && layout.colorFilter !== "uncolored" && !Object.values(columnColors).includes(layout.colorFilter) ? "" :
+                  layout.colorFilter === "uncolored" && columns.every((item) => columnColors[item.key]) ? "" : layout.colorFilter;
+                onChange({ ...layout, columnColors, colorFilter });
+              }} className="max-w-28 rounded border border-slate-300 bg-white px-1 py-1">
+                <option value="">No color</option>
+                {layout.colorTags.map((tag) => <option key={tag.id} value={tag.id}>{tag.name || "Unnamed color"}</option>)}
+              </select>
               <button type="button" aria-label={`Move ${column.label} left`} disabled={index === 0} className="px-1 disabled:opacity-30" onClick={() => onChange({ ...layout, columns: moveGridColumn(layout.columns, key, layout.columns[index - 1]) })}>←</button>
               <button type="button" aria-label={`Move ${column.label} right`} disabled={index === layout.columns.length - 1} className="px-1 disabled:opacity-30" onClick={() => onChange({ ...layout, columns: moveGridColumn(layout.columns, key, layout.columns[index + 1]) })}>→</button>
             </li>;

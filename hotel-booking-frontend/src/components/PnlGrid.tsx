@@ -80,6 +80,11 @@ const incomeViewColumns = incomeColumns.map((column) => ({
 }));
 const defaultIncomeLayout: api.PnlGridLayout = {
   columns: incomeColumns.map((column) => column.key), hiddenGroups: [], frozenColumns: 4, widths: {},
+  colorTags: [], columnColors: {}, colorFilter: "", columnFilters: {},
+};
+const tint = (hex: string, strength: number, base = 255) => {
+  const channels = [1, 3, 5].map((index) => Math.round(base * (1 - strength) + parseInt(hex.slice(index, index + 2), 16) * strength));
+  return `rgb(${channels.join(", ")})`;
 };
 const entryColumns: Column[] = [
   { key: "description", label: "Description", width: 210 },
@@ -260,6 +265,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   const [widths, setWidths] = useState<Record<string, number>>({});
   const [incomeLayout, setIncomeLayout] = useState<api.PnlGridLayout>(defaultIncomeLayout);
   const [layoutDirty, setLayoutDirty] = useState(false);
+  const [filterRevision, setFilterRevision] = useState(0);
   const layoutDirtyRef = useRef(false);
   layoutDirtyRef.current = layoutDirty;
   const [, redraw] = useState(0);
@@ -308,6 +314,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           row.booking = { ...payload.booking, ...payload.identity, overrides: payload.details };
         }
         row.saved = values;
+        if (row.sheet === "income") setFilterRevision((previous) => previous + 1);
       } catch {
         row.error = "Save failed. Your changes are still here; retry with Save all.";
       }
@@ -351,14 +358,28 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     const column = incomeColumns.find((item) => item.key === key);
     return column ? [column] : [];
   }), [incomeLayout.columns]);
-  const columns = useMemo(() => sheet === "income" ? orderedIncomeColumns.filter((column) =>
-    !incomeLayout.hiddenGroups.includes(incomeViewColumns.find((item) => item.key === column.key)!.group)
-  ) : sheet === "expense" ? entryColumns : additionalColumns, [sheet, orderedIncomeColumns, incomeLayout.hiddenGroups]);
+  const columns = useMemo(() => sheet === "income" ? orderedIncomeColumns.filter((column) => {
+    const color = incomeLayout.columnColors[column.key];
+    return !incomeLayout.hiddenGroups.includes(incomeViewColumns.find((item) => item.key === column.key)!.group) &&
+      (!incomeLayout.colorFilter || (incomeLayout.colorFilter === "uncolored" ? !color : color === incomeLayout.colorFilter));
+  }) : sheet === "expense" ? entryColumns : additionalColumns,
+  [sheet, orderedIncomeColumns, incomeLayout.hiddenGroups, incomeLayout.colorFilter, incomeLayout.columnColors]);
+  const columnValues = useMemo(() => {
+    if (sheet !== "income") return new Map<string, string[]>();
+    return new Map(incomeColumns.map((column) => [
+      column.key,
+      [...new Set(rows.current.filter((row) => row.sheet === "income").map((row) => display(row, column, rooms, bookings)))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" })),
+    ]));
+  }, [sheet, rooms, bookings, filterRevision]);
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
     const searchColumns = sheet === "income" ? orderedIncomeColumns : columns;
     const result = rows.current.filter((row) => row.sheet === sheet && (!term || searchColumns.some((column) =>
-      display(row, column, rooms, bookings).toLocaleLowerCase().includes(term))));
+      display(row, column, rooms, bookings).toLocaleLowerCase().includes(term))) &&
+      (sheet !== "income" || Object.entries(incomeLayout.columnFilters).every(([key, value]) => {
+        const column = incomeColumns.find((item) => item.key === key);
+        return column && display(row, column, rooms, bookings) === value;
+      })));
     if (sort) {
       const column = searchColumns.find((item) => item.key === sort.key);
       if (column) result.sort((a, b) => {
@@ -372,7 +393,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     }
     return result;
     // Row edits are deliberately not re-sorted while typing.
-  }, [sheet, search, sort, rooms, columns, orderedIncomeColumns, bookings]);
+  }, [sheet, search, sort, rooms, columns, orderedIncomeColumns, bookings, incomeLayout.columnFilters, filterRevision]);
   const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const dirtyCount = rows.current.filter(rowDirty).length;
   const savingCount = rows.current.filter((row) => row.saving).length;
@@ -428,7 +449,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
       <header className="max-h-[60vh] shrink-0 overflow-y-auto border-b border-slate-300 bg-white px-4 py-3 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div><h2 className="text-xl font-semibold">{type === "income" ? "Income" : "Expenses"} editor <span className="text-slate-500">{year}</span></h2>
-            <p className="text-xs text-slate-600">Changes save when you leave a cell. Tab moves across; Enter moves down. Shift+Enter adds a line in text cells. Grey cells are read-only. Booking suggestions need review and do not link records or change totals. Inclusion warnings refresh when you reopen the editor.</p></div>
+            <p className="text-xs text-slate-600">Changes save when you leave a cell. Tab moves across; Enter moves down. Shift+Enter adds a line in text cells. Booking identity and calculated cells are read-only. Booking suggestions need review and do not link records or change totals. Inclusion warnings refresh when you reopen the editor.</p></div>
           <div className="flex flex-wrap items-center gap-2">
             <span aria-live="polite" className={`flex h-10 w-44 items-center text-sm ${errorCount ? "text-rose-700" : "text-slate-600"}`}>{savingCount ? `Saving ${savingCount}…` : errorCount ? `${errorCount} row(s) need attention` : dirtyCount ? `${dirtyCount} unsaved row(s)` : "All changes saved"}</span>
             <Button size="sm" onClick={() => void saveAll()}>Save all</Button>
@@ -453,16 +474,31 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           <colgroup>{sheet !== "income" && <col style={{ width: 90 }} />}{columns.map((column) => <col key={column.key} style={{ width: width(column) }} />)}</colgroup>
           <thead className="sticky top-0 z-20 bg-slate-100">
             <tr>{sheet !== "income" && <th scope="col" className="sticky left-0 z-30 border-b border-r border-slate-300 bg-slate-100 p-2">Row</th>}
-              {columns.map((column, index) => <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} style={{ left: pinnedOffset(index) }} className={`${pinnedOffset(index) !== undefined ? "sticky z-30" : "relative"} border-b border-r border-slate-300 bg-slate-100 p-2 pr-4 align-top`}
+              {columns.map((column, index) => {
+                const color = sheet === "income" ? incomeLayout.colorTags.find((tag) => tag.id === incomeLayout.columnColors[column.key])?.color : undefined;
+                const selectedValue = incomeLayout.columnFilters[column.key];
+                const values = columnValues.get(column.key) || [];
+                return <th key={column.key} scope="col" aria-sort={sort?.key === column.key ? sort.desc ? "descending" : "ascending" : "none"} style={{ left: pinnedOffset(index), backgroundColor: color ? tint(color, 0.3) : undefined }} className={`${pinnedOffset(index) !== undefined ? "sticky z-30" : "relative"} border-b border-r border-slate-300 bg-slate-100 p-2 pr-4 align-top`}
                 onDragOver={(event) => { if (sheet === "income" && draggedColumn.current) event.preventDefault(); }}
                 onDrop={(event) => { event.preventDefault(); const from = draggedColumn.current; if (from) setIncomeLayout((previous) => ({ ...previous, columns: moveGridColumn(previous.columns, from, column.key) })); draggedColumn.current = null; }}>
                 {sheet === "income" && <span draggable aria-label={`Drag ${column.label} column`} title={`Drag ${column.label} to reorder`} className="mr-1 cursor-grab select-none text-slate-500"
                   onDragStart={(event) => { draggedColumn.current = column.key; event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", column.key); }}
                   onDragEnd={() => { draggedColumn.current = null; }}><GripVertical className="inline h-4 w-4" aria-hidden="true" /></span>}
                 <button type="button" className="text-left font-semibold" onClick={() => { setSort({ key: column.key, desc: sort?.key === column.key && !sort.desc }); setPage(0); }}>{column.label}{sort?.key === column.key ? sort.desc ? " ↓" : " ↑" : ""}</button>
+                {sheet === "income" && <select aria-label={`Filter ${column.label} by value`} value={selectedValue === undefined ? "" : JSON.stringify(selectedValue)} onChange={(event) => {
+                  const filters = { ...incomeLayout.columnFilters };
+                  if (event.target.value === "") delete filters[column.key];
+                  else filters[column.key] = JSON.parse(event.target.value) as string;
+                  setIncomeLayout({ ...incomeLayout, columnFilters: filters });
+                  setPage(0);
+                }} className="mt-1 block w-full min-w-0 rounded border border-slate-300 bg-white px-1 py-1 text-xs">
+                  <option value="">All values</option>
+                  {selectedValue !== undefined && !values.includes(selectedValue) && <option value={JSON.stringify(selectedValue)}>{selectedValue || "(Empty)"} (not present)</option>}
+                  {values.map((value) => <option key={value} value={JSON.stringify(value)}>{value || "(Empty)"}</option>)}
+                </select>}
                 <div role="separator" aria-label={`Resize ${column.label} column`} aria-orientation="vertical" aria-valuemin={90} aria-valuemax={600} aria-valuenow={width(column)} tabIndex={0} style={{ touchAction: "none" }} className="absolute inset-y-0 right-0 w-3 cursor-col-resize border-r border-slate-300 focus-visible:outline focus-visible:outline-teal-600"
                   onKeyDown={(event) => keyboardResize(event, column)} onPointerDown={(event) => { event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); drag.current = { key: column.key, x: event.clientX, width: width(column) }; }} onPointerMove={moveResize} onPointerUp={() => { drag.current = null; }} onPointerCancel={() => { drag.current = null; }} />
-              </th>)}</tr>
+              </th>; })}</tr>
           </thead>
           <tbody>{visible.map((row, index) => <tr key={row.key} className="bg-white">
             {sheet !== "income" && <th scope="row" className={`sticky left-0 z-10 border-b border-r border-slate-300 p-2 text-xs ${row.error ? "bg-rose-100 text-rose-800" : rowDirty(row) ? "bg-amber-50" : "bg-slate-50"}`}>
@@ -474,7 +510,8 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
               const label = `${column.label} for ${rowLabel(row)}`;
               const cellClass = `h-full min-h-10 w-full border-0 bg-transparent px-2 py-2 text-left outline-none focus:bg-teal-50 focus:ring-2 focus:ring-inset focus:ring-teal-600 ${row.values[column.key] !== row.saved[column.key] ? "bg-amber-50" : ""}`;
               const common = { "aria-label": label, value, onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => change(row, column.key, event.target.value), onBlur: () => { if (row.saving || row.values[column.key] !== row.saved[column.key]) void saveRow(row); } };
-              return <td key={column.key} style={{ left: pinnedOffset(columnIndex) }} className={`${pinnedOffset(columnIndex) !== undefined ? "sticky z-10" : ""} border-b border-r border-slate-200 align-top ${readOnly ? "bg-slate-50 px-2 py-2 text-slate-600 [overflow-wrap:anywhere]" : "bg-white"}`}>
+              const color = sheet === "income" ? incomeLayout.colorTags.find((tag) => tag.id === incomeLayout.columnColors[column.key])?.color : undefined;
+              return <td key={column.key} title={readOnly ? "Read-only" : undefined} style={{ left: pinnedOffset(columnIndex), backgroundColor: color ? tint(color, 0.08, readOnly ? 248 : 255) : undefined }} className={`${pinnedOffset(columnIndex) !== undefined ? "sticky z-10" : ""} border-b border-r border-slate-200 align-top ${readOnly ? "bg-slate-50 px-2 py-2 text-slate-600 [overflow-wrap:anywhere]" : "bg-white"}`}>
                 {column.key === "possibleBookings" && row.booking ? row.booking.source === "recorded" ? <PnlBookingMatches matches={possibleBookingMatches({ source: row.booking.source, reference: row.values.reference, roomId: row.values.roomId, checkIn: row.values.date, checkOut: display(row, { key: "checkOut", label: "Check-out" }, rooms) }, bookings)} /> : "—"
                   : readOnly ? value || "—" : column.kind === "room" ? <select {...common} className={cellClass}><option value="">Unassigned</option>{value && !rooms.some((room) => room._id === value) && <option value={value}>Removed room</option>}{rooms.map((room) => <option key={room._id} value={room._id}>{room.name}</option>)}</select>
                   : column.kind === "payment" ? <select {...common} className={cellClass}><option value="unknown">Not specified</option><option value="paid">Paid</option><option value="pending">Pending</option></select>

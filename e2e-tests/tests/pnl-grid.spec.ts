@@ -248,7 +248,7 @@ test("income starts with stay keys and proposes site and booking.com matches wit
   await expect(referenceRow).not.toContainText("B-123");
   await page.getByRole("button", { name: "Open full-screen editor" }).click();
   const editor = page.getByRole("dialog");
-  expect((await editor.getByRole("columnheader").allTextContents()).slice(0, 4)).toEqual(["Room", "Check-in", "Check-out", "Guest"]);
+  expect((await editor.locator("thead th > button").allTextContents()).slice(0, 4)).toEqual(["Room", "Check-in", "Check-out", "Guest"]);
   const gridRow = editor.getByLabel("Guest for Recorded guest").locator("xpath=ancestor::tr");
   const region = editor.getByRole("region", { name: "Editable grid" });
   const grid = editor.getByRole("table", { name: "Booking income grid" });
@@ -320,7 +320,7 @@ test("income views save and restore column order, groups, widths and freeze sett
   const editor = page.getByRole("dialog");
   const table = editor.getByRole("table", { name: "Booking income grid" });
   await editor.getByLabel("Drag Guest column").dragTo(editor.getByRole("button", { name: "Reference", exact: true }));
-  expect((await table.getByRole("columnheader").allTextContents()).slice(0, 5)).toEqual(["Room", "Check-in", "Check-out", "Reference", "Guest"]);
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 5)).toEqual(["Room", "Check-in", "Check-out", "Reference", "Guest"]);
   await editor.getByText("Configure columns and groups").click();
   await editor.getByLabel("Freeze first visible columns").selectOption("2");
   await editor.getByLabel("Guest details", { exact: true }).uncheck();
@@ -347,7 +347,7 @@ test("income views save and restore column order, groups, widths and freeze sett
   await expect(editor.getByLabel("Guest details", { exact: true })).not.toBeChecked();
   await expect(editor.getByRole("separator", { name: "Resize Room column" })).toHaveAttribute("aria-valuenow", "196");
   await editor.getByLabel("Income grid view").selectOption("");
-  expect((await table.getByRole("columnheader").allTextContents()).slice(0, 4)).toEqual(["Room", "Check-in", "Check-out", "Guest"]);
+  expect((await table.locator("thead th > button").allTextContents()).slice(0, 4)).toEqual(["Room", "Check-in", "Check-out", "Guest"]);
   await editor.getByRole("button", { name: "Close editor" }).click();
   await page.getByRole("button", { name: "Open full-screen editor" }).click();
   const reopened = page.getByRole("dialog");
@@ -356,7 +356,7 @@ test("income views save and restore column order, groups, widths and freeze sett
   await expect(reopened.getByLabel("Freeze first visible columns")).toHaveValue("2");
   await expect(reopened.getByLabel("Guest details", { exact: true })).not.toBeChecked();
   await expect(reopened.getByRole("button", { name: "Email", exact: true })).toHaveCount(0);
-  expect((await reopened.getByRole("table", { name: "Booking income grid" }).getByRole("columnheader").allTextContents()).slice(0, 5))
+  expect((await reopened.getByRole("table", { name: "Booking income grid" }).locator("thead th > button").allTextContents()).slice(0, 5))
     .toEqual(["Room", "Check-in", "Check-out", "Reference", "Guest"]);
   const positions = await reopened.getByRole("table", { name: "Booking income grid" }).locator("thead th").evaluateAll(
     (cells) => cells.slice(0, 3).map((cell) => getComputedStyle(cell).position)
@@ -377,4 +377,73 @@ test("income views save and restore column order, groups, widths and freeze sett
   await reopened.getByRole("button", { name: "Delete view" }).click();
   await expect.poll(() => views.length).toBe(1);
   await expect(reopened.getByLabel("Income grid view")).toHaveValue("");
+});
+
+test("named column colors and value filters are restored with a view", async ({ page }) => {
+  const record = {
+    id: "a".repeat(64), reference: "REC-1", source: "recorded", roomId, roomName: "Test room",
+    checkIn: `${year}-01-02`, checkOut: `${year}-01-05`, status: "recorded", guestName: "First guest",
+    phone: "", email: "", country: "", city: "", identifier: "", guestDetails: "", guestCount: 2, nights: 3,
+    amountCents: 10000, currency: "EUR", reason: "", netAmountCents: 9000, unitAmountCents: 3000,
+    invoiceRequired: null, invoiceCreated: null, invoiceNumber: "INV-1", paymentMethod: "", taxQuarter: "",
+    overrides: { grossAmountCents: 10000, netAmountCents: 9000, invoiceNumber: "INV-1" },
+  };
+  const second = { ...record, id: "b".repeat(64), reference: "REC-2", guestName: "Second guest", invoiceNumber: "", overrides: { grossAmountCents: 10000 } };
+  let views: Array<Record<string, unknown>> = [{ id: "old", name: "Old view", columns: ["roomId"], hiddenGroups: [], frozenColumns: 1, widths: {} }];
+  await page.route(/\/api\/pnl\/entries(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { entries: [] } }));
+  await page.route(/\/api\/pnl\/bookings(?:\/|\?|$)/, (route) => route.fulfill({ headers, json: { bookings: [record, second] } }));
+  await page.route(/\/api\/pnl\/views(?:\/|$)/, async (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (request.method() === "GET") return route.fulfill({ headers, json: { views } });
+    if (request.method() === "POST") {
+      const saved = { ...request.postDataJSON(), id: "new" };
+      views = [...views, saved];
+      return route.fulfill({ status: 201, headers, json: saved });
+    }
+    return route.fulfill({ status: 500, headers });
+  });
+  await page.goto(`${uiUrl}/pnl/income`);
+  await page.getByRole("button", { name: "Open full-screen editor" }).click();
+  const editor = page.getByRole("dialog");
+  await editor.getByLabel("Income grid view").selectOption("old");
+  await expect(editor.getByLabel("Filter columns by color")).toHaveValue("");
+  await editor.getByText("Configure columns and groups").click();
+  await editor.getByRole("button", { name: "Add color" }).click();
+  await editor.getByLabel("Color name 1").fill("Invoices");
+  await editor.getByLabel("Color value 1").fill("#ff0000");
+  await editor.getByLabel("Color for Room").selectOption({ label: "Invoices" });
+  await editor.getByLabel("Color for Invoice number").selectOption({ label: "Invoices" });
+  const invoiceHeader = editor.getByRole("button", { name: "Invoice number", exact: true }).locator("..");
+  await expect(invoiceHeader).toHaveCSS("background-color", "rgb(255, 179, 179)");
+  await expect(editor.getByLabel("Invoice number for First guest").locator("..")).toHaveCSS("background-color", "rgb(255, 235, 235)");
+  const filter = editor.getByLabel("Filter Invoice number by value");
+  await expect(filter.locator("option")).toHaveText(["All values", "(Empty)", "INV-1"]);
+  await filter.selectOption(JSON.stringify(""));
+  await expect(editor.getByText("1 rows", { exact: true })).toBeVisible();
+  await filter.selectOption(JSON.stringify("INV-1"));
+  await expect(editor.getByText("1 rows", { exact: true })).toBeVisible();
+  await expect(editor.getByLabel("Invoice number for First guest")).toBeVisible();
+  await editor.getByLabel("Filter columns by color").selectOption({ label: "Invoices" });
+  await expect(editor.getByRole("button", { name: "Guest", exact: true })).toHaveCount(0);
+  await editor.getByLabel("Color name 1").fill("Accounting");
+  await expect(editor.getByLabel("Filter columns by color").locator("option:checked")).toHaveText("Accounting");
+  await editor.getByLabel("View name").fill("Color view");
+  await editor.getByRole("button", { name: "Save as new view" }).click();
+  await expect.poll(() => views.length).toBe(2);
+  expect(views[1].columnFilters).toEqual({ invoiceNumber: "INV-1" });
+  await editor.getByRole("button", { name: "Close editor" }).click();
+  await page.getByRole("button", { name: "Open full-screen editor" }).click();
+  const reopened = page.getByRole("dialog");
+  await reopened.getByLabel("Income grid view").selectOption("new");
+  await expect(reopened.getByLabel("Filter columns by color").locator("option:checked")).toHaveText("Accounting");
+  await expect(reopened.getByLabel("Filter Invoice number by value")).toHaveValue(JSON.stringify("INV-1"));
+  await expect(reopened.getByText("1 rows", { exact: true })).toBeVisible();
+  await expect(reopened.getByRole("button", { name: "Guest", exact: true })).toHaveCount(0);
+  await reopened.getByLabel("Invoice number for First guest").fill("INV-3");
+  await reopened.getByLabel("Room for First guest").focus();
+  await expect(reopened.getByText("0 rows", { exact: true })).toBeVisible();
+  await expect(reopened.getByLabel("Filter Invoice number by value").locator("option:checked")).toHaveText("INV-1 (not present)");
+  await reopened.getByRole("button", { name: "Clear value filters" }).click();
+  await expect(reopened.getByText("2 rows", { exact: true })).toBeVisible();
 });

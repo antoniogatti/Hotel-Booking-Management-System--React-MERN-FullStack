@@ -454,6 +454,10 @@ export type PnlGridLayout = {
   hiddenGroups: string[];
   frozenColumns: number;
   widths: Record<string, number>;
+  colorTags: { id: string; name: string; color: string }[];
+  columnColors: Record<string, string>;
+  colorFilter: string;
+  columnFilters: Record<string, string>;
 };
 
 export type PnlGridView = PnlGridLayout & { id: string; name: string };

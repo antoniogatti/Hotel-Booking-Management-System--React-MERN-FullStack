@@ -39,7 +39,11 @@ income sheet, Room, Check-in, Check-out and Guest are frozen by default.
 Drag column handles to reorder them, and use Configure columns and groups
 to show or hide groups and choose how many visible columns to freeze.
 Name and save multiple views for your account; each view stores column order,
-group visibility, frozen-column count and widths. Booking-sourced
+group visibility, frozen-column count and widths. Create named colors, assign
+them to columns, and use the color filter to focus on those columns. Each
+column's value filter lists values present in the income data. Color settings
+and active color and value filters are saved with the view; value filters
+still apply when their columns are hidden. Booking-sourced
 identity fields and calculated values are read-only; inclusion warnings
 refresh when the editor is reopened. Recorded income shows possible site and
 Booking.com matches based on reference or room and check-in; compare check-out

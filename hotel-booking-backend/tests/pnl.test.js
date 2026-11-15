@@ -150,6 +150,7 @@ test("P&L endpoints require an admin", async () => {
 
 test("grid views validate and persist layouts per admin", async () => {
   const layout = { name: "Invoices", columns: ["roomId", "invoiceNumber"], hiddenGroups: ["guest"], frozenColumns: 1, widths: { roomId: 210 } };
+  const colorDefaults = { colorTags: [], columnColors: {}, colorFilter: "", columnFilters: {} };
   const defaultWidths = new PnlGridView({ ...layout, userId: adminId, widths: {} });
   assert.equal(defaultWidths.validateSync(), undefined);
   assert.deepEqual(defaultWidths.toObject().widths, {});
@@ -160,11 +161,18 @@ test("grid views validate and persist layouts per admin", async () => {
   const response = await request("/views", { method: "POST", body: layout });
   assert.equal(response.status, 201);
   const created = await response.json();
-  assert.deepEqual({ ...created, id: undefined }, { ...layout, id: undefined });
+  assert.deepEqual({ ...created, id: undefined }, { ...layout, ...colorDefaults, id: undefined });
   assert.equal((await (await request("/views", { user: secondAdminId })).json()).views.length, 0);
   assert.equal((await request(`/views/${created.id}`, { user: secondAdminId, method: "PUT", body: layout })).status, 404);
   assert.equal((await request(`/views/${created.id}`, { user: secondAdminId, method: "DELETE" })).status, 404);
-  const changed = { ...layout, name: "Guest", frozenColumns: 2, hiddenGroups: [], widths: { roomId: 300 } };
+  const changed = { ...layout, name: "Guest", frozenColumns: 2, hiddenGroups: [], widths: { roomId: 300 },
+    colorTags: [{ id: "color-1", name: "Important", color: "#123456" }], columnColors: { invoiceNumber: "color-1" },
+    colorFilter: "color-1", columnFilters: { invoiceNumber: "INV-1" } };
+  assert.equal((await request("/views", { method: "POST", body: { ...changed, columnColors: { roomId: "missing" } } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...changed, colorTags: [{ id: "color-1", name: " ", color: "#123456" }] } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...changed, colorTags: [{ id: "color-1", name: "Important", color: "red" }] } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...changed, columnFilters: { other: "x" } } })).status, 400);
+  assert.equal((await request("/views", { method: "POST", body: { ...changed, colorFilter: "missing" } })).status, 400);
   assert.equal((await request(`/views/${created.id}`, { method: "PUT", body: changed })).status, 200);
   assert.deepEqual((await (await request("/views")).json()).views[0], { id: created.id, ...changed });
   assert.equal((await request(`/views/${created.id}`, { method: "DELETE" })).status, 204);
