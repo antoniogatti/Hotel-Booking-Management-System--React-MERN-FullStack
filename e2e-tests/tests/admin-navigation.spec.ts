@@ -142,19 +142,19 @@ test("admin navigation remains available and marks the active page", async ({ pa
     "Self check-in",
     "Bookings & analytics",
     "Vacancy management",
-    "P&L overview",
+    "Overview",
     "Income",
     "Expenses",
     "Sync center",
     "n8n workflows",
     "Traffic insights",
-    "Business insights",
     "API docs",
     "API status",
   ]);
   await expect(nav.getByRole("link", { name: "Properties", exact: true })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Add property", exact: true })).toHaveCount(0);
-  await expect(nav.getByRole("link", { name: "Overview", exact: true })).toHaveAttribute("aria-current", "page");
+  await expect(nav.locator('a[href="/admin-portal"]')).toHaveAttribute("aria-current", "page");
+  await expect(nav.locator('a[href="/pnl"]')).toHaveText("Overview");
   await expect(page.getByText("Sections", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Upcoming check-ins", { exact: true })).toBeVisible();
   const arrival = page.getByRole("row").filter({ hasText: "Alex Guest" });
@@ -162,12 +162,12 @@ test("admin navigation remains available and marks the active page", async ({ pa
   await expect(arrival.getByRole("link", { name: "Check in" })).toHaveAttribute("href", "/hotel/test-room/check-in/test-booking");
   await expect(arrival.getByRole("link", { name: "Booking" })).toHaveAttribute("href", "/booking/test-booking");
   await page.evaluate(() => window.scrollTo(0, 500));
-  await expect(page.locator("aside").getByRole("link", { name: "Overview", exact: true })).toBeInViewport();
+  await expect(page.locator('aside a[href="/admin-portal"]')).toBeInViewport();
   await page.evaluate(() => window.scrollTo(0, 0));
   await nav.getByRole("link", { name: "Check-in desk" }).click();
   await expect(page).toHaveURL(/\/admin-portal\/check-in(?:\?.*)?$/);
   await expect(nav.getByRole("link", { name: "Check-in desk" })).toHaveAttribute("aria-current", "page");
-  await expect(nav.getByRole("link", { name: "Overview", exact: true })).not.toHaveAttribute("aria-current", "page");
+  await expect(nav.locator('a[href="/admin-portal"]')).not.toHaveAttribute("aria-current", "page");
 
   for (const [path, label] of [
     ["/booking-dashboard", "Bookings & analytics"],
@@ -178,18 +178,20 @@ test("admin navigation remains available and marks the active page", async ({ pa
     ["/booking-com-sync", "Sync center"],
     ["/n8n-workflows", "n8n workflows"],
     ["/traffic-insights", "Traffic insights"],
-    ["/pnl", "P&L overview"],
     ["/pnl/income", "Income"],
     ["/pnl/expenses", "Expenses"],
     ["/vacancy-management", "Vacancy management"],
     ["/wa-inbox", "WhatsApp inbox"],
-    ["/business-insights", "Business insights"],
     ["/api-docs", "API docs"],
     ["/api-status", "API status"],
   ]) {
     await page.goto(`${uiUrl}${path}`);
     await expect(nav.getByRole("link", { name: label, exact: true })).toHaveAttribute("aria-current", "page");
   }
+
+  await page.goto(`${uiUrl}/business-insights`);
+  await expect(page).toHaveURL(/\/pnl$/);
+  await expect(nav.locator('a[href="/pnl"]')).toHaveAttribute("aria-current", "page");
 
   for (const path of ["/my-hotels", "/edit-hotel/example", "/add-hotel"]) {
     await page.goto(`${uiUrl}${path}`);
@@ -435,6 +437,44 @@ test("standalone income records remain editable without a booking link", async (
   const updatedRow = page.getByRole("row").filter({ hasText: "Updated Guest" });
   await updatedRow.getByRole("button", { name: "Exclude from totals" }).click();
   await expect(updatedRow).toContainText("Excluded by administrator");
+});
+
+test("P&L overview includes business insights and keeps the old URL working", async ({ page }) => {
+  await mockSession(page, "admin");
+  const headers = {
+    "access-control-allow-origin": uiUrl,
+    "access-control-allow-credentials": "true",
+    "access-control-allow-headers": "authorization,content-type",
+  };
+  await page.route("**/api/business-insights/**", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({ status: 204, headers });
+      return;
+    }
+    const path = new URL(route.request().url()).pathname;
+    const body = path.endsWith("/forecast") ? {
+      historical: [], forecasts: [], seasonalGrowth: 3,
+      trends: { bookingTrend: "increasing", revenueTrend: "increasing" }, lastUpdated: new Date().toISOString(),
+    } : path.endsWith("/system-stats") ? {
+      system: { memory: { used: 10, total: 100, percentage: 10 }, cpu: { user: 0, system: 0 }, uptime: 60 },
+      database: { collections: 1, totalHotels: 1, totalBookings: 7, totalRevenue: 300 },
+      application: { avgResponseTime: 10, requestsPerMinute: 0, errorRate: 0, uptime: "online", todayBookings: 0, thisWeekBookings: 1 },
+      lastUpdated: new Date().toISOString(),
+    } : {
+      overview: { totalHotels: 1, totalUsers: 2, totalBookings: 7, recentBookings: 1, totalRevenue: 300, recentRevenue: 100, revenueGrowth: 10 },
+      popularDestinations: [], dailyBookings: [], hotelPerformance: [], lastUpdated: new Date().toISOString(),
+    };
+    await route.fulfill({ headers, json: body });
+  });
+  await page.goto(`${uiUrl}/business-insights`);
+  await expect(page).toHaveURL(/\/pnl$/);
+  const insights = page.getByRole("region", { name: "Business insights" });
+  await expect(insights.getByText("Total Bookings")).toBeVisible();
+  await expect(insights).toContainText("not the selected P&L year");
+  await insights.getByRole("button", { name: "Forecasting" }).click();
+  await expect(insights.getByText("Booking Trend")).toBeVisible();
+  await insights.getByRole("button", { name: "Performance" }).click();
+  await expect(insights.getByText("Memory Usage")).toBeVisible();
 });
 
 test("P&L overview and ledgers track room and shared entries", async ({ page }) => {

@@ -68,11 +68,11 @@ const MobileNavLinks = ({ onNavigate }: MobileNavLinksProps) => {
       { to: "/manage-bookings", label: "Room Calendar", icon: CalendarDays },
       { to: "/booking-com-sync", label: "Sync Center", icon: Activity },
       { to: "/wa-inbox", label: "Sofia Inbox", icon: MessageCircle },
-      ...(!siteConfig.singlePropertyMode
-        ? [{ to: "/business-insights", label: "Business Insights", icon: BarChart3 }]
+      ...(!siteConfig.singlePropertyMode && userRole === "admin"
+        ? [{ to: "/pnl", label: "Overview", icon: BarChart3 }]
         : []),
     ],
-    []
+    [userRole]
   );
 
   useEffect(() => {

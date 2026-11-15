@@ -137,7 +137,7 @@ const AnalyticsDashboard = () => {
     }
   );
 
-  const { data: forecastData } = useQueryWithLoading<ForecastData>(
+  const { data: forecastData, isLoading: forecastLoading, isError: forecastError, refetch: refetchForecast } = useQueryWithLoading<ForecastData>(
     "business-insights-forecast",
     fetchBusinessInsightsForecast,
     {
@@ -148,7 +148,7 @@ const AnalyticsDashboard = () => {
     }
   );
 
-  const { data: performanceData } = useQueryWithLoading<PerformanceData>(
+  const { data: performanceData, isLoading: performanceLoading, isError: performanceError, refetch: refetchPerformance } = useQueryWithLoading<PerformanceData>(
     "business-insights-performance",
     fetchBusinessInsightsPerformance,
     {
@@ -174,7 +174,7 @@ const AnalyticsDashboard = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div role="status" className="rounded-2xl border border-slate-200 bg-white p-8 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading business insights data...</p>
@@ -185,7 +185,7 @@ const AnalyticsDashboard = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div role="alert" className="rounded-2xl border border-slate-200 bg-white p-8 flex items-center justify-center">
         <div className="text-center">
           <div className="text-red-500 mb-4">
             Failed to load business insights data
@@ -202,20 +202,20 @@ const AnalyticsDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f6f8] py-8">
-      <div className="w-full mx-auto px-4 sm:px-6 lg:px-8">
+    <section aria-label="Business insights">
+      <div className="w-full">
         {/* Header */}
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
           <div>
-            <h1 className="mb-2 text-3xl font-semibold tracking-tight text-slate-950">
-              Business Insights Dashboard
-            </h1>
+            <h2 className="mb-2 text-2xl font-semibold tracking-tight text-slate-950">
+              Business insights
+            </h2>
             <p className="text-gray-600">
-              Comprehensive insights into your hotel booking business
+              These insights use local booking records and their own time periods, not the selected P&amp;L year, imported bookings or manual ledger entries. Totals can differ from P&amp;L.
             </p>
           </div>
           <button
-            onClick={() => refetch()}
+            onClick={() => { void refetch(); void refetchForecast(); void refetchPerformance(); }}
             className="flex items-center rounded-lg bg-slate-900 px-4 py-2 text-white transition-colors hover:bg-slate-800"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
@@ -227,16 +227,16 @@ const AnalyticsDashboard = () => {
         <div className="bg-white rounded-lg shadow-sm border mb-8">
           <div className="border-b border-gray-200">
             <nav className="flex space-x-8 px-6">
-              {[
+              {([
                 { id: "overview", label: "Overview", icon: BarChart3 },
                 { id: "forecast", label: "Forecasting", icon: TrendingUp },
                 { id: "performance", label: "Performance", icon: Activity },
-              ].map((tab) => {
+              ] as const).map((tab) => {
                 const Icon = tab.icon;
                 return (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
+                    onClick={() => setActiveTab(tab.id)}
                     className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
                       activeTab === tab.id
                         ? "border-blue-500 text-blue-600"
@@ -457,6 +457,11 @@ const AnalyticsDashboard = () => {
             </div>
           </div>
         )}
+
+        {activeTab === "forecast" && forecastLoading && <p role="status">Loading forecast data...</p>}
+        {activeTab === "forecast" && forecastError && <p role="alert">Unable to load forecast data. <button className="font-semibold underline" onClick={() => refetchForecast()}>Retry</button></p>}
+        {activeTab === "performance" && performanceLoading && <p role="status">Loading performance data...</p>}
+        {activeTab === "performance" && performanceError && <p role="alert">Unable to load performance data. <button className="font-semibold underline" onClick={() => refetchPerformance()}>Retry</button></p>}
 
         {/* Forecast Tab */}
         {activeTab === "forecast" && forecastData && (
@@ -765,7 +770,7 @@ const AnalyticsDashboard = () => {
             : "N/A"}
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 

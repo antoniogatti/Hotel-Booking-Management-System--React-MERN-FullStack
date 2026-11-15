@@ -51,6 +51,7 @@ From `hotel-booking-frontend/package.json` the frontend uses:
 - `/booking-com-sync`
 - `/n8n-workflows` (`/scheduler-monitor` redirects here)
 - `/traffic-insights`
+- `/pnl` (includes business insights; `/business-insights` redirects here)
 - `/manage-bookings`
 - `/vacancy-management`
 - `/add-hotel`

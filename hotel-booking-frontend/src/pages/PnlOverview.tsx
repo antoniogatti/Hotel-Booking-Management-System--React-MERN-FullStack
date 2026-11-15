@@ -4,6 +4,7 @@ import { useState } from "react";
 import * as apiClient from "../api-client";
 import { currentYear, formatMoney, validYear } from "./pnl-utils";
 import PnlTable, { PnlColumn } from "../components/PnlTable";
+import AnalyticsDashboard from "./AnalyticsDashboard";
 
 const months = Array.from({ length: 12 }, (_, index) =>
   new Date(2024, index, 1).toLocaleString("en-GB", { month: "short" })
@@ -86,6 +87,7 @@ const PnlOverview = () => {
           </section>
         </>
       }
+      <AnalyticsDashboard />
     </div>
   );
 };

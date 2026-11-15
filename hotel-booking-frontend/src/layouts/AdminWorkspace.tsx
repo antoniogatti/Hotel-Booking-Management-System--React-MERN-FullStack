@@ -57,13 +57,12 @@ const administrationItems: NavItem[] = [
   { label: "Sync center", to: "/booking-com-sync", icon: RefreshCw, adminOnly: true },
   { label: "n8n workflows", to: "/n8n-workflows", icon: Clock3, adminOnly: true },
   { label: "Traffic insights", to: "/traffic-insights", icon: Activity, adminOnly: true },
-  { label: "Business insights", to: "/business-insights", icon: BarChart3, adminOnly: true },
   { label: "API docs", to: "/api-docs", icon: FileText, adminOnly: true },
   { label: "API status", to: "/api-status", icon: Server, adminOnly: true },
 ];
 
 const pnlItems: NavItem[] = [
-  { label: "P&L overview", to: "/pnl", icon: LayoutDashboard, adminOnly: true },
+  { label: "Overview", to: "/pnl", icon: LayoutDashboard, adminOnly: true },
   { label: "Income", to: "/pnl/income", icon: BarChart3, adminOnly: true },
   { label: "Expenses", to: "/pnl/expenses", icon: FileText, adminOnly: true },
 ];
@@ -112,6 +111,7 @@ const AdminWorkspace = ({ children }: { children: React.ReactNode }) => {
       <Link
         key={item.to}
         to={item.to}
+        aria-label={item.to === "/pnl" ? "P&L overview" : undefined}
         title={!mobile && collapsed ? item.label : undefined}
         aria-current={active ? "page" : undefined}
         className={

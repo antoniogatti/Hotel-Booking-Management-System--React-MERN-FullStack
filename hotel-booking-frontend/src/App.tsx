@@ -22,7 +22,6 @@ import Checkout from "./pages/Checkout";
 import Home from "./pages/Home";
 import ApiDocs from "./pages/ApiDocs";
 import ApiStatus from "./pages/ApiStatus";
-import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import AuthCallback from "./pages/AuthCallback";
 import PrivacyCookiePolicy from "./pages/PrivacyCookiePolicy";
 import TermsConditions from "./pages/TermsConditions";
@@ -315,15 +314,7 @@ const App = () => {
         />
         <Route
           path="/business-insights"
-          element={
-            userRole === "admin" ? (
-              <Layout admin>
-                <AnalyticsDashboard />
-              </Layout>
-            ) : (
-              <Navigate to="/" />
-            )
-          }
+          element={<Navigate to={userRole === "admin" ? "/pnl" : "/"} replace />}
         />
         <Route
           path="/register"

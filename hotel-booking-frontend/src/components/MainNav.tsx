@@ -40,8 +40,8 @@ const MainNav = () => {
       {userRole === "admin" && (
         <>
           {!siteConfig.singlePropertyMode && (
-            <Link to="/business-insights" className={navLinkClass}>
-              Business Insights
+            <Link to="/pnl" className={navLinkClass}>
+              Overview
             </Link>
           )}
           {!siteConfig.singlePropertyMode && (
