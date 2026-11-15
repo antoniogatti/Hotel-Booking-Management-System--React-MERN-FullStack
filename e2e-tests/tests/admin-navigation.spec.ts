@@ -4,7 +4,7 @@ const uiUrl = process.env.ADMIN_TEST_URL || "http://localhost:5174";
 
 test("booking and check-in screens use booking data without retired integration controls", async ({ page }) => {
   await mockSession(page, "admin");
-  await page.route("**/api/bookings/test-booking", async (route) => {
+  await page.route("**/api/bookings/test-booking*", async (route) => {
     await route.fulfill({
       headers: {
         "access-control-allow-origin": uiUrl,
@@ -31,6 +31,110 @@ test("booking and check-in screens use booking data without retired integration 
   await expect(page.getByText("Payment Details", { exact: true }).locator("..").locator("select")).toHaveValue("Cash at check-in");
   await expect(page.getByText("Special Notes", { exact: true }).locator("..").locator("textarea")).toHaveValue("Late arrival");
   await expect(page.getByText(/OneNote|Excel/i)).toHaveCount(0);
+});
+
+test("check-in uses Income details and reviews an unknown guest breakdown", async ({ page }) => {
+  await mockSession(page, "hotel_owner");
+  let savedNotes: unknown;
+  let checkInBody = "";
+  const headers = {
+    "access-control-allow-origin": uiUrl, "access-control-allow-credentials": "true",
+    "access-control-allow-headers": "authorization,content-type", "access-control-allow-methods": "GET,PUT,POST,OPTIONS",
+  };
+  await page.route(/\/api\/bookings\/income-test(?:[/?]|$)/, async (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (request.method() === "PUT") {
+      savedNotes = request.postDataJSON();
+      return route.fulfill({ headers, json: { notes: "Updated note", arrivalTime: "17:30" } });
+    }
+    if (request.method() === "POST") {
+      checkInBody = request.postData() || "";
+      return route.fulfill({ headers, json: { message: "Saved" } });
+    }
+    return route.fulfill({ headers, json: {
+      _id: "income-test", hotelId: "test-room", hotelName: "Test room", status: "imported", isImported: true,
+      reservationNumber: "ORIGINAL", firstName: "Old", lastName: "Guest", adultCount: 2, childCount: 0,
+      checkIn: "2026-03-01", checkOut: "2026-03-02", totalCost: 100, specialRequests: "Keep private",
+      checkInIncome: { reference: "INCOME-REF", guestName: "New Guest", phone: "123", email: "new@example.test",
+        city: "Paris", country: "France", guestCount: 3, amountCents: 22000, currency: "EUR",
+        paymentMethod: "Cash at check-in", notes: "Income note", arrivalTime: "14:15",
+        arrivalTimeOverride: "14:15", nationality: "Italian", bookingChannel: "Booking.com" },
+    } });
+  });
+  await page.goto(`${uiUrl}/hotel/test-room/check-in/income-test`);
+  await expect(page.getByText("Ref: INCOME-REF")).toBeVisible();
+  await expect(page.getByText("New Guest", { exact: true })).toBeVisible();
+  await expect(page.getByText("3 guests (Income)")).toBeVisible();
+  await expect(page.getByText("€220.00")).toBeVisible();
+  await expect(page.getByText("Paris , France")).toBeVisible();
+  await expect(page.getByText("Guest First Name *").locator("..").locator("input")).toHaveValue("New");
+  await expect(page.getByText("Guest Last Name *").locator("..").locator("input")).toHaveValue("Guest");
+  const adults = page.getByText("Adults *", { exact: true }).locator("..").locator("input");
+  const children = page.getByText("Children", { exact: true }).locator("..").locator("input");
+  await expect(adults).toHaveValue("");
+  await expect(children).toHaveValue("");
+  await expect(page.getByText("Special Requests", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("Notes", { exact: true })).toHaveValue("Income note");
+  await expect(page.getByText("Special Notes", { exact: true }).locator("..").locator("textarea")).toHaveValue("Income note");
+  const arrivalTime = page.getByText("Arrival Time", { exact: true }).locator("..").locator("input");
+  await expect(arrivalTime).toHaveValue("14:15");
+  await expect(page.getByText("Nationality", { exact: true }).locator("..").locator("select")).toHaveValue("Italian");
+  await expect(page.getByText("Phone Number", { exact: true }).locator("..").locator("input")).toHaveValue("123");
+  await expect(page.getByText("Payment Details", { exact: true }).locator("..").locator("select")).toHaveValue("Cash at check-in");
+  await adults.fill("2");
+  await children.fill("1");
+  await arrivalTime.fill("17:30");
+  await page.getByLabel("Notes", { exact: true }).fill("Updated note");
+  await expect(page.getByText("Special Notes", { exact: true }).locator("..").locator("textarea")).toHaveValue("Updated note");
+  await page.getByRole("button", { name: "Save Details and Check-in" }).click();
+  await expect.poll(() => savedNotes).toEqual({ notes: "Updated note", expectedNotes: "Income note", arrivalTime: "17:30", expectedArrivalTime: "14:15" });
+  await expect.poll(() => checkInBody).toContain("New");
+  expect(checkInBody).not.toContain('name="specialRequests"');
+  expect(checkInBody).not.toContain('name="email"');
+  expect(checkInBody).not.toContain('name="phone"');
+});
+
+test("site check-in shows Income overrides and refuses stale note edits", async ({ page }) => {
+  await mockSession(page, "hotel_owner");
+  let submitted = false;
+  const headers = {
+    "access-control-allow-origin": uiUrl, "access-control-allow-credentials": "true",
+    "access-control-allow-headers": "authorization,content-type", "access-control-allow-methods": "GET,PUT,POST,OPTIONS",
+  };
+  await page.route(/\/api\/bookings\/income-site(?:[/?]|$)/, async (route) => {
+    const request = route.request();
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    if (request.method() === "PUT") return route.fulfill({ status: 409, headers, json: { message: "Income notes changed. Reload the page before saving." } });
+    if (request.method() === "POST") {
+      submitted = true;
+      return route.fulfill({ headers, json: {} });
+    }
+    return route.fulfill({ headers, json: {
+      _id: "income-site", hotelId: "test-room", hotelName: "Test room", status: "confirmed",
+      reservationNumber: "ORIGINAL", firstName: "Original", lastName: "Guest", adultCount: 2, childCount: 0,
+      email: "original@example.test", checkIn: "2026-03-01", checkOut: "2026-03-02", totalCost: 100,
+      checkInInfo: { arrivalTime: "09:00", nationality: "French", specialNotes: "Old check-in note" },
+      checkInIncome: { reference: "SITE-REF", guestName: "Income Guest", phone: "555", email: "income@example.test",
+        city: "Rome", country: "Italy", guestCount: 3, amountCents: 15000, currency: "EUR", paymentMethod: "Cash", notes: "Old note",
+        arrivalTime: "18:30", arrivalTimeOverride: "18:30", nationality: "Italian", bookingChannel: "Direct" },
+    } });
+  });
+  await page.goto(`${uiUrl}/hotel/test-room/check-in/income-site`);
+  await expect(page.getByText("Ref: SITE-REF")).toBeVisible();
+  await expect(page.getByText("Income Guest", { exact: true })).toBeVisible();
+  await expect(page.getByText("3 guests (Income)")).toBeVisible();
+  await expect(page.getByText(/breakdown differs from Income/)).toBeVisible();
+  await expect(page.getByText("€150.00")).toBeVisible();
+  await expect(page.getByText("Email", { exact: true }).locator("..").locator("input")).toHaveValue("income@example.test");
+  await expect(page.getByText("Arrival Time", { exact: true }).locator("..").locator("input")).toHaveValue("18:30");
+  await expect(page.getByText("Nationality", { exact: true }).locator("..").locator("select")).toHaveValue("Italian");
+  await expect(page.getByText("Booking Channel", { exact: true }).locator("..").locator("select")).toHaveValue("Direct");
+  await expect(page.getByText("Special Notes", { exact: true }).locator("..").locator("textarea")).toHaveValue("Old note");
+  await page.getByLabel("Notes", { exact: true }).fill("Conflicting note");
+  await page.getByRole("button", { name: "Save Check-in", exact: true }).click();
+  await expect(page.getByText("Income notes changed. Reload the page before saving.")).toBeVisible();
+  expect(submitted).toBe(false);
 });
 
 async function mockSession(page: Page, role: "admin" | "hotel_owner") {
@@ -148,6 +252,40 @@ test("check-in desk requests only marked bookings without filtering the overview
   fail = false;
   await page.getByRole("button", { name: "Retry" }).click();
   await expect(page.getByText("No bookings marked Check-in desk match the current filters.")).toBeVisible();
+});
+
+test("check-in desk offers a 60-day horizon and restores it from the URL", async ({ page }) => {
+  await mockSession(page, "admin");
+  const daysRequested: string[] = [];
+  await page.route("**/api/bookings/dashboard/upcoming-check-ins?**", async (route) => {
+    const request = route.request();
+    const headers = {
+      "access-control-allow-origin": uiUrl, "access-control-allow-credentials": "true",
+      "access-control-allow-headers": "authorization,content-type", "access-control-allow-methods": "GET,OPTIONS",
+    };
+    if (request.method() === "OPTIONS") return route.fulfill({ status: 204, headers });
+    const url = new URL(request.url());
+    const days = url.searchParams.get("days") || "";
+    daysRequested.push(`${days}:${url.searchParams.get("deskOnly")}`);
+    const rows = days === "60" ? [{
+      _id: "future", hotelId: "test-room", hotelName: "Test room", firstName: "Future", lastName: "Guest",
+      email: "", phone: "", nationality: "", status: "confirmed", source: "local", sourceLabel: "Direct",
+      checkIn: "2026-12-29T00:00:00.000Z", checkOut: "2027-01-02T00:00:00.000Z",
+      arrivalTime: "", isCheckedIn: false, isImported: false,
+    }] : [];
+    return route.fulfill({ headers, json: { rows, range: { start: "", end: "", days: Number(days) },
+      summary: { arrivalsToday: 0, upcomingArrivals: rows.length, inHouseToday: 0, checkedInToday: 0,
+        sync: { totalRooms: 0, enabledRooms: 0, issueRooms: 0, lastSuccessfulSyncAt: null } } } });
+  });
+  await page.goto(`${uiUrl}/admin-portal/check-in?days=30`);
+  await expect(page.getByText("No bookings marked Check-in desk match the current filters.")).toBeVisible();
+  await page.getByLabel("Horizon").selectOption("60");
+  await expect(page.getByRole("row").filter({ hasText: "Future Guest" })).toBeVisible();
+  await expect(page).toHaveURL(/days=60/);
+  expect(daysRequested).toContain("60:true");
+  await page.reload();
+  await expect(page.getByLabel("Horizon")).toHaveValue("60");
+  await expect(page.getByRole("row").filter({ hasText: "Future Guest" })).toBeVisible();
 });
 
 test("n8n monitor distinguishes setup, workflow status and failures", async ({ page }) => {

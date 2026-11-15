@@ -25,6 +25,7 @@ import { body, param, query, validationResult } from "express-validator";
 import { recordAuditEvent } from "../lib/audit-log";
 import { logError } from "../lib/logger";
 import { checkInInfoForResponse } from "../lib/booking-check-in-response";
+import { isArrivalTime, normalizeArrivalTime } from "../lib/arrival-time";
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -101,6 +102,43 @@ const getAccessibleHotel = async (hotelId: string, req: Request) => {
   }
 
   return { hotel };
+};
+
+const checkInIncomeDetails = async (
+  source: "local" | "booking_com",
+  id: string,
+  booking: {
+    firstName?: string; lastName?: string; email?: string; phone?: string;
+    city?: string; country?: string; adultCount?: number; childCount?: number;
+    totalCost?: number; currency?: string; pnlIncome?: PnlBookingDetails; nationality?: string;
+    checkInInfo?: { paymentDetails?: string; arrivalTime?: string; bookingChannel?: string };
+    excelSync?: { city?: string; country?: string; paymentVia?: string };
+  },
+  reference: string
+) => {
+  const record = await PnlBookingIncome.findById(`${source}:${id}`).lean();
+  const details = record?.details ?? booking.pnlIncome ?? {};
+  const guests = (booking.adultCount || 0) + (booking.childCount || 0);
+  const total = booking.totalCost;
+  const cents = typeof total === "number" && Number.isFinite(total) && total > 0 ? Math.round(total * 100) : null;
+  const amountCents = cents !== null && Number.isSafeInteger(cents) && cents > 0 ? cents : null;
+  return {
+    reference: details.bookingReference || reference,
+    guestName: details.bookingGuestName || [booking.firstName, booking.lastName].filter(Boolean).join(" "),
+    phone: details.bookingPhone || booking.phone || "",
+    email: details.bookingEmail || booking.email || "",
+    city: details.city || booking.city || booking.excelSync?.city || "",
+    country: details.country || booking.country || booking.excelSync?.country || "",
+    guestCount: details.guestCount ?? (guests || null),
+    amountCents: details.grossAmountCents ?? amountCents,
+    currency: details.grossAmountCents !== undefined || source === "local" ? "EUR" : (booking.currency || "").toUpperCase(),
+    paymentMethod: details.paymentMethod || booking.checkInInfo?.paymentDetails || booking.excelSync?.paymentVia || "",
+    arrivalTime: details.arrivalTime || normalizeArrivalTime(booking.checkInInfo?.arrivalTime),
+    arrivalTimeOverride: details.arrivalTime || "",
+    nationality: booking.nationality || "",
+    bookingChannel: booking.checkInInfo?.bookingChannel || (source === "booking_com" ? "Booking.com" : "Direct"),
+    notes: details.notes || "",
+  };
 };
 
 const toBookingCalendarStatus = (status: string | undefined) => {
@@ -738,13 +776,14 @@ router.get(
 // Get booking by ID
 router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req: Request, res: Response) => {
   try {
-    const booking = await Booking.findById(req.params.id).populate(
+    const includeIncome = req.query.includeIncome === "true";
+    const booking = await Booking.findById(req.params.id).select(includeIncome ? "+pnlIncome" : "").populate(
       "hotelId",
       "name city country imageUrls"
     );
 
     if (!booking) {
-      const importedEvent = await ExternalCalendarEvent.findById(req.params.id);
+      const importedEvent = await ExternalCalendarEvent.findById(req.params.id).select(includeIncome ? "+pnlIncome" : "");
       if (!importedEvent) {
         return res.status(404).json({ message: "Booking not found" });
       }
@@ -754,7 +793,12 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
         return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
       }
 
-      return res.status(200).json(toImportedEventResponse(importedEvent, accessCheck.hotel));
+      return res.status(200).json({
+        ...toImportedEventResponse(importedEvent, accessCheck.hotel),
+        ...(includeIncome ? {
+          checkInIncome: await checkInIncomeDetails("booking_com", req.params.id, importedEvent, importedEvent.externalUid),
+        } : {}),
+      });
     }
 
     const hotel = await Hotel.findById(booking.hotelId);
@@ -770,6 +814,9 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
     res.status(200).json({
       ...bookingObject,
       hotelName: hotel.name,
+      ...(includeIncome ? {
+        checkInIncome: await checkInIncomeDetails("local", req.params.id, booking, booking.reservationNumber || req.params.id),
+      } : {}),
     });
   } catch (error) {
     logError("Unable to fetch booking", error, {
@@ -777,6 +824,72 @@ router.get("/:id", verifyToken, requireRole("hotel_owner", "admin"), async (req:
       bookingId: req.params.id,
     });
     res.status(500).json({ message: "Unable to fetch booking" });
+  }
+});
+
+router.put("/:id/check-in-notes", verifyToken, requireRole("hotel_owner", "admin"), async (req: Request, res: Response) => {
+  const { notes, expectedNotes, arrivalTime, expectedArrivalTime } = req.body || {};
+  if (typeof notes !== "string" || notes.length > 1000 || typeof expectedNotes !== "string" || expectedNotes.length > 1000 ||
+      (arrivalTime !== undefined && (typeof arrivalTime !== "string" || (arrivalTime !== "" && !isArrivalTime(arrivalTime)) ||
+        typeof expectedArrivalTime !== "string" || (expectedArrivalTime !== "" && !isArrivalTime(expectedArrivalTime))))) {
+    return res.status(400).json({ message: "Provide valid Income notes and arrival time." });
+  }
+  try {
+    const local = await Booking.findById(req.params.id).select("+pnlIncome").lean();
+    const imported = local ? null : await ExternalCalendarEvent.findById(req.params.id).select("+pnlIncome").lean();
+    const booking = local || imported;
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    const accessCheck = await getAccessibleHotel(booking.hotelId, req);
+    if (accessCheck.error) return res.status(accessCheck.error.status).json({ message: accessCheck.error.message });
+
+    const source = local ? "local" : "booking_com";
+    const key = `${source}:${req.params.id}`;
+    const record = await PnlBookingIncome.findById(key).lean();
+    const currentNotes = (record?.details ?? booking.pnlIncome)?.notes || "";
+    const currentArrivalTime = (record?.details ?? booking.pnlIncome)?.arrivalTime || "";
+    if (currentNotes !== expectedNotes) {
+      return res.status(409).json({ message: "Income notes changed. Reload the page before saving." });
+    }
+    if (arrivalTime !== undefined && currentArrivalTime !== expectedArrivalTime) {
+      return res.status(409).json({ message: "Income arrival time changed. Reload the page before saving." });
+    }
+
+    if (record) {
+      const filter: Record<string, unknown> = { _id: key, "details.notes": currentNotes || { $in: ["", null] } };
+      const set: Record<string, unknown> = { "details.notes": notes.trim(), updatedBy: req.userId };
+      const update: { $set: Record<string, unknown>; $unset?: Record<string, number> } = { $set: set };
+      if (arrivalTime !== undefined) {
+        filter["details.arrivalTime"] = currentArrivalTime || { $in: ["", null] };
+        if (arrivalTime) set["details.arrivalTime"] = arrivalTime;
+        else update.$unset = { "details.arrivalTime": 1 };
+      }
+      const result = await PnlBookingIncome.updateOne(
+        filter, update,
+        { runValidators: true }
+      );
+      if (!result.matchedCount) return res.status(409).json({ message: "Income details changed. Reload the page before saving." });
+    } else {
+      const details = { ...(booking.pnlIncome || {}), notes: notes.trim() };
+      if (arrivalTime !== undefined) {
+        if (arrivalTime) details.arrivalTime = arrivalTime;
+        else delete details.arrivalTime;
+      }
+      await PnlBookingIncome.create({
+        _id: key, source, bookingId: req.params.id,
+        details, updatedBy: req.userId,
+      });
+    }
+    await recordAuditEvent({
+      action: "booking.check-in.income-notes-updated", entityType: source === "local" ? "booking" : "external_booking",
+      entityId: req.params.id, hotelId: String(booking.hotelId), actorId: req.userId, actorRole: req.userRole, req,
+    });
+    return res.json({ notes: notes.trim(), ...(arrivalTime !== undefined ? { arrivalTime } : {}) });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) {
+      return res.status(409).json({ message: "Income notes changed. Reload the page before saving." });
+    }
+    logError("Unable to save check-in Income notes", error, { route: "bookings.check-in-notes", bookingId: req.params.id });
+    return res.status(500).json({ message: "Unable to save Income notes." });
   }
 });
 

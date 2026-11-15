@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "react-query";
+import axios from "axios";
 import {
   ArrowLeft,
   Calendar,
@@ -45,6 +46,23 @@ type BookingDetails = {
   specialRequests?: string;
   summary?: string;
   externalUid?: string;
+  checkInIncome?: {
+    reference: string;
+    guestName: string;
+    phone: string;
+    email: string;
+    city: string;
+    country: string;
+    guestCount: number | null;
+    amountCents: number | null;
+    currency: string;
+    paymentMethod: string;
+    arrivalTime?: string;
+    arrivalTimeOverride?: string;
+    nationality?: string;
+    bookingChannel?: string;
+    notes: string;
+  };
   checkInInfo?: {
     arrivalTime?: string;
     phone?: string;
@@ -67,9 +85,9 @@ type BookingDetails = {
 type CheckInFormData = {
   firstName: string;
   lastName: string;
-  adultCount: number;
-  childCount: number;
-  specialRequests: string;
+  adultCount: number | "";
+  childCount: number | "";
+  incomeNotes: string;
   arrivalTime: string;
   phone: string;
   email: string;
@@ -149,7 +167,7 @@ const BookingCheckIn = () => {
     lastName: "",
     adultCount: 1,
     childCount: 0,
-    specialRequests: "",
+    incomeNotes: "",
     arrivalTime: "",
     phone: "",
     email: "",
@@ -163,15 +181,21 @@ const BookingCheckIn = () => {
     documents: [],
   });
   const [existingDocuments, setExistingDocuments] = useState<string[]>([]);
+  const [savedIncomeNotes, setSavedIncomeNotes] = useState("");
+  const initialContact = useRef({ phone: "", email: "" });
+  const initialArrivalTime = useRef("");
+  const arrivalTimeOverride = useRef("");
+  const initialSpecialNotes = useRef("");
 
   const { data: booking, isLoading } = useQuery<BookingDetails>(
-    ["booking", bookingId],
+    ["booking-check-in", bookingId],
     async () => {
-      const response = await axiosInstance.get(`/api/bookings/${bookingId}`);
+      const response = await axiosInstance.get(`/api/bookings/${bookingId}?includeIncome=true`);
       return response.data as BookingDetails;
     },
     {
       enabled: Boolean(bookingId),
+      refetchOnWindowFocus: false,
       onError: () => {
         showToast({ title: "Failed to load booking details", type: "ERROR" });
       },
@@ -179,76 +203,114 @@ const BookingCheckIn = () => {
   );
 
   const isImportedBooking = Boolean(booking?.isImported || booking?.source === "booking_com" || booking?.status === "imported");
-  const guestDisplayName = `${formData.firstName} ${formData.lastName}`.trim() || (isImportedBooking ? "Booking.com imported booking" : "Guest details not available");
+  const guestDisplayName = (isImportedBooking
+    ? `${formData.firstName} ${formData.lastName}`.trim()
+    : booking?.checkInIncome?.guestName || `${formData.firstName} ${formData.lastName}`.trim()
+  ) || (isImportedBooking ? "Booking.com imported booking" : "Guest details not available");
 
   useEffect(() => {
     if (!booking) return;
+    const income = booking.checkInIncome;
+    const originalName = `${booking.firstName || ""} ${booking.lastName || ""}`.trim();
+    const imported = Boolean(booking.isImported || booking.source === "booking_com" || booking.status === "imported");
+    const nameParts = income?.guestName && income.guestName !== originalName
+      ? income.guestName.trim().split(/\s+/) : [];
+    const knownGuests = (booking.adultCount || 0) + (booking.childCount || 0);
+    const needsGuestSplit = imported && (knownGuests < 1 || (income?.guestCount != null && income.guestCount !== knownGuests));
+    const phone = income?.phone || booking.checkInInfo?.phone || booking.phone || "";
+    const email = income?.email || booking.checkInInfo?.email || booking.email || "";
+    initialContact.current = { phone, email };
+    const arrivalTime = income?.arrivalTime || extractTimeValue(booking.checkInInfo?.arrivalTime) || extractTimeValue(booking.arrivalTime);
+    const specialNotes = income?.notes || booking.checkInInfo?.specialNotes || "";
+    initialArrivalTime.current = arrivalTime;
+    arrivalTimeOverride.current = income?.arrivalTimeOverride || "";
+    initialSpecialNotes.current = specialNotes;
 
     setFormData((prev) => ({
       ...prev,
-      firstName: booking.firstName || "",
-      lastName: booking.lastName || "",
-      adultCount: booking.adultCount || 1,
-      childCount: booking.childCount || 0,
-      specialRequests: booking.specialRequests || "",
-      arrivalTime:
-        extractTimeValue(booking.checkInInfo?.arrivalTime) ||
-        extractTimeValue(booking.arrivalTime) ||
-        prev.arrivalTime,
-      phone: booking.checkInInfo?.phone || booking.phone || "",
-      email: booking.checkInInfo?.email || booking.email || "",
+      firstName: nameParts.length ? nameParts[0] : booking.firstName || "",
+      lastName: nameParts.length ? nameParts.slice(1).join(" ") : booking.lastName || "",
+      adultCount: needsGuestSplit ? "" : booking.adultCount ?? 0,
+      childCount: needsGuestSplit ? "" : booking.childCount ?? 0,
+      incomeNotes: income?.notes || "",
+      arrivalTime,
+      phone,
+      email,
       nationality:
-        booking.checkInInfo?.nationality ||
+        income?.nationality || booking.checkInInfo?.nationality ||
         booking.nationality ||
         "",
       bookingChannel:
-        booking.checkInInfo?.bookingChannel ||
+        income?.bookingChannel || booking.checkInInfo?.bookingChannel ||
         (booking.source === "booking_com" ? "Booking.com" : prev.bookingChannel),
       paymentDetails:
-        booking.checkInInfo?.paymentDetails ||
+        income?.paymentMethod || booking.checkInInfo?.paymentDetails ||
         prev.paymentDetails,
-      specialNotes: booking.checkInInfo?.specialNotes || "",
+      specialNotes,
       breakfastTime: booking.checkInInfo?.breakfast?.time || "",
       breakfastSavouryCount: booking.checkInInfo?.breakfast?.savouryCount || 0,
       breakfastSweetCount: booking.checkInInfo?.breakfast?.sweetCount || 0,
     }));
 
     setExistingDocuments(booking.checkInInfo?.documents || []);
+    setSavedIncomeNotes(income?.notes || "");
   }, [booking]);
 
   const submitCheckInMutation = useMutation(
     async () => {
+      let incomeSaved = false;
+      const arrivalChanged = formData.arrivalTime !== initialArrivalTime.current;
+      if (formData.incomeNotes.trim() !== savedIncomeNotes || arrivalChanged) {
+        const response = await axiosInstance.put(`/api/bookings/${bookingId}/check-in-notes`, {
+          notes: formData.incomeNotes, expectedNotes: savedIncomeNotes,
+          ...(arrivalChanged ? { arrivalTime: formData.arrivalTime, expectedArrivalTime: arrivalTimeOverride.current } : {}),
+        });
+        setSavedIncomeNotes(response.data.notes);
+        if (arrivalChanged) {
+          arrivalTimeOverride.current = response.data.arrivalTime;
+          initialArrivalTime.current = formData.arrivalTime;
+        }
+        incomeSaved = true;
+      }
       const payload = new FormData();
       payload.append("firstName", formData.firstName);
       payload.append("lastName", formData.lastName);
       payload.append("adultCount", String(formData.adultCount));
       payload.append("childCount", String(formData.childCount));
-      payload.append("specialRequests", formData.specialRequests);
       payload.append("arrivalTime", formData.arrivalTime);
-      payload.append("phone", formData.phone);
-      payload.append("email", formData.email);
+      if (!isImportedBooking || formData.phone !== initialContact.current.phone) payload.append("phone", formData.phone);
+      if (!isImportedBooking || formData.email !== initialContact.current.email) payload.append("email", formData.email);
       payload.append("nationality", formData.nationality);
       payload.append("bookingChannel", formData.bookingChannel);
       payload.append("paymentDetails", formData.paymentDetails);
-      payload.append("specialNotes", formData.specialNotes);
+      payload.append("specialNotes", formData.specialNotes === initialSpecialNotes.current
+        ? booking?.checkInInfo?.specialNotes || "" : formData.specialNotes);
       payload.append("breakfastTime", formData.breakfastTime);
       payload.append("breakfastSavouryCount", String(formData.breakfastSavouryCount));
       payload.append("breakfastSweetCount", String(formData.breakfastSweetCount));
       existingDocuments.forEach((url) => payload.append("existingDocuments", url));
       formData.documents.forEach((doc) => payload.append("documents", doc));
 
-      return axiosInstance.post(`/api/bookings/${bookingId}/check-in`, payload, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      try {
+        return await axiosInstance.post(`/api/bookings/${bookingId}/check-in`, payload, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      } catch (error) {
+        if (incomeSaved) {
+          const message = axios.isAxiosError(error) ? error.response?.data?.message : undefined;
+          throw new Error(`Income details saved, but check-in failed${message ? `: ${message}` : "."}`);
+        }
+        throw error;
+      }
     },
     {
       onSuccess: () => {
         showToast({ title: "Check-in submitted successfully", type: "SUCCESS" });
         navigate(-1);
       },
-      onError: (error: any) => {
-        const message = error?.response?.data?.message || "Failed to submit check-in";
-        showToast({ title: message, type: "ERROR" });
+      onError: (error: unknown) => {
+        const message = axios.isAxiosError(error) ? error.response?.data?.message : error instanceof Error ? error.message : undefined;
+        showToast({ title: message || "Failed to submit check-in", type: "ERROR" });
       },
     }
   );
@@ -277,9 +339,9 @@ const BookingCheckIn = () => {
     );
   }
 
-  const mailSubject = encodeURIComponent(
-    `Palazzo Pinto Brindisi - ${booking.reservationNumber || "Booking"}`
-  );
+  const income = booking.checkInIncome;
+  const reference = income?.reference || booking.reservationNumber || "N/A";
+  const mailSubject = encodeURIComponent(`Palazzo Pinto Brindisi - ${reference}`);
   const hotelName = booking.hotelName || (typeof booking.hotelId === "object" ? booking.hotelId?.name || "" : "");
   const normalizedHotelName = hotelName.toLowerCase();
   const supportsBreakfast = normalizedHotelName.includes("malvasia") || normalizedHotelName.includes("verdeca");
@@ -288,10 +350,12 @@ const BookingCheckIn = () => {
   const ms = new Date(booking.checkOut).getTime() - new Date(booking.checkIn).getTime();
   const nights = Math.max(1, Math.ceil(ms / 86400000));
   const taxableDays = Math.min(nights, 7);
-  const guestCount = Math.max(1, formData.adultCount + formData.childCount);
-  const cityTax = taxableDays * guestCount * 2.5;
-  const currentTotalCost = Math.max(0, Number(booking.totalCost || 0));
-  const totalWithCityTax = currentTotalCost + cityTax;
+  const hasGuestSplit = formData.adultCount !== "" && formData.childCount !== "";
+  const guestCount = hasGuestSplit ? Number(formData.adultCount) + Number(formData.childCount) : 0;
+  const cityTax = guestCount > 0 ? taxableDays * guestCount * 2.5 : null;
+  const amountCents = income ? income.amountCents : booking.totalCost > 0 ? Math.round(booking.totalCost * 100) : null;
+  const currency = income?.currency || (isImportedBooking ? "" : "EUR");
+  const currentTotalCost = amountCents !== null && currency === "EUR" ? amountCents / 100 : null;
   const bookingChannelOptions = withCurrentOption(BOOKING_CHANNEL_OPTIONS, formData.bookingChannel);
   const paymentOptions = withCurrentOption(PAYMENT_OPTIONS, formData.paymentDetails);
   const nationalityOptions = withCurrentOption(NATIONALITY_OPTIONS, formData.nationality);
@@ -304,7 +368,9 @@ const BookingCheckIn = () => {
   const missingRequiredFields: string[] = [];
   if (isImportedBooking && !formData.firstName.trim()) missingRequiredFields.push("guest first name");
   if (isImportedBooking && !formData.lastName.trim()) missingRequiredFields.push("guest last name");
-  if (isImportedBooking && formData.adultCount + formData.childCount < 1) {
+  if (isImportedBooking && (!hasGuestSplit || !Number.isSafeInteger(formData.adultCount) ||
+      !Number.isSafeInteger(formData.childCount) || Number(formData.adultCount) < 0 ||
+      Number(formData.childCount) < 0 || guestCount < 1)) {
     missingRequiredFields.push("guest count");
   }
   if (formData.email.trim() && !isValidEmail(formData.email)) {
@@ -335,7 +401,7 @@ const BookingCheckIn = () => {
           <h1 className="text-2xl font-semibold leading-tight tracking-tight text-slate-950 sm:text-3xl">
             Guest Check-in{hotelName ? ` - ${hotelName}` : ""}
           </h1>
-          <p className="break-all text-sm text-slate-600 sm:text-base">Ref: {booking.reservationNumber || "N/A"}</p>
+          <p className="break-all text-sm text-slate-600 sm:text-base">Ref: {reference}</p>
         </div>
       </div>
 
@@ -364,28 +430,33 @@ const BookingCheckIn = () => {
               <Users className="h-4 w-4" /> Guests
             </p>
             <p className="font-semibold text-gray-900">
-              {formData.adultCount} Adult{formData.adultCount > 1 ? "s" : ""}
-              {formData.childCount > 0
-                ? `, ${formData.childCount} Child${formData.childCount > 1 ? "ren" : ""}`
-                : ""}
+              {income?.guestCount != null ? `${income.guestCount} guests (Income)` : guestCount > 0 ? `${guestCount} guests` : "Guest total unavailable"}
             </p>
+            <p className="mt-1 text-xs text-gray-600">
+              {hasGuestSplit && guestCount > 0
+                ? `Booking breakdown: ${formData.adultCount} adults, ${formData.childCount} children`
+                : "Enter the adult and child breakdown below."}
+            </p>
+            {income?.guestCount != null && hasGuestSplit && income.guestCount !== guestCount && (
+              <p className="mt-1 text-xs text-amber-700">The breakdown differs from Income. Review the guest count in Income.</p>
+            )}
           </div>
           <div className={detailBlockClass}>
             <p className="text-sm text-gray-600 flex items-center gap-1">
-              <Euro className="h-4 w-4" /> Total Due Today
+              <Euro className="h-4 w-4" /> Booking Value
             </p>
-            <p className="text-lg font-semibold text-gray-900">€{totalWithCityTax.toFixed(2)}</p>
-            <p className="mt-1 text-xs text-gray-600">Room total: €{currentTotalCost.toFixed(2)}</p>
+            <p className="text-lg font-semibold text-gray-900">{currentTotalCost === null ? "Not available in EUR" : `€${currentTotalCost.toFixed(2)}`}</p>
             <p className="mt-1 text-xs leading-5 text-gray-600">
-              City tax: €{cityTax.toFixed(2)} ({taxableDays} day{taxableDays > 1 ? "s" : ""} x {guestCount} guest{guestCount > 1 ? "s" : ""} x €2.50, max 7 days)
+              City tax: {cityTax === null ? "Enter guest breakdown" : `€${cityTax.toFixed(2)} (${taxableDays} day${taxableDays > 1 ? "s" : ""} x ${guestCount} guests x €2.50, max 7 days)`}
             </p>
+            <p className="mt-1 text-xs text-gray-600">The booking value is not a verified balance due. City tax uses the booking breakdown and may already be included.</p>
           </div>
           <div className={`${detailBlockClass} sm:col-span-2 xl:col-span-1`}>
             <p className="text-sm text-gray-600 flex items-center gap-1">
               <MapPin className="h-4 w-4" /> City / Country
             </p>
             <p className="font-semibold text-gray-900">
-              {booking.city || "N/A"} {booking.country ? `, ${booking.country}` : ""}
+              {income?.city || (!income && booking.city) || "N/A"} {income?.country || (!income && booking.country) ? `, ${income?.country || booking.country}` : ""}
             </p>
           </div>
         </CardContent>
@@ -399,7 +470,7 @@ const BookingCheckIn = () => {
           {isImportedBooking && (
             <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
               <div className="text-sm leading-6 text-slate-700 sm:col-span-2">
-                This reservation was imported from Booking.com. The guest-name fields below are intentionally separate from the import source so you can enter the real guest details manually.
+                Review the guest name and adult/child breakdown before saving. Income records a total guest count, not the breakdown.
               </div>
               <div>
                 <label className={labelClass}>Guest First Name *</label>
@@ -425,7 +496,7 @@ const BookingCheckIn = () => {
                   type="number"
                   min={0}
                   value={formData.adultCount}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, adultCount: Number(e.target.value) || 0 }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, adultCount: e.target.value === "" ? "" : Number(e.target.value) }))}
                   className={inputClass}
                 />
               </div>
@@ -435,22 +506,26 @@ const BookingCheckIn = () => {
                   type="number"
                   min={0}
                   value={formData.childCount}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, childCount: Number(e.target.value) || 0 }))}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, childCount: e.target.value === "" ? "" : Number(e.target.value) }))}
                   className={inputClass}
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelClass}>Special Requests</label>
-                <textarea
-                  rows={2}
-                  value={formData.specialRequests}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, specialRequests: e.target.value }))}
-                  className={inputClass}
-                  placeholder="Optional guest requests or notes"
                 />
               </div>
             </div>
           )}
+
+          <div>
+            <label className={labelClass} htmlFor="income-notes">Notes</label>
+            <textarea
+              id="income-notes"
+              rows={2}
+              maxLength={1000}
+              value={formData.incomeNotes}
+              onChange={(e) => setFormData((prev) => ({ ...prev, incomeNotes: e.target.value, specialNotes: e.target.value }))}
+              className={inputClass}
+              placeholder="Income notes"
+            />
+            <p className="mt-1 text-xs text-slate-600">Saved to Income when you save check-in.</p>
+          </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
@@ -615,8 +690,9 @@ const BookingCheckIn = () => {
               <label className={labelClass}>Special Notes</label>
               <textarea
                 rows={3}
+                maxLength={1000}
                 value={formData.specialNotes}
-                onChange={(e) => setFormData((prev) => ({ ...prev, specialNotes: e.target.value }))}
+                onChange={(e) => setFormData((prev) => ({ ...prev, specialNotes: e.target.value, incomeNotes: e.target.value }))}
                 className={inputClass}
                 placeholder="Optional notes"
               />

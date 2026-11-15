@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "react-query";
 import { Link } from "react-router-dom";
+import axios from "axios";
 import { Button } from "../components/ui/button";
 import PnlTable, { PnlColumn } from "../components/PnlTable";
 import PnlGrid from "../components/PnlGrid";
@@ -127,10 +128,10 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
     const details = booking.overrides || {};
     const money = (value?: number) => value === undefined ? "" : (value / 100).toFixed(2);
     setBookingForm({
-      reference: booking.reference,
-      guestName: booking.guestName,
-      phone: booking.phone,
-      email: booking.email,
+      reference: booking.source === "recorded" ? booking.reference : details.bookingReference || "",
+      guestName: booking.source === "recorded" ? booking.guestName : details.bookingGuestName || "",
+      phone: booking.source === "recorded" ? booking.phone : details.bookingPhone || "",
+      email: booking.source === "recorded" ? booking.email : details.bookingEmail || "",
       roomId: booking.roomId,
       date: booking.checkIn,
       checkOut: booking.checkOut || "",
@@ -176,6 +177,12 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
     }
     const details: apiClient.PnlBookingDetails = {
       ...editingBooking.overrides,
+      ...(editingBooking.source === "recorded" ? {} : {
+        bookingReference: bookingForm.reference.trim() || undefined,
+        bookingGuestName: bookingForm.guestName.trim() || undefined,
+        bookingPhone: bookingForm.phone.trim() || undefined,
+        bookingEmail: bookingForm.email.trim() || undefined,
+      }),
       country: bookingForm.country.trim() || undefined,
       city: bookingForm.city.trim() || undefined,
       identifier: bookingForm.identifier.trim() || undefined,
@@ -205,8 +212,10 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
       setEditingBooking(null);
       setBookingForm(null);
       setError("");
-    } catch {
-      setError("Unable to save booking income details. Check the details and try again.");
+    } catch (error) {
+      setError(axios.isAxiosError(error) && error.response?.status === 409
+        ? "Income notes or arrival time changed elsewhere. Close this editor, reload Income and review your changes."
+        : "Unable to save booking income details. Check the details and try again.");
     }
   };
   const toggleOverlap = async (booking: apiClient.PnlBooking) => {
@@ -214,8 +223,10 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
       await saveBooking.mutateAsync({ booking, details: { ...booking.overrides, includePossibleOverlap: !booking.overrides.includePossibleOverlap } });
       await queryClient.invalidateQueries("pnl-bookings");
       setError("");
-    } catch {
-      setError("Unable to update the overlap decision. Please try again.");
+    } catch (error) {
+      setError(axios.isAxiosError(error) && error.response?.status === 409
+        ? "Income notes or arrival time changed elsewhere. Reload Income and try again."
+        : "Unable to update the overlap decision. Please try again.");
     }
   };
   const toggleRecordedIncome = async (booking: apiClient.PnlBooking) => {
@@ -255,7 +266,7 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
     { key: "guestDetails", label: "Guest ages / details", width: 180, value: (row) => row.guestDetails, render: (row) => row.guestDetails || "—" },
     { key: "paymentMethod", label: "Payment method", value: (row) => row.paymentMethod, render: (row) => row.paymentMethod || "—" },
     { key: "taxQuarter", label: "Tax quarter", value: (row) => row.taxQuarter, render: (row) => row.taxQuarter || "—" },
-    { key: "status", label: "Booking status", value: (row) => row.status, render: (row) => <><span className="capitalize">{row.status}</span>{row.reason && <p className="text-xs font-medium text-amber-700">{row.reason} — excluded</p>}{row.possibleRecordedOverlap && row.overrides.includePossibleOverlap && <p className="text-xs font-medium text-amber-700">Possible overlap — manually included</p>}{row.possibleRepeatedRecord && <p className="text-xs font-medium text-amber-700">Another record has the same room and date — review</p>}</> },
+    { key: "status", label: "Booking status", value: (row) => row.status, render: (row) => <><span className="capitalize">{row.status}</span>{row.calendarEvent && <p className="text-xs font-medium text-amber-700">iCal availability event — verify reservation</p>}{row.reason && <p className="text-xs font-medium text-amber-700">{row.reason} — excluded</p>}{row.possibleRecordedOverlap && row.overrides.includePossibleOverlap && <p className="text-xs font-medium text-amber-700">Possible overlap — manually included</p>}{row.possibleRepeatedRecord && <p className="text-xs font-medium text-amber-700">Another record has the same room and date — review</p>}</> },
     { key: "invoiceRequired", label: "Invoice required", value: (row) => row.invoiceRequired == null ? null : row.invoiceRequired ? "Yes" : "No", render: (row) => row.invoiceRequired === true ? "Yes" : row.invoiceRequired === false ? "No" : "Not specified" },
     { key: "invoiceStatus", label: "Invoice status", value: (row) => row.invoiceRequired === true ? row.invoiceCreated === true ? "Created" : row.invoiceCreated === false ? "Pending" : null : null, render: (row) => row.invoiceRequired === true ? row.invoiceCreated === true ? "Created" : row.invoiceCreated === false ? "Pending" : "Not specified" : "—" },
     { key: "actions", label: "Actions", width: 180, render: (row) => <><button className="font-semibold text-teal-700" aria-label={`Edit income details for ${row.reference || row.guestName}`} onClick={() => editBookingDetails(row)}>Edit details</button>{row.possibleRecordedOverlap && (row.reason === "Possible overlap with recorded income" || !row.reason) && <button className="mt-2 block font-semibold text-amber-700" disabled={saveBooking.isLoading} onClick={() => toggleOverlap(row)}>{row.overrides.includePossibleOverlap ? "Exclude overlap" : "Include despite overlap"}</button>}{row.source === "recorded" && <button className="mt-2 block font-semibold text-amber-700" disabled={saveBooking.isLoading} onClick={() => toggleRecordedIncome(row)}>{row.overrides.excludeFromTotals ? "Include in totals" : "Exclude from totals"}</button>}</> },
@@ -286,7 +297,7 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">P&amp;L management</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-950">{title}</h1>
-          <p className="mt-2 text-sm text-slate-600">{type === "income" ? "Bookings are loaded automatically. Add only additional non-booking income below to avoid double counting." : "Track manually recorded costs in EUR."}</p>
+          <p className="mt-2 text-sm text-slate-600">{type === "income" ? "Site bookings and active Booking.com calendar events are loaded by check-in year. Add only additional non-booking income below to avoid double counting." : "Track manually recorded costs in EUR."}</p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-slate-700">Year<input aria-label="Year" type="number" min="1900" max="9998" value={year} onChange={(e) => setYear(e.target.value)} className="ml-3 w-24 rounded-lg border border-slate-300 px-3 py-2" /></label>
@@ -329,6 +340,7 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 sm:p-7">
           <h2 className="text-xl font-semibold text-slate-900">Booking income</h2>
           <p className="mt-1 text-sm text-slate-500">Values are attributed to the check-in month, not verified payments. Unconfirmed, missing, non-EUR and possible duplicate or overlapping bookings are excluded from totals.</p>
+          <p className="mt-1 text-sm text-slate-500">iCal may contain availability blocks and often omits guest and price details. Verify each event before recording income.</p>
           <p className="mt-1 text-sm text-slate-500">Possible bookings are suggestions based on reference or room and check-in. Review dates and guest details; suggestions do not link records or change totals.</p>
           <p className="mt-1 text-sm text-slate-500">Nights and month come from the stay dates. Unit price is the amount before tourist tax per night when available. Missing amounts are not estimated.</p>
           {editingBooking && bookingForm && (
@@ -346,6 +358,13 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
                 <label className="text-sm font-medium text-slate-700">Check-in date<input required type="date" min="1900-01-01" max="9998-12-31" value={bookingForm.date} onChange={(e) => setBookingForm({ ...bookingForm, date: e.target.value })} className={fieldClass} /></label>
                 <label className="text-sm font-medium text-slate-700">Check-out date<input type="date" min="1900-01-01" max="9998-12-31" value={bookingForm.checkOut} onChange={(e) => setBookingForm({ ...bookingForm, checkOut: e.target.value })} className={fieldClass} /></label>
                 <p className="text-sm text-slate-700">Nights: {stayNights(bookingForm.date, bookingForm.checkOut) ?? "Not available"}</p>
+              </>}
+              {editingBooking.source !== "recorded" && <>
+                <label className="text-sm font-medium text-slate-700">Reference override<input maxLength={200} value={bookingForm.reference} placeholder={editingBooking.sourceDetails?.reference || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, reference: e.target.value })} className={fieldClass} /></label>
+                <label className="text-sm font-medium text-slate-700">Guest name override<input maxLength={200} value={bookingForm.guestName} placeholder={editingBooking.sourceDetails?.guestName || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, guestName: e.target.value })} className={fieldClass} /></label>
+                <label className="text-sm font-medium text-slate-700">Phone override<input maxLength={200} value={bookingForm.phone} placeholder={editingBooking.sourceDetails?.phone || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, phone: e.target.value })} className={fieldClass} /></label>
+                <label className="text-sm font-medium text-slate-700">Email override<input maxLength={200} value={bookingForm.email} placeholder={editingBooking.sourceDetails?.email || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, email: e.target.value })} className={fieldClass} /></label>
+                <p className="text-sm text-slate-700 sm:col-span-2 lg:col-span-3">These overrides are for income reporting only. Check-in emails use the original booking email.</p>
               </>}
               <label className="text-sm font-medium text-slate-700">Country override<input maxLength={100} value={bookingForm.country} placeholder={editingBooking.country || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, country: e.target.value })} className={fieldClass} /></label>
               <label className="text-sm font-medium text-slate-700">City override<input maxLength={100} value={bookingForm.city} placeholder={editingBooking.city || "Not available"} onChange={(e) => setBookingForm({ ...bookingForm, city: e.target.value })} className={fieldClass} /></label>

@@ -373,11 +373,14 @@ export type PnlEntry = PnlEntryInput & { _id: string };
 export type PnlBookingDetails = {
   bookingReference?: string;
   bookingGuestName?: string;
+  bookingPhone?: string;
+  bookingEmail?: string;
   country?: string;
   city?: string;
   identifier?: string;
   guestDetails?: string;
   notes?: string;
+  arrivalTime?: string;
   checkInDesk?: boolean;
   selfCheckIn?: boolean;
   guestCount?: number;
@@ -400,6 +403,8 @@ export type PnlBooking = {
   id: string;
   reference: string;
   source: "local" | "booking_com" | "recorded";
+  sourceDetails?: { reference: string; guestName: string; email: string; phone: string };
+  calendarEvent?: boolean;
   roomId: string;
   roomName?: string;
   checkIn: string;
@@ -416,6 +421,8 @@ export type PnlBooking = {
   identifier: string;
   guestDetails: string;
   notes: string;
+  arrivalTime?: string;
+  sourceArrivalTime?: string;
   guestCount: number | null;
   nights: number | null;
   netAmountCents: number | null;
@@ -457,8 +464,8 @@ export type PnlRecordedIdentity = {
   nights: number | null;
 };
 
-export const savePnlBookingDetails = async (booking: PnlBooking, details: PnlBookingDetails, identity?: PnlRecordedIdentity): Promise<void> => {
-  await axiosInstance.put(`/api/pnl/bookings/${booking.source}/${booking.id}`, booking.source === "recorded" ? { ...identity, details } : details);
+export const savePnlBookingDetails = async (booking: PnlBooking, details: PnlBookingDetails, identity?: PnlRecordedIdentity, expectedNotes?: string): Promise<void> => {
+  await axiosInstance.put(`/api/pnl/bookings/${booking.source}/${booking.id}`, booking.source === "recorded" ? { ...identity, details } : { ...details, expectedNotes: expectedNotes ?? booking.notes ?? "", expectedArrivalTime: booking.overrides?.arrivalTime || "" });
 };
 
 export const fetchPnlBookings = async (year: number): Promise<PnlBooking[]> => {

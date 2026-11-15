@@ -57,7 +57,7 @@ const getWhatsappHref = (phone: string) => {
 };
 
 type CheckInStatusFilter = "all" | "needs-action" | "checked-in";
-type HorizonFilter = "1" | "7" | "14" | "30" | "past";
+type HorizonFilter = "1" | "7" | "14" | "30" | "60" | "past";
 
 const AdminPortalCheckIns = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -69,7 +69,7 @@ const AdminPortalCheckIns = () => {
     }
 
     const requestedDays = searchParams.get("days");
-    return requestedDays === "7" || requestedDays === "14" || requestedDays === "30"
+    return requestedDays === "7" || requestedDays === "14" || requestedDays === "30" || requestedDays === "60"
       ? requestedDays
       : "1";
   });
@@ -166,6 +166,7 @@ const AdminPortalCheckIns = () => {
                 <option value="7">Next 7 days</option>
                 <option value="14">Next 14 days</option>
                 <option value="30">Next 30 days</option>
+                <option value="60">Next 60 days</option>
                 <option value="past">All Past</option>
               </select>
             </label>

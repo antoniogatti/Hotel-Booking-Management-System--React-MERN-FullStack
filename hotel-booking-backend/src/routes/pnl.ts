@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import verifyToken from "../middleware/auth";
 import requireRole from "../middleware/requireRole";
 import { logError } from "../lib/logger";
+import { isArrivalTime, normalizeArrivalTime } from "../lib/arrival-time";
 import Hotel from "../models/hotel";
 import PnlEntry from "../models/pnl-entry";
 import Booking from "../models/booking";
@@ -150,10 +151,14 @@ const validDate = (value: unknown): value is string => {
 const parseBookingDetails = (body: unknown): PnlBookingDetails | null => {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const input = body as Record<string, unknown>;
-  const fields = ["bookingReference", "bookingGuestName", "country", "city", "identifier", "guestDetails", "notes", "checkInDesk", "selfCheckIn", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "invoiceDate", "touristTaxCents", "paymentMethod", "paymentStatus", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
+  const fields = ["bookingReference", "bookingGuestName", "bookingPhone", "bookingEmail", "country", "city", "identifier", "guestDetails", "notes", "arrivalTime", "checkInDesk", "selfCheckIn", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "invoiceDate", "touristTaxCents", "paymentMethod", "paymentStatus", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
   if (Object.keys(input).some((key) => !fields.includes(key))) return null;
   const details: PnlBookingDetails = {};
-  for (const key of ["bookingReference", "bookingGuestName"] as const) {
+  if (input.arrivalTime !== undefined && input.arrivalTime !== null && input.arrivalTime !== "") {
+    if (typeof input.arrivalTime !== "string" || !isArrivalTime(input.arrivalTime)) return null;
+    details.arrivalTime = input.arrivalTime;
+  }
+  for (const key of ["bookingReference", "bookingGuestName", "bookingPhone", "bookingEmail"] as const) {
     const value = input[key];
     if (value === undefined || value === null || value === "") continue;
     if (typeof value !== "string" || value.trim().length > 200) return null;
@@ -205,7 +210,7 @@ const incomeDetails = (booking: {
   adultCount?: number;
   childCount?: number;
   pnlIncome?: PnlBookingDetails;
-  checkInInfo?: { paymentDetails?: string };
+  checkInInfo?: { paymentDetails?: string; arrivalTime?: string };
   excelSync?: {
     country?: string;
     city?: string;
@@ -239,6 +244,8 @@ const incomeDetails = (booking: {
     identifier: overrides.identifier || previous?.identifier || "",
     guestDetails: overrides.guestDetails || (typeof rawDetails === "string" || typeof rawDetails === "number" ? String(rawDetails) : ""),
     notes: overrides.notes || "",
+    arrivalTime: overrides.arrivalTime || normalizeArrivalTime(booking.checkInInfo?.arrivalTime),
+    sourceArrivalTime: normalizeArrivalTime(booking.checkInInfo?.arrivalTime),
     guestCount: overrides.guestCount ?? (adults + children || null),
     nights,
     netAmountCents,
@@ -313,10 +320,10 @@ router.get("/bookings", async (req, res) => {
     const end = new Date(`${Number(year) + 1}-01-01T00:00:00.000Z`);
     const [local, imported, recorded] = await Promise.all([
       Booking.find({ checkIn: { $gte: start, $lt: end } })
-        .select("_id hotelId reservationNumber firstName lastName email phone adultCount childCount nationality city country checkIn checkOut status totalCost checkInInfo.paymentDetails +pnlIncome excelSync.identifier excelSync.invoiceNumber excelSync.country excelSync.city excelSync.netPrice excelSync.unitPrice excelSync.paymentVia excelSync.raw")
+        .select("_id hotelId reservationNumber firstName lastName email phone adultCount childCount nationality city country checkIn checkOut status totalCost checkInInfo.paymentDetails checkInInfo.arrivalTime +pnlIncome excelSync.identifier excelSync.invoiceNumber excelSync.country excelSync.city excelSync.netPrice excelSync.unitPrice excelSync.paymentVia excelSync.raw")
         .lean(),
       ExternalCalendarEvent.find({ source: "booking_com", status: "active", startDate: { $gte: start, $lt: end } })
-        .select("_id hotelId externalUid firstName lastName email phone adultCount childCount nationality city country startDate endDate totalCost currency checkInInfo.paymentDetails +pnlIncome excelSync.identifier excelSync.invoiceNumber excelSync.country excelSync.city excelSync.netPrice excelSync.unitPrice excelSync.paymentVia excelSync.raw")
+        .select("_id hotelId externalUid origin firstName lastName email phone adultCount childCount nationality city country startDate endDate totalCost currency checkInInfo.paymentDetails checkInInfo.arrivalTime +pnlIncome excelSync.identifier excelSync.invoiceNumber excelSync.country excelSync.city excelSync.netPrice excelSync.unitPrice excelSync.paymentVia excelSync.raw")
         .lean(),
       PnlRecordedIncome.find({ date: { $gte: `${year}-01-01`, $lte: `${year}-12-31` } }).lean(),
     ]);
@@ -334,17 +341,23 @@ router.get("/bookings", async (req, res) => {
     const rows = [
       ...local.map((booking) => {
         const overrides = incomeByBooking.get(`local:${String(booking._id)}`) ?? booking.pnlIncome;
+        const sourceDetails = {
+          reference: booking.reservationNumber || String(booking._id),
+          guestName: [booking.firstName, booking.lastName].filter(Boolean).join(" "),
+          email: booking.email || "", phone: booking.phone || "",
+        };
         return {
         id: String(booking._id),
-        reference: booking.reservationNumber || String(booking._id),
+        reference: overrides?.bookingReference || sourceDetails.reference,
         source: "local" as const,
+        sourceDetails,
         roomId: String(booking.hotelId),
         checkIn: booking.checkIn.toISOString().slice(0, 10),
         checkOut: booking.checkOut.toISOString().slice(0, 10),
         status: booking.status,
-        guestName: [booking.firstName, booking.lastName].filter(Boolean).join(" "),
-        email: booking.email || "",
-        phone: booking.phone || "",
+        guestName: overrides?.bookingGuestName || sourceDetails.guestName,
+        email: overrides?.bookingEmail || sourceDetails.email,
+        phone: overrides?.bookingPhone || sourceDetails.phone,
         ...incomeDetails({ ...booking, pnlIncome: overrides }, booking.checkIn.toISOString().slice(0, 10), booking.checkOut.toISOString().slice(0, 10), true),
         nationality: booking.nationality || "",
         adults: booking.adultCount,
@@ -356,17 +369,24 @@ router.get("/bookings", async (req, res) => {
       }; }),
       ...imported.map((booking) => {
         const overrides = incomeByBooking.get(`booking_com:${String(booking._id)}`) ?? booking.pnlIncome;
+        const sourceDetails = {
+          reference: booking.externalUid,
+          guestName: [booking.firstName, booking.lastName].filter(Boolean).join(" "),
+          email: booking.email || "", phone: booking.phone || "",
+        };
         return {
         id: String(booking._id),
-        reference: overrides?.bookingReference || booking.externalUid,
+        reference: overrides?.bookingReference || sourceDetails.reference,
         source: "booking_com" as const,
+        sourceDetails,
+        calendarEvent: booking.origin !== "api",
         roomId: String(booking.hotelId),
         checkIn: booking.startDate.toISOString().slice(0, 10),
         checkOut: booking.endDate.toISOString().slice(0, 10),
         status: "imported",
-        guestName: overrides?.bookingGuestName || [booking.firstName, booking.lastName].filter(Boolean).join(" "),
-        email: booking.email || "",
-        phone: booking.phone || "",
+        guestName: overrides?.bookingGuestName || sourceDetails.guestName,
+        email: overrides?.bookingEmail || sourceDetails.email,
+        phone: overrides?.bookingPhone || sourceDetails.phone,
         ...incomeDetails({ ...booking, pnlIncome: overrides }, booking.startDate.toISOString().slice(0, 10), booking.endDate.toISOString().slice(0, 10), overrides?.grossAmountCents !== undefined || booking.currency?.toUpperCase() === "EUR"),
         nationality: booking.nationality || "",
         adults: booking.adultCount,
@@ -543,22 +563,54 @@ router.put("/bookings/:source/:id", async (req, res) => {
       return res.status(500).json({ message: "Unable to save recorded income details." });
     }
   }
-  const details = parseBookingDetails(req.body);
-  if (!details || !mongoose.isValidObjectId(req.params.id) || !["local", "booking_com"].includes(req.params.source)) {
+  const input = req.body && typeof req.body === "object" && !Array.isArray(req.body)
+    ? req.body as Record<string, unknown> : null;
+  const { expectedNotes, expectedArrivalTime, ...rawDetails } = input || {};
+  const details = input ? parseBookingDetails(rawDetails) : null;
+  if (!details || (expectedNotes !== undefined && (typeof expectedNotes !== "string" || expectedNotes.length > 1000)) ||
+      (expectedArrivalTime !== undefined && (typeof expectedArrivalTime !== "string" || (expectedArrivalTime !== "" && !isArrivalTime(expectedArrivalTime)))) ||
+      !mongoose.isValidObjectId(req.params.id) || !["local", "booking_com"].includes(req.params.source)) {
     return res.status(400).json({ message: "Provide valid booking income details." });
   }
   try {
-    const exists = req.params.source === "local"
-      ? await Booking.exists({ _id: req.params.id })
-      : await ExternalCalendarEvent.exists({ _id: req.params.id, source: "booking_com" });
-    if (!exists) return res.status(404).json({ message: "Booking not found." });
-    await PnlBookingIncome.findByIdAndUpdate(
-      `${req.params.source}:${req.params.id}`,
-      { $set: { source: req.params.source, bookingId: req.params.id, details, updatedBy: req.userId } },
-      { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
-    );
+    const key = `${req.params.source}:${req.params.id}`;
+    if (expectedNotes !== undefined) {
+      const booking = req.params.source === "local"
+        ? await Booking.findById(req.params.id).select("+pnlIncome").lean()
+        : await ExternalCalendarEvent.findOne({ _id: req.params.id, source: "booking_com" }).select("+pnlIncome").lean();
+      if (!booking) return res.status(404).json({ message: "Booking not found." });
+      const current = await PnlBookingIncome.findById(key).lean();
+      const currentNotes = (current?.details ?? booking.pnlIncome)?.notes || "";
+      const currentArrivalTime = (current?.details ?? booking.pnlIncome)?.arrivalTime || "";
+      if (currentNotes !== expectedNotes) return res.status(409).json({ message: "Income notes changed. Reload and review your changes." });
+      if (expectedArrivalTime !== undefined && currentArrivalTime !== expectedArrivalTime) return res.status(409).json({ message: "Income arrival time changed. Reload and review your changes." });
+      if (current) {
+        const filter: Record<string, unknown> = { _id: key, "details.notes": currentNotes || { $in: ["", null] } };
+        if (expectedArrivalTime !== undefined) filter["details.arrivalTime"] = currentArrivalTime || { $in: ["", null] };
+        const saved = await PnlBookingIncome.updateOne(
+          filter,
+          { $set: { details, updatedBy: req.userId } },
+          { runValidators: true }
+        );
+        if (!saved.matchedCount) return res.status(409).json({ message: "Income notes or arrival time changed. Reload and review your changes." });
+      } else {
+        await PnlBookingIncome.create({ _id: key, source: req.params.source, bookingId: req.params.id, details, updatedBy: req.userId });
+      }
+    } else {
+      const exists = req.params.source === "local"
+        ? await Booking.exists({ _id: req.params.id })
+        : await ExternalCalendarEvent.exists({ _id: req.params.id, source: "booking_com" });
+      if (!exists) return res.status(404).json({ message: "Booking not found." });
+      await PnlBookingIncome.findByIdAndUpdate(
+        key, { $set: { source: req.params.source, bookingId: req.params.id, details, updatedBy: req.userId } },
+        { upsert: true, new: true, runValidators: true, setDefaultsOnInsert: true }
+      );
+    }
     return res.json({ message: "Booking income details saved." });
   } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === 11000) {
+      return res.status(409).json({ message: "Income details changed. Reload and review your changes." });
+    }
     logError("Failed to save booking income details", error);
     return res.status(500).json({ message: "Unable to save booking income details." });
   }

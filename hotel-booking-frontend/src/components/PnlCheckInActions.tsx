@@ -52,8 +52,8 @@ export default function PnlCheckInActions({ bookings, onSent, onBusyChange }: {
         if (booking.source === "recorded") continue;
         try {
           await api.sendPnlCheckInInvitation(mode === "desk"
-            ? { source: booking.source, id: booking.id, expectedEmail: booking.email, mode }
-            : { source: booking.source, id: booking.id, expectedEmail: booking.email, mode, ...getOptions(key) });
+            ? { source: booking.source, id: booking.id, expectedEmail: booking.sourceDetails?.email ?? booking.email, mode }
+            : { source: booking.source, id: booking.id, expectedEmail: booking.sourceDetails?.email ?? booking.email, mode, ...getOptions(key) });
           setResults((previous) => ({ ...previous, [key]: { sent: true, message: "Accepted for sending" } }));
           onSent(key);
         } catch (failure) {
@@ -76,7 +76,7 @@ export default function PnlCheckInActions({ bookings, onSent, onBusyChange }: {
       <SheetContent overlayClassName="z-[110] bg-black/40" className="z-[120] w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader>
           <SheetTitle>Check-in actions</SheetTitle>
-          <SheetDescription>Review selected bookings. Desk procedures are for staff; emails go to each guest separately.</SheetDescription>
+          <SheetDescription>Review selected bookings. Desk procedures are for staff; emails use the name and address on the original booking, not income-only overrides.</SheetDescription>
         </SheetHeader>
         <fieldset className="mt-4 flex flex-wrap gap-4 text-sm">
           <legend className="font-medium">Check-in type</legend>
@@ -91,7 +91,9 @@ export default function PnlCheckInActions({ bookings, onSent, onBusyChange }: {
             const result = results[key];
             return <div key={key} className="rounded border border-slate-200 p-3 text-sm">
               <p className="font-semibold">{booking.guestName || "Guest"} · {booking.reference || booking.id}</p>
-              <p>{booking.email || "No guest email"} · {booking.checkIn}</p>
+              {booking.sourceDetails && booking.sourceDetails.guestName !== booking.guestName &&
+                <p>Original booking guest: {booking.sourceDetails.guestName || "Not available"}</p>}
+              <p>{(booking.sourceDetails?.email ?? booking.email) || "No booking email"} · {booking.checkIn}</p>
               {booking.roomId && <a className="text-teal-700 underline" target="_blank" rel="noopener noreferrer" href={`/hotel/${encodeURIComponent(booking.roomId)}/check-in/${encodeURIComponent(booking.id)}`}>Open staff check-in procedure</a>}
               {mode === "self" && !result?.sent && <div className="mt-2 flex flex-wrap items-end gap-3">
                 <label>Access code <input aria-label={`Access code for ${booking.reference}`} type="password" autoComplete="off" maxLength={80} disabled={sending} value={option.accessCode} onChange={(event) => updateOptions(key, { accessCode: event.target.value })} className="block rounded border border-slate-300 px-2 py-1" /></label>

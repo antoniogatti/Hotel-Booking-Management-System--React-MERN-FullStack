@@ -38,7 +38,9 @@ pagination and column resizing to navigate large ledgers. In the booking
 income sheet, the check-in markers, Notes, Room and Check-in are frozen by default.
 The numbered Stay, Registration, Invoicing and Payment & review groups organize
 the columns. Nights are calculated from check-in and check-out; for recorded
-income, edit those dates to change the calculation. Pax is the guest count.
+income, edit those dates to change the calculation. The Stay group includes an
+editable arrival time; it uses the saved check-in time when no Income override
+is present. Pax is the guest count.
 Invoice date, tourist tax and payment status are optional manual details;
 entering tourist tax does not automatically change amounts or totals.
 Use the numbered group buttons to toggle groups independently, or All groups
@@ -58,9 +60,15 @@ the resulting column colors are saved with the view. Each
 column's value filter lists values present in the income data; use Show value
 filters to reveal them. Color settings
 and active color and value filters are saved with the view; value filters
-still apply when their columns are hidden. Booking-sourced
-identity fields and calculated values are read-only; inclusion warnings
-refresh when the editor is reopened. Recorded income shows possible site and
+still apply when their columns are hidden. Site bookings and active Booking.com
+events are loaded by check-in year; use the source selector to find each type.
+iCal entries may be availability blocks and often lack guest, contact and price
+data, so verify them before recording income. Guest name, reference, phone and
+email can be edited as income-only overrides for either booking source; clear
+an override to restore its source value. These edits do not change the original
+booking or the address used for check-in emails. Room, dates and calculated
+values remain read-only for booking-sourced rows; inclusion warnings refresh
+when the editor is reopened. Recorded income shows possible site and
 Booking.com matches based on reference or room and check-in; compare check-out
 and guest details before deciding how to reconcile. These are suggestions only:
 they do not link records or alter totals.
@@ -75,7 +83,8 @@ can be filtered like other columns. They are manual markers only:
 checking them does not send an email or mark a guest checked in.
 The Check-in Desk shows only site and Booking.com bookings marked **Check-in
 desk**, subject to its room, date and status filters; recorded income is not
-linked to a booking. Its counts also include only marked bookings. The admin
+linked to a booking. Select a horizon up to **Next 60 days** to see future
+arrivals. Its counts also include only marked bookings. The admin
 overview still shows all arrivals.
 
 Select site or Booking.com rows and open Check-in actions to access each
@@ -89,6 +98,20 @@ Email acceptance is shown per guest; if delivery is unconfirmed, check sent
 mail before retrying. Row selections and entered access codes are not saved in views.
 Codes are included in guest emails and the sender's Sent mail; self check-in
 submissions remain separate and do not automatically mark a booking checked in.
+
+The staff check-in form loads the matching Income guest, contact, location,
+payment and booking value details for site and Booking.com bookings. An Income
+guest total does not specify adults and children; review the breakdown before
+checking in. Booking value is not a verified balance due, and city tax is shown
+separately because it may already be included. Notes on the form come from
+Income and are saved to Income before check-in; they do not replace the original
+booking's special requests. If Income notes change elsewhere, reload and review
+before saving. Other Income overrides remain reporting details and do not change
+the original address used for check-in invitations. On imported bookings,
+prefilled Income contact details do not replace the original booking contact
+unless staff edit those fields during check-in. Arrival time and special notes
+are prefilled from Income; editing them in check-in also saves them to Income.
+The booking's nationality and source are used where available.
 
 ### Booking.com screenshot import
 

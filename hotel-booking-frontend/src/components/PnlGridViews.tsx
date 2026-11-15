@@ -7,7 +7,7 @@ type ViewColumn = { key: string; label: string; group: string };
 type Group = { id: string; label: string };
 
 const legacyGroups: Record<string, string[]> = {
-  stay: ["roomId", "date", "checkOut", "guestName", "month", "nights", "guestCount"],
+  stay: ["roomId", "date", "arrivalTime", "checkOut", "guestName", "month", "nights", "guestCount"],
   booking: ["notes", "reference", "possibleBookings", "status", "includePossibleOverlap", "excludeFromTotals"],
   guest: ["phone", "email", "country", "identifier", "city", "guestDetails"],
   amounts: ["grossAmountCents", "sourceAmount", "unit", "netAmountCents", "paymentMethod", "taxQuarter"],
@@ -36,12 +36,17 @@ function normalizeView(view: api.PnlGridLayout, columns: ViewColumn[], groups: G
     return column && !hiddenColumns.includes(key) && !view.hiddenGroups.includes(column.group) &&
       (!view.colorFilter || (view.colorFilter === "uncolored" ? !color : color === view.colorFilter));
   };
+  const arrivalIndex = known.has("arrivalTime") && !order.includes("arrivalTime")
+    ? (order.includes("date") ? order.indexOf("date") + 1 : order.length) : -1;
+  const insertedBeforeFrozen = arrivalIndex >= 0 && isVisible("arrivalTime") &&
+    order.slice(0, arrivalIndex).filter(isVisible).length < view.frozenColumns;
+  if (arrivalIndex >= 0) order.splice(arrivalIndex, 0, "arrivalTime");
   return {
     columns: [...newCheckInColumns, ...(addNotes ? ["notes"] : []), ...order, ...columns.map((column) => column.key).filter((key) => key !== "notes" && !newCheckInColumns.includes(key) && !order.includes(key))],
     hiddenGroups: view.hiddenGroups.filter((key) => groups.some((group) => group.id === key)),
     hiddenColumns,
     frozenColumns: view.frozenColumns + (view.frozenColumns > 0
-      ? [...newCheckInColumns, ...(addNotes ? ["notes"] : [])].filter(isVisible).length : 0),
+      ? [...newCheckInColumns, ...(addNotes ? ["notes"] : [])].filter(isVisible).length + (insertedBeforeFrozen ? 1 : 0) : 0),
     widths: Object.fromEntries(Object.entries(view.widths).filter(([key]) => known.has(key))),
     colorTags: view.colorTags ?? [],
     columnColors: Object.fromEntries(Object.entries(view.columnColors ?? {}).filter(([key]) => known.has(key))),

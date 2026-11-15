@@ -9,6 +9,7 @@ const { MongoMemoryServer } = require("mongodb-memory-server");
 process.env.JWT_SECRET_KEY = "local-test-secret";
 const User = require("../src/models/user").default;
 const ExternalCalendarEvent = require("../src/models/external-calendar-event").default;
+const Booking = require("../src/models/booking").default;
 const PnlBookingIncome = require("../src/models/pnl-booking-income").default;
 const router = require("../src/routes/pnl").default;
 
@@ -57,4 +58,43 @@ test("screenshot patch persists and preserves legacy and concurrent fields", asy
   const original = await ExternalCalendarEvent.findById(event.id).select("+pnlIncome").lean();
   assert.equal(original.externalUid, "opaque");
   assert.equal(original.pnlIncome.grossAmountCents, 5000);
+});
+
+test("income loads site bookings and active calendar events by check-in year with editable reporting details", async () => {
+  const site = await Booking.create({
+    userId: admin, hotelId: roomId, reservationNumber: "SITE-2028", firstName: "Site", lastName: "Guest",
+    email: "source@example.test", adultCount: 2, childCount: 0, status: "confirmed", totalCost: 200,
+    checkIn: new Date("2028-12-30T00:00:00Z"), checkOut: new Date("2029-01-02T00:00:00Z"),
+  });
+  const calendar = await ExternalCalendarEvent.create({
+    hotelId: roomId, externalUid: "opaque-2028", source: "booking_com", origin: "ical",
+    startDate: new Date("2028-06-02T00:00:00Z"), endDate: new Date("2028-06-05T00:00:00Z"),
+  });
+  await ExternalCalendarEvent.create({
+    hotelId: roomId, externalUid: "inactive", source: "booking_com", status: "inactive",
+    startDate: new Date("2028-07-01T00:00:00Z"), endDate: new Date("2028-07-03T00:00:00Z"),
+  });
+  const headers = { "Content-Type": "application/json", Authorization: `Bearer ${jwt.sign({ userId: admin }, process.env.JWT_SECRET_KEY)}` };
+  const getRows = async (year) => (await (await fetch(`${baseUrl}/bookings?year=${year}`, { headers })).json()).bookings;
+  let rows = await getRows(2028);
+  assert.equal(rows.length, 2);
+  assert.equal(rows.find((row) => row.id === site.id).source, "local");
+  assert.equal(rows.find((row) => row.id === calendar.id).calendarEvent, true);
+  assert.equal(rows.find((row) => row.id === calendar.id).amountCents, null);
+  assert.equal((await getRows(2029)).some((row) => row.id === site.id), false);
+  for (const [source, id] of [["local", site.id], ["booking_com", calendar.id]]) {
+    const response = await fetch(`${baseUrl}/bookings/${source}/${id}`, {
+      method: "PUT", headers,
+      body: JSON.stringify({ bookingGuestName: "Reporting Guest", bookingReference: "CUSTOM", bookingEmail: "report@example.test", bookingPhone: "123", notes: "Keep" }),
+    });
+    assert.equal(response.status, 200);
+  }
+  rows = await getRows(2028);
+  for (const id of [site.id, calendar.id]) {
+    const row = rows.find((item) => item.id === id);
+    assert.deepEqual([row.guestName, row.reference, row.email, row.phone, row.notes], ["Reporting Guest", "CUSTOM", "report@example.test", "123", "Keep"]);
+  }
+  assert.equal(rows.find((row) => row.id === site.id).sourceDetails.email, "source@example.test");
+  assert.equal((await Booking.findById(site.id).lean()).email, "source@example.test");
+  assert.equal((await ExternalCalendarEvent.findById(calendar.id).lean()).externalUid, "opaque-2028");
 });

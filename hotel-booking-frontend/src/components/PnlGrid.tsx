@@ -1,5 +1,6 @@
 import { KeyboardEvent, PointerEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "react-query";
+import axios from "axios";
 import * as api from "../api-client";
 import { moneyToCents, signedMoneyToCents, stayNights, validYear } from "../pages/pnl-utils";
 import { Button } from "./ui/button";
@@ -26,7 +27,7 @@ type Column = {
   key: string;
   label: string;
   width?: number;
-  kind?: "date" | "money" | "number" | "room" | "payment" | "boolean" | "invoiceStatus" | "checkbox";
+  kind?: "date" | "time" | "money" | "number" | "room" | "payment" | "boolean" | "invoiceStatus" | "checkbox";
   readOnly?: boolean;
   recordedOnly?: boolean;
   overlapOnly?: boolean;
@@ -38,9 +39,10 @@ const incomeColumns: Column[] = [
   { key: "notes", label: "Notes", width: 220 },
   { key: "roomId", label: "Room", width: 180, kind: "room", recordedOnly: true },
   { key: "date", label: "Check-in", kind: "date", recordedOnly: true },
+  { key: "arrivalTime", label: "Arrival time", kind: "time", width: 140 },
   { key: "checkOut", label: "Check-out", kind: "date", recordedOnly: true },
-  { key: "guestName", label: "Guest", width: 180, recordedOnly: true },
-  { key: "reference", label: "Reference", width: 160, recordedOnly: true },
+  { key: "guestName", label: "Guest", width: 180 },
+  { key: "reference", label: "Reference", width: 160 },
   { key: "source", label: "Source", readOnly: true },
   { key: "grossAmountCents", label: "Booking value (€)", kind: "money" },
   { key: "nights", label: "Nights", kind: "number", readOnly: true, width: 100 },
@@ -49,8 +51,8 @@ const incomeColumns: Column[] = [
   { key: "guestDetails", label: "Guest ages / details", width: 180 },
   { key: "country", label: "Country" },
   { key: "city", label: "City" },
-  { key: "phone", label: "Phone", width: 150, recordedOnly: true },
-  { key: "email", label: "Email", width: 200, recordedOnly: true },
+  { key: "phone", label: "Phone", width: 150 },
+  { key: "email", label: "Email", width: 200 },
   { key: "invoiceDate", label: "Invoice date", kind: "date" },
   { key: "invoiceNumber", label: "Invoice number" },
   { key: "invoiceRequired", label: "Invoice required", kind: "boolean" },
@@ -75,7 +77,7 @@ const incomeGroups = [
   { id: "reviewV2", label: "04 Payment & review" },
 ];
 const groupKeys: Record<string, string[]> = {
-  stayV2: ["roomId", "date", "checkOut", "guestName", "reference", "source", "grossAmountCents", "nights", "guestCount"],
+  stayV2: ["roomId", "date", "arrivalTime", "checkOut", "guestName", "reference", "source", "grossAmountCents", "nights", "guestCount"],
   registrationV2: ["identifier", "guestDetails", "country", "city", "phone", "email", "checkInDesk", "selfCheckIn"],
   invoicingV2: ["invoiceDate", "invoiceNumber", "invoiceRequired", "invoiceCreated", "unit", "netAmountCents", "touristTaxCents", "month", "taxQuarter"],
   reviewV2: ["notes", "paymentMethod", "paymentStatus", "sourceAmount", "possibleBookings", "status", "includePossibleOverlap", "excludeFromTotals"],
@@ -121,6 +123,7 @@ function makeBookingRow(booking: api.PnlBooking): GridRow {
   const values: Values = {
     reference: booking.reference, guestName: booking.guestName, phone: booking.phone, email: booking.email,
     roomId: booking.roomId, date: booking.checkIn, checkOut: booking.checkOut || "",
+    arrivalTime: booking.arrivalTime || "",
     country: booking.country, identifier: booking.identifier, city: booking.city,
     guestCount: stringNumber(booking.guestCount),
     grossAmountCents: booking.currency === "EUR" ? money(booking.amountCents) : "",
@@ -191,6 +194,19 @@ function buildSave(row: GridRow, values: Values, rooms: Room[]) {
   }
   const booking = row.booking!;
   const details = { ...booking.overrides };
+  if (changed("arrivalTime")) {
+    if (values.arrivalTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(values.arrivalTime)) throw new Error("Enter a valid arrival time.");
+    details.arrivalTime = values.arrivalTime || undefined;
+  }
+  if (booking.source !== "recorded") {
+    const identityFields = [["reference", "bookingReference"], ["guestName", "bookingGuestName"], ["phone", "bookingPhone"], ["email", "bookingEmail"]] as const;
+    for (const [field, detail] of identityFields) {
+      if (!changed(field)) continue;
+      const value = values[field].trim();
+      if (value.length > 200) throw new Error(`${field} must be at most 200 characters.`);
+      details[detail] = value || undefined;
+    }
+  }
   const textFields = ["country", "identifier", "city", "guestDetails", "notes", "paymentMethod", "taxQuarter", "invoiceNumber"] as const;
   for (const key of textFields) {
     if (!changed(key)) continue;
@@ -271,7 +287,7 @@ function display(row: GridRow, column: Column, rooms: Room[], bookings: api.PnlB
   }
   if (column.key === "status" && row.booking) {
     const booking = row.booking;
-    return [booking.status, booking.reason ? `${booking.reason} — excluded` : "", booking.possibleRepeatedRecord ? "Same room/date — review" : "", booking.possibleRecordedOverlap && booking.overrides.includePossibleOverlap ? "Overlap — manually included" : ""].filter(Boolean).join(" · ");
+    return [booking.status, booking.calendarEvent ? "iCal availability event — verify reservation" : "", booking.reason ? `${booking.reason} — excluded` : "", booking.possibleRepeatedRecord ? "Same room/date — review" : "", booking.possibleRecordedOverlap && booking.overrides.includePossibleOverlap ? "Overlap — manually included" : ""].filter(Boolean).join(" · ");
   }
   if (column.kind === "room") return rooms.find((room) => room._id === row.values.roomId)?.name || row.booking?.roomName || (row.values.roomId ? "Removed room" : "Unassigned");
   return row.values[column.key] || "";
@@ -285,6 +301,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   const queryClient = useQueryClient();
   const [sheet, setSheet] = useState<Sheet>(type === "income" ? "income" : "expense");
   const [search, setSearch] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<"all" | api.PnlBooking["source"]>("all");
   const [page, setPage] = useState(0);
   const [sort, setSort] = useState<{ key: string; desc: boolean } | null>(null);
   const [widths, setWidths] = useState<Record<string, number>>({});
@@ -339,13 +356,29 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           const saved = await api.savePnlEntry(payload.entry, row.entry!._id);
           row.entry = saved;
         } else if (payload.booking && payload.details) {
-          await api.savePnlBookingDetails(payload.booking, payload.details, payload.identity);
+          await api.savePnlBookingDetails(payload.booking, payload.details, payload.identity, row.saved.notes);
           row.booking = { ...payload.booking, ...payload.identity, overrides: payload.details };
+          if (payload.booking.source !== "recorded") {
+            if (values.arrivalTime !== row.saved.arrivalTime && !payload.details.arrivalTime) {
+              const fallback = payload.booking.sourceArrivalTime || "";
+              if (row.values.arrivalTime === values.arrivalTime) row.values.arrivalTime = fallback;
+              values.arrivalTime = fallback;
+            }
+            for (const field of ["reference", "guestName", "phone", "email"] as const) {
+              if (values[field] === row.saved[field]) continue;
+              const savedValue = values[field].trim() || payload.booking.sourceDetails?.[field] || "";
+              if (row.values[field] === values[field]) row.values[field] = savedValue;
+              values[field] = savedValue;
+              row.booking[field] = savedValue;
+            }
+          }
         }
         row.saved = values;
         if (row.sheet === "income") setFilterRevision((previous) => previous + 1);
-      } catch {
-        row.error = "Save failed. Your changes are still here; retry with Save all.";
+      } catch (error) {
+        row.error = axios.isAxiosError(error) && error.response?.status === 409
+          ? "Income notes or arrival time changed elsewhere. Reload Income and review your changes."
+          : "Save failed. Your changes are still here; retry with Save all.";
       }
     })();
     refresh();
@@ -404,7 +437,8 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase();
     const searchColumns = sheet === "income" ? orderedIncomeColumns : columns;
-    const result = rows.current.filter((row) => row.sheet === sheet && (!term || searchColumns.some((column) =>
+    const result = rows.current.filter((row) => row.sheet === sheet &&
+      (sheet !== "income" || sourceFilter === "all" || row.booking?.source === sourceFilter) && (!term || searchColumns.some((column) =>
       display(row, column, rooms, bookings).toLocaleLowerCase().includes(term))) &&
       (sheet !== "income" || Object.entries(incomeLayout.columnFilters).every(([key, value]) => {
         const column = incomeColumns.find((item) => item.key === key);
@@ -423,7 +457,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
     }
     return result;
     // Row edits are deliberately not re-sorted while typing.
-  }, [sheet, search, sort, rooms, columns, orderedIncomeColumns, bookings, incomeLayout.columnFilters, filterRevision]);
+  }, [sheet, search, sourceFilter, sort, rooms, columns, orderedIncomeColumns, bookings, incomeLayout.columnFilters, filterRevision]);
   const visible = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const selectable = visible.filter((row) => row.booking && row.booking.source !== "recorded");
   const selected = rows.current.flatMap((row) => row.booking && selectedBookings.has(row.key) ? [row.booking] : []);
@@ -488,7 +522,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           <div className="min-w-0 flex-1 basis-80"><h2 className="text-xl font-semibold">{type === "income" ? "Income" : "Expenses"} editor <span className="text-slate-500">{year}</span></h2>
             <p className="text-xs text-slate-600">Changes save when you leave a cell{type === "income" ? "; check-in markers save immediately and do not send emails" : ""}.</p>
             <details className="text-xs text-slate-600"><summary className="cursor-pointer text-teal-700">Editing tips</summary>
-              <p>Tab moves across; Enter moves down. Shift+Enter adds a line in text cells. Booking identity and calculated cells are read-only. Booking suggestions need review and do not link records or change totals. Inclusion warnings refresh when you reopen the editor.</p>
+              <p>Tab moves across; Enter moves down. Shift+Enter adds a line in text cells. Guest, reference and contact edits on bookings are income-only overrides; clear a value to restore the original. Room, dates and calculated cells are read-only. Inclusion warnings refresh when you reopen the editor.</p>
             </details></div>
           <div className="flex flex-wrap items-center gap-2">
             <span aria-live="polite" className={`flex h-10 w-44 items-center text-sm ${errorCount ? "text-rose-700" : "text-slate-600"}`}>{savingCount ? `Saving ${savingCount}…` : errorCount ? `${errorCount} row(s) need attention` : dirtyCount ? `${dirtyCount} unsaved row(s)` : "All changes saved"}</span>
@@ -503,6 +537,10 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
               <button key={key} type="button" disabled={checkInBusy} aria-pressed={sheet === key} onClick={() => { setSheet(key); setPage(0); setSort(null); }} className={`rounded-md px-3 py-1.5 text-sm font-medium ${sheet === key ? "bg-teal-700 text-white" : "bg-slate-100 text-slate-700"}`}>{label}</button>)}
           </div>}
           <label className="text-sm">Search <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} className="ml-1 rounded border border-slate-300 px-2 py-1" placeholder="Search this sheet" /></label>
+          {sheet === "income" && <label className="text-sm">Booking source <select value={sourceFilter} onChange={(event) => {
+            const value = event.target.value;
+            if (value === "all" || value === "local" || value === "booking_com" || value === "recorded") { setSourceFilter(value); setPage(0); }
+          }} className="ml-1 rounded border border-slate-300 px-2 py-1"><option value="all">All sources</option><option value="local">Site</option><option value="booking_com">Booking.com</option><option value="recorded">Recorded income</option></select></label>}
           {sheet === "income" && <button type="button" aria-pressed={showFilters} onClick={() => setShowFilters((value) => !value)} className="rounded border border-slate-300 px-2 py-1 text-sm">{showFilters ? "Hide value filters" : "Show value filters"}</button>}
           {sheet === "income" && <><PnlCheckInActions bookings={selected} onSent={(key) => selectRow(key, false)} onBusyChange={(busy) => { checkInBusyRef.current = busy; setCheckInBusy(busy); }} />
             {selected.length > 0 && <button type="button" disabled={checkInBusy} onClick={() => setSelectedBookings(new Set())} className="text-sm text-teal-700 underline">Clear selection</button>}</>}
@@ -510,7 +548,8 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
           <div className="ml-auto flex items-center gap-2 text-sm"><button disabled={page === 0} onClick={() => setPage(page - 1)} className="rounded border px-2 py-1 disabled:opacity-40">Previous</button><span>Page {page + 1} of {Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))}</span><button disabled={(page + 1) * PAGE_SIZE >= filtered.length} onClick={() => setPage(page + 1)} className="rounded border px-2 py-1 disabled:opacity-40">Next</button></div>
         </div>
         {type === "income" && <div className="min-w-0" hidden={sheet !== "income"}><PnlGridViews layout={incomeLayout} defaultLayout={defaultIncomeLayout} columns={incomeViewColumns} groups={incomeGroups} onChange={setIncomeLayout} onDirtyChange={setLayoutDirty} />
-          <p className="mt-1 text-xs text-slate-600">Check-in actions are available for site and Booking.com bookings; recorded income is not linked to a booking.</p></div>}
+          <p className="mt-1 text-xs text-slate-600">Loaded for check-in year {year}: {bookings.filter((booking) => booking.source === "local").length} site, {bookings.filter((booking) => booking.source === "booking_com").length} Booking.com, {bookings.filter((booking) => booking.source === "recorded").length} recorded. Search and saved filters may hide rows.</p>
+          <p className="mt-1 text-xs text-slate-600">iCal may contain availability blocks and often omits guest and price details; verify before entering income. Check-in emails use the original booking email, not an income-only override.</p></div>}
         {message && <p role={errorCount || dirtyCount ? "alert" : "status"} className="mt-2 text-sm text-rose-700">{message}</p>}
       </header>
       <div role="region" aria-label="Editable grid" tabIndex={0} className="min-h-0 flex-1 overflow-auto">
@@ -574,7 +613,7 @@ export default function PnlGrid({ type, year, bookings, entries, rooms, onClose 
                   : column.kind === "boolean" || column.kind === "invoiceStatus" ? <select {...common} className={cellClass}><option value="">Not specified</option><option value="yes">{column.kind === "boolean" ? "Yes" : "Created"}</option><option value="no">{column.kind === "boolean" ? "No" : "Pending"}</option></select>
                   : ["description", "guestName", "notes", "guestDetails", "email", "payee"].includes(column.key)
                     ? <textarea {...common} rows={2} placeholder={column.key === "notes" ? "Add a note…" : undefined} className={`${cellClass} resize-none [overflow-wrap:anywhere]`} onKeyDown={enterCell} />
-                    : <input {...common} type={column.kind === "date" ? "date" : "text"} inputMode={column.kind === "money" ? "decimal" : column.kind === "number" ? "numeric" : undefined} className={cellClass} onKeyDown={enterCell} />}
+                    : <input {...common} type={column.kind === "date" ? "date" : column.kind === "time" ? "time" : "text"} inputMode={column.kind === "money" ? "decimal" : column.kind === "number" ? "numeric" : undefined} className={cellClass} onKeyDown={enterCell} />}
                 {sheet === "income" && columnIndex === 0 && (row.saving || row.error || rowDirty(row)) && <span className={`block px-2 pb-1 text-xs ${row.error ? "text-rose-800" : "text-slate-600"}`}>
                   {row.saving ? "Saving" : row.error ? "Error" : "Unsaved"}{row.error && <span role="alert" className="block break-words">{row.error}</span>}
                 </span>}

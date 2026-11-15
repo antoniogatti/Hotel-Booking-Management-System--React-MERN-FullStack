@@ -368,6 +368,33 @@ test("reviewed screenshot updates preserve existing and legacy details", async (
   delete booking.pnlIncome;
 });
 
+test("site and calendar income identity overrides preserve booking details and restore source values", async () => {
+  const site = localBookings[0];
+  const calendar = importedBookings[3];
+  calendar.origin = "ical";
+  calendar.email = "calendar@example.test";
+  for (const [source, booking] of [["local", site], ["booking_com", calendar]]) {
+    const id = String(booking._id);
+    const path = `/bookings/${source}/${id}`;
+    const details = { bookingReference: "CUSTOM-1", bookingGuestName: "Reporting Guest", bookingEmail: "report@example.test", bookingPhone: "123", notes: "Keep" };
+    assert.equal((await request(path, { method: "PUT", body: { ...details, bookingEmail: "x".repeat(201) } })).status, 400);
+    assert.equal((await request(path, { method: "PUT", body: details })).status, 200);
+    let row = (await (await request("/bookings?year=2026")).json()).bookings.find((item) => item.id === id);
+    assert.deepEqual([row.reference, row.guestName, row.email, row.phone], ["CUSTOM-1", "Reporting Guest", "report@example.test", "123"]);
+    assert.equal(row.sourceDetails.email, booking.email || "");
+    if (source === "booking_com") assert.equal(row.calendarEvent, true);
+    assert.equal((await request(path, { method: "PUT", body: { notes: "Keep" } })).status, 200);
+    row = (await (await request("/bookings?year=2026")).json()).bookings.find((item) => item.id === id);
+    assert.equal(row.reference, row.sourceDetails.reference);
+    assert.equal(row.guestName, row.sourceDetails.guestName);
+    assert.equal(row.email, row.sourceDetails.email);
+    assert.equal(row.notes, "Keep");
+    dedicated.delete(`${source}:${id}`);
+  }
+  delete calendar.origin;
+  delete calendar.email;
+});
+
 test("standalone income is reported, editable and prevents possible booking overlap", async () => {
   const id = "a".repeat(64);
   recorded.push({
