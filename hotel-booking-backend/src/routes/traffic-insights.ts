@@ -71,6 +71,9 @@ const parseDays = (value: unknown) => {
   return Math.min(30, Math.max(1, Math.floor(parsed)));
 };
 
+export const trafficPageFilter = (category: "customer" | "admin" | "other") =>
+  `customEvents\n| where name in ("page_view", "public_page_view")\n| extend trafficCategory = iff(name == "public_page_view", "other", tostring(customDimensions["trafficCategory"]))\n| where trafficCategory == "${category}"`;
+
 const classifyDevice = (userAgent: string) => {
   const ua = String(userAgent || "").toLowerCase();
   if (!ua) {
@@ -183,6 +186,11 @@ router.get(
     }
 
     const days = parseDays(req.query.days);
+    const category = req.query.category || "customer";
+    if (category !== "customer" && category !== "admin" && category !== "other") {
+      return res.status(400).json({ message: "Invalid traffic category" });
+    }
+    const pageFilter = trafficPageFilter(category);
     const apiPrefixes = getPublicApiPrefixes();
     const prefixFilter = apiPrefixes
       .map((prefix) => {
@@ -221,12 +229,12 @@ router.get(
         runAppInsightsQuery(
           appId,
           authHeader,
-          `customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(${days}d)\n| summarize pageCount = count() by day = bin(timestamp, 1d)\n| order by day asc`
+          `${pageFilter}\n| where timestamp >= ago(${days}d)\n| summarize pageCount = count() by day = bin(timestamp, 1d)\n| order by day asc`
         ),
         runAppInsightsQuery(
           appId,
           authHeader,
-          `customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(${days}d)\n| extend pagePath = tostring(customDimensions[\"path\"])\n| summarize viewCount = count() by pagePath\n| sort by viewCount desc\n| take 8`
+          `${pageFilter}\n| where timestamp >= ago(${days}d)\n| extend pagePath = tostring(customDimensions[\"path\"])\n| summarize viewCount = count() by pagePath\n| sort by viewCount desc\n| take 8`
         ),
         runAppInsightsQuery(
           appId,
@@ -236,17 +244,17 @@ router.get(
         runAppInsightsQuery(
           appId,
           authHeader,
-          `customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(${days}d)\n| extend country = tostring(customDimensions[\"country\"]), city = tostring(customDimensions[\"city\"]), latitude = todouble(customDimensions[\"latitude\"]), longitude = todouble(customDimensions[\"longitude\"])\n| where isnotempty(country) and isnotempty(city)\n| summarize hitCount = count(), lastSeen = max(timestamp), latitude = any(latitude), longitude = any(longitude) by country, city\n| sort by hitCount desc\n| take 100`
+          `${pageFilter}\n| where timestamp >= ago(${days}d)\n| extend country = client_CountryOrRegion, city = client_City\n| where isnotempty(country)\n| summarize hitCount = count(), lastSeen = max(timestamp) by country, city\n| sort by hitCount desc\n| take 100`
         ),
         runAppInsightsQuery(
           appId,
           authHeader,
-          `let publicPageEvents = customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(24h);\nlet publicRequests = requests\n| where timestamp >= ago(24h)\n| where ${prefixFilter};\npublicPageEvents\n| summarize pageCount24h = count(), uniqueVisitors24h = dcount(tostring(customDimensions[\"ip\"]))\n| extend joinKey = 1\n| join kind=inner (publicRequests | summarize requestCount24h = count(), failedRequests24h = countif(success == false), avgApiDurationMs24h = avg(duration) | extend joinKey = 1) on joinKey\n| project pageCount24h, uniqueVisitors24h, requestCount24h, failedRequests24h, avgApiDurationMs24h = iff(isfinite(avgApiDurationMs24h), avgApiDurationMs24h, 0.0)`
+          `let publicPageEvents = ${pageFilter}\n| where timestamp >= ago(24h);\nlet publicRequests = requests\n| where timestamp >= ago(24h)\n| where ${prefixFilter};\npublicPageEvents\n| summarize pageCount24h = count(), uniqueVisitors24h = dcountif(tostring(customDimensions[\"ip\"]), isnotempty(tostring(customDimensions[\"ip\"])))\n| extend joinKey = 1\n| join kind=inner (publicRequests | summarize requestCount24h = count(), failedRequests24h = countif(success == false), avgApiDurationMs24h = avg(duration) | extend joinKey = 1) on joinKey\n| project pageCount24h, uniqueVisitors24h, requestCount24h, failedRequests24h, avgApiDurationMs24h = iff(isfinite(avgApiDurationMs24h), avgApiDurationMs24h, 0.0)`
         ),
         runAppInsightsQuery(
           appId,
           authHeader,
-          `customEvents\n| where name == \"public_page_view\"\n| where timestamp >= ago(${days}d)\n| project userAgent = tostring(customDimensions[\"userAgent\"]), sessionId = operation_Id\n| summarize sessions = dcount(sessionId) by userAgent`
+          `${pageFilter}\n| where timestamp >= ago(${days}d)\n| project userAgent = tostring(customDimensions[\"userAgent\"])\n| summarize sessions = count() by userAgent`
         ),
       ]);
 
@@ -273,10 +281,7 @@ router.get(
           city: String(row[1] || ""),
           hits: Number(row[2] || 0),
           lastSeen: row[3] ? new Date(String(row[3])).toISOString() : null,
-          latitude: Number(row[4]),
-          longitude: Number(row[5]),
-        }))
-        .filter((row) => Number.isFinite(row.latitude) && Number.isFinite(row.longitude));
+        }));
 
       const metricsRow = summaryRows[0];
       if (!metricsRow || metricsRow.length < 5) {

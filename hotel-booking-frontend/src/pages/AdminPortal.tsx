@@ -129,7 +129,7 @@ const AdminPortal = () => {
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 id="traffic-overview-heading" className="text-xl font-semibold text-slate-900">Traffic insights</h2>
-                <p className="mt-1 text-sm text-slate-500">Public website and API activity over the last 24 hours.</p>
+                <p className="mt-1 text-sm text-slate-500">Customer page views and public API activity over the last 24 hours. API counts include all callers.</p>
               </div>
               <Link to="/traffic-insights" className="text-sm font-semibold text-teal-700 hover:text-teal-800">
                 View traffic dashboard
@@ -146,7 +146,7 @@ const AdminPortal = () => {
               <dl className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
                 {[
                   ["Page views", traffic.data.metrics.pageViews24h],
-                  ["Unique visitors", traffic.data.metrics.uniqueVisitors24h],
+                  ["Unique IP addresses", traffic.data.metrics.uniqueVisitors24h],
                   ["API requests", traffic.data.metrics.requestCount24h],
                   ["Failed requests", traffic.data.metrics.failedRequests24h],
                 ].map(([label, value]) => (

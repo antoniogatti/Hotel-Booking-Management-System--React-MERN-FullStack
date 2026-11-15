@@ -84,6 +84,10 @@ router.post(
       .optional({ nullable: true })
       .custom((value) => value === true || value === false)
       .withMessage("isPublicPage must be boolean"),
+    body("trafficCategory")
+      .optional()
+      .isIn(["customer", "admin", "other"])
+      .withMessage("Invalid traffic category"),
   ],
   (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -112,10 +116,12 @@ router.post(
       city: "",
     };
 
-    logInfo("public_page_view", pageViewContext);
+    const trafficCategory = req.body.trafficCategory;
+    const eventName = trafficCategory ? "page_view" : "public_page_view";
+    logInfo(eventName, { ...pageViewContext, trafficCategory });
 
     trackTelemetryEvent(
-      "public_page_view",
+      eventName,
       withClientIp(
         {
           path: pageViewContext.path,
@@ -126,6 +132,7 @@ router.post(
           userAgent: pageViewContext.userAgent,
           ip: pageViewContext.ip,
           isPublicPage: String(pageViewContext.isPublicPage),
+          ...(trafficCategory ? { trafficCategory: String(trafficCategory) } : {}),
           countryCode: pageViewContext.countryCode,
           region: pageViewContext.region,
           city: pageViewContext.city,

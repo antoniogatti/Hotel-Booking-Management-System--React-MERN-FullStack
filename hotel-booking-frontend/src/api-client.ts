@@ -735,6 +735,7 @@ export type SelfCheckinAdminListResponse = {
 
 export type PublicPageViewPayload = {
   path: string;
+  trafficCategory?: "customer" | "admin" | "other";
   title?: string;
   referrer?: string;
   language?: string;
@@ -776,8 +777,6 @@ export type TrafficInsightsDashboardResponse = {
     city: string;
     hits: number;
     lastSeen: string | null;
-    latitude: number;
-    longitude: number;
   }>;
   lastUpdated: string;
 };
@@ -939,10 +938,11 @@ export const trackClientError = async (payload: {
 };
 
 export const fetchTrafficInsightsDashboard = async (
-  days = 7
+  days = 7,
+  category: "customer" | "admin" | "other" = "customer"
 ): Promise<TrafficInsightsDashboardResponse> => {
   const response = await axiosInstance.get(
-    `/api/traffic-insights/dashboard?days=${days}`
+    `/api/traffic-insights/dashboard?days=${days}&category=${category}`
   );
   return response.data;
 };

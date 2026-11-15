@@ -49,6 +49,7 @@ import SelfCheckin from "./pages/SelfCheckin";
 import { siteConfig } from "./config/siteConfig";
 import { isCustomRoomSlug, roomPageCatalog } from "../../shared/roomCatalog";
 import { trackClientError, trackPublicPageView } from "./api-client";
+import { classifyTrafficPage } from "./lib/trafficPage";
 
 const BRAND_NAME = "Palazzo Pinto B&B";
 
@@ -126,45 +127,30 @@ const PageTitleManager = () => {
   return null;
 };
 
-const isPublicPagePath = (pathname: string): boolean => {
-  if (pathname === "/") return true;
-
-  const publicPrefixes = [
-    "/rooms",
-    "/search",
-    "/detail/",
-    "/contact-us",
-    "/self-checkin",
-    "/reach-us",
-    "/our-recommendations",
-    "/privacy-cookie-policy",
-    "/terms-conditions",
-    "/sign-in",
-    "/auth/callback",
-  ];
-
-  return publicPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix));
-};
-
-const PublicPageTrafficTracker = () => {
+const PageTrafficTracker = () => {
   const location = useLocation();
+  const { isLoggedIn, userRole, isOwnerOrAdmin } = useAppContext();
 
   useEffect(() => {
-    if (!isPublicPagePath(location.pathname)) {
-      return;
-    }
+    if (isLoggedIn && !userRole) return;
+    const page = classifyTrafficPage(location.pathname, isOwnerOrAdmin);
+    const trafficCategory = page.category;
+    const referrer = document.referrer ? new URL(document.referrer) : null;
 
     void trackPublicPageView({
-      path: location.pathname,
+      path: page.path,
       title: document.title,
-      referrer: document.referrer || undefined,
+      referrer: trafficCategory === "customer" && referrer?.origin !== window.location.origin
+        ? referrer?.origin
+        : undefined,
       language: navigator.language || undefined,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-      isPublicPage: true,
+      isPublicPage: trafficCategory === "customer",
+      trafficCategory,
     }).catch(() => {
       // Keep navigation resilient if telemetry endpoint is unavailable.
     });
-  }, [location.pathname]);
+  }, [location.pathname, isLoggedIn, userRole, isOwnerOrAdmin]);
 
   return null;
 };
@@ -209,7 +195,7 @@ const App = () => {
   return (
     <Router>
       <PageTitleManager />
-      <PublicPageTrafficTracker />
+      <PageTrafficTracker />
       <ClientErrorReporter />
       <ScrollToTop />
       <Routes>

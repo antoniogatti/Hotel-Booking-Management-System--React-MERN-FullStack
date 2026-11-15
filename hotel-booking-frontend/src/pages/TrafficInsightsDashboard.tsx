@@ -12,19 +12,12 @@ import {
   PieChart,
   Pie,
   Cell,
-  BarChart,
-  Bar,
-  ScatterChart,
-  Scatter,
-  ZAxis,
 } from "recharts";
 import {
   RefreshCw,
   Activity,
   Globe,
   Users,
-  Gauge,
-  ServerCrash,
 } from "lucide-react";
 
 const resolveErrorMessage = (error: unknown) => {
@@ -77,8 +70,6 @@ interface TrafficInsightsData {
     city: string;
     hits: number;
     lastSeen: string | null;
-    latitude: number;
-    longitude: number;
   }>;
   lastUpdated: string;
 }
@@ -90,24 +81,9 @@ const formatDay = (value: string) => {
   return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 };
 
-const shortEndpoint = (value: string) => {
-  if (!value) return "unknown";
-
-  try {
-    const url = new URL(value);
-    return url.pathname;
-  } catch {
-    return value.length > 30 ? `${value.slice(0, 30)}...` : value;
-  }
-};
-
-const formatPercent = (part: number, total: number) => {
-  if (!total) return "0.0%";
-  return `${((part / total) * 100).toFixed(1)}%`;
-};
-
 const TrafficInsightsDashboard = () => {
   const [days, setDays] = useState(7);
+  const [category, setCategory] = useState<"customer" | "admin" | "other">("customer");
 
   const {
     data,
@@ -115,8 +91,8 @@ const TrafficInsightsDashboard = () => {
     error,
     refetch,
   } = useQueryWithLoading<TrafficInsightsData>(
-    ["traffic-insights-dashboard", days],
-    () => fetchTrafficInsightsDashboard(days),
+    ["traffic-insights-dashboard", days, category],
+    () => fetchTrafficInsightsDashboard(days, category),
     {
       retry: 2,
       retryDelay: 1000,
@@ -130,43 +106,6 @@ const TrafficInsightsDashboard = () => {
 
   const errorMessage = useMemo(() => resolveErrorMessage(error), [error]);
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#f5f6f8] px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-7xl rounded-2xl border border-slate-200 bg-white p-12 text-center">
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
-            <RefreshCw className="h-6 w-6 animate-spin text-slate-700" />
-          </div>
-          <h2 className="text-lg font-semibold text-slate-900">Loading live traffic telemetry</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            Pulling page views, sessions, API health, and geolocation signals from Application Insights.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className="min-h-screen bg-[#f5f6f8] px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-10 text-center">
-          <p className="text-lg font-semibold text-rose-700">Unable to load traffic insights</p>
-          <p className="mt-2 text-sm text-rose-600">
-            {errorMessage}
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const failedRate = formatPercent(data.metrics.failedRequests24h, data.metrics.requestCount24h);
-
   return (
     <div className="min-h-screen bg-[#f5f6f8] px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -177,9 +116,9 @@ const TrafficInsightsDashboard = () => {
                 <Globe className="h-4 w-4" />
                 Traffic Insights
               </p>
-              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Live public traffic dashboard</h1>
+              <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Website traffic dashboard</h1>
               <p className="mt-2 max-w-3xl text-sm text-slate-600">
-                Dedicated telemetry view for visitor traffic, device sessions, API status, and global IP-based activity.
+                Page views are separated by audience. Staff browsing public pages counts as admin traffic when signed in; signed-out staff may count as customers.
               </p>
             </div>
 
@@ -203,10 +142,44 @@ const TrafficInsightsDashboard = () => {
               </button>
             </div>
           </div>
-          <p className="mt-4 text-xs text-slate-500">Last updated: {new Date(data.lastUpdated).toLocaleString("en-GB")}</p>
+          <div className="mt-5 flex flex-wrap gap-2" role="group" aria-label="Traffic category">
+            {([
+              ["customer", "Customer traffic"],
+              ["admin", "Admin and staff"],
+              ["other", "Other and unclassified"],
+            ] as const).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={category === value}
+                onClick={() => setCategory(value)}
+                className={`rounded-xl border px-4 py-2 text-sm font-semibold ${category === value ? "border-teal-700 bg-teal-700 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-slate-500">
+            Older page views cannot be reliably identified as customer or staff and are shown under Other. Categories apply to new page views only; search and error telemetry in Application Insights is not audience-filtered.
+          </p>
+          {data && <p className="mt-4 text-xs text-slate-500">Last updated: {new Date(data.lastUpdated).toLocaleString("en-GB")}</p>}
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+        {isLoading ? (
+          <div role="status" className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-600">
+            Loading page views and locations...
+          </div>
+        ) : error || !data ? (
+          <div role="alert" className="rounded-2xl border border-slate-200 bg-white p-10 text-center">
+            <p className="text-lg font-semibold text-rose-700">Unable to load traffic insights</p>
+            <p className="mt-2 text-sm text-rose-600">{errorMessage}</p>
+            <button onClick={() => refetch()} className="mt-4 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+              Retry
+            </button>
+          </div>
+        ) : (
+        <>
+        <section className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between text-slate-600">
               <span className="text-sm font-medium">Page Views (24h)</span>
@@ -217,35 +190,12 @@ const TrafficInsightsDashboard = () => {
 
           <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex items-center justify-between text-slate-600">
-              <span className="text-sm font-medium">Unique Visitors (24h)</span>
+              <span className="text-sm font-medium">Unique IP addresses (24h)</span>
               <Users className="h-4 w-4 text-blue-600" />
             </div>
             <p className="mt-2 text-3xl font-bold text-slate-900">{data.metrics.uniqueVisitors24h}</p>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between text-slate-600">
-              <span className="text-sm font-medium">Public API Calls (24h)</span>
-              <Gauge className="h-4 w-4 text-indigo-600" />
-            </div>
-            <p className="mt-2 text-3xl font-bold text-slate-900">{data.metrics.requestCount24h}</p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between text-slate-600">
-              <span className="text-sm font-medium">Failed API Rate</span>
-              <ServerCrash className="h-4 w-4 text-rose-600" />
-            </div>
-            <p className="mt-2 text-3xl font-bold text-slate-900">{failedRate}</p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="flex items-center justify-between text-slate-600">
-              <span className="text-sm font-medium">Avg API Duration</span>
-              <Gauge className="h-4 w-4 text-amber-600" />
-            </div>
-            <p className="mt-2 text-3xl font-bold text-slate-900">{Math.round(data.metrics.avgApiDurationMs24h)} ms</p>
-          </div>
         </section>
 
         <section className="grid gap-5 lg:grid-cols-2">
@@ -269,7 +219,7 @@ const TrafficInsightsDashboard = () => {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Sessions by device</h2>
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">Page views by device</h2>
             <ResponsiveContainer width="100%" height={280}>
               <PieChart>
                 <Pie data={data.sessionsByDevice} dataKey="sessions" nameKey="device" outerRadius={95} label>
@@ -277,31 +227,18 @@ const TrafficInsightsDashboard = () => {
                     <Cell key={`device-${index}`} fill={PIE_COLORS[index % PIE_COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip formatter={(value) => [value, "Sessions"]} />
+                <Tooltip formatter={(value) => [value, "Page views"]} />
               </PieChart>
             </ResponsiveContainer>
-            <div className="mt-2 text-sm text-slate-600">Total sessions: {totalDeviceSessions}</div>
+            <div className="mt-2 text-sm text-slate-600">Total page views: {totalDeviceSessions}</div>
           </div>
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1.35fr_0.65fr]">
+        <section className="grid gap-5 lg:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Recent public API success vs failures</h2>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.recentApi}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="endpoint" tickFormatter={shortEndpoint} interval={0} angle={-18} textAnchor="end" height={70} />
-                <YAxis />
-                <Tooltip labelFormatter={shortEndpoint} />
-                <Bar dataKey="successCount" stackId="a" fill="#16a34a" name="Success" />
-                <Bar dataKey="failedCount" stackId="a" fill="#dc2626" name="Failed" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold text-slate-900">Top public pages</h2>
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">Top pages</h2>
             <div className="space-y-2">
+              {data.topPages.length === 0 && <p className="text-sm text-slate-500">No page views for this category yet.</p>}
               {data.topPages.map((row) => (
                 <div key={row.path} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
                   <span className="max-w-[75%] truncate text-sm text-slate-700">{row.path}</span>
@@ -310,28 +247,22 @@ const TrafficInsightsDashboard = () => {
               ))}
             </div>
           </div>
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="mb-4 text-lg font-semibold text-slate-900">Countries and cities</h2>
+            <p className="mb-3 text-xs text-slate-500">Approximate IP-based location; some locations may be unavailable.</p>
+            <div className="space-y-2">
+              {data.geoTraffic.length === 0 && <p className="text-sm text-slate-500">No location data for this category yet.</p>}
+              {data.geoTraffic.map((row) => (
+                <div key={`${row.country}-${row.city}`} className="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2">
+                  <span className="text-sm text-slate-700">{row.city ? `${row.city}, ` : ""}{row.country}</span>
+                  <span className="text-sm font-semibold text-slate-900">{row.hits}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
-
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">Global map (IP geolocation clusters)</h2>
-          <ResponsiveContainer width="100%" height={340}>
-            <ScatterChart margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis type="number" dataKey="longitude" name="Longitude" domain={[-180, 180]} tickCount={9} />
-              <YAxis type="number" dataKey="latitude" name="Latitude" domain={[-90, 90]} tickCount={7} />
-              <ZAxis type="number" dataKey="hits" range={[70, 600]} name="Hits" />
-              <Tooltip
-                cursor={{ strokeDasharray: "3 3" }}
-                formatter={(value, name) => [value, name === "hits" ? "Hits" : name]}
-                labelFormatter={(_, payload) => {
-                  const row = payload?.[0]?.payload;
-                  return row ? `${row.city}, ${row.country}` : "";
-                }}
-              />
-              <Scatter data={data.geoTraffic} fill="#0f766e" />
-            </ScatterChart>
-          </ResponsiveContainer>
-        </section>
+        </>
+        )}
       </div>
     </div>
   );
