@@ -28,6 +28,19 @@ This frontend serves as the **user interface** for a comprehensive hotel booking
 - **📊 Analytics Dashboard**: Business insights and performance metrics
 - **📱 Mobile-First**: Responsive design optimized for all devices
 
+### P&L full-screen editor
+
+Open the full-screen editor from the Income or Expenses page. Edits save when
+you leave a cell; Save all retries unsaved rows. Errors keep the edited values
+visible until corrected or discarded. Tab moves across editable cells, Enter
+moves down, and Shift+Enter adds a line in text cells. Use search, sorting,
+pagination and column resizing to navigate large ledgers. Booking-sourced
+identity fields and calculated values are read-only; inclusion warnings
+refresh when the editor is reopened. Recorded income shows possible site and
+Booking.com matches based on reference or room and check-in; compare check-out
+and guest details before deciding how to reconcile. These are suggestions only:
+they do not link records or alter totals.
+
 ### **Architecture Highlights**
 
 ```bash
