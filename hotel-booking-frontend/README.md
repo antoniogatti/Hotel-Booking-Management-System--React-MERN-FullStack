@@ -90,6 +90,19 @@ mail before retrying. Row selections and entered access codes are not saved in v
 Codes are included in guest emails and the sender's Sent mail; self check-in
 submissions remain separate and do not automatically mark a booking checked in.
 
+### Booking.com screenshot import
+
+On Income, choose **Import screenshot** and paste or select an image. The
+English Tesseract neural OCR model and image processing run in the browser;
+the image is not uploaded. OCR can misread or miss fields, so compare every
+row with the image, correct dates and guest details, find bookings for the
+stay dates, and explicitly select the matching active Booking.com booking.
+Saving updates only the reviewed P&L details, not the underlying booking.
+Rows without an existing match cannot be created through this panel. The
+detected reservation total is never automatically assigned to a room: enter
+and review each room's share, especially for multi-room reservations. Blank
+amount and guest-count fields leave existing values unchanged.
+
 ### **Architecture Highlights**
 
 ```bash

@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 
 export type PnlBookingDetails = {
+  bookingReference?: string;
+  bookingGuestName?: string;
   country?: string;
   city?: string;
   identifier?: string;
@@ -26,6 +28,8 @@ export type PnlBookingDetails = {
 
 const pnlBookingDetailsSchema = new mongoose.Schema<PnlBookingDetails>(
   {
+    bookingReference: { type: String, trim: true, maxlength: 200 },
+    bookingGuestName: { type: String, trim: true, maxlength: 200 },
     country: { type: String, trim: true, maxlength: 100 },
     city: { type: String, trim: true, maxlength: 100 },
     identifier: { type: String, trim: true, maxlength: 100 },

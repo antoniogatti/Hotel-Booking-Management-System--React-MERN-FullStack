@@ -117,10 +117,29 @@ const importedBookings = [
 ];
 Booking.find = findRows(localBookings);
 ExternalCalendarEvent.find = findRows(importedBookings);
+ExternalCalendarEvent.findOne = ({ _id, source, status }) => ({
+  select: () => ({ lean: async () => source === "booking_com" && status === "active"
+    ? importedBookings.find((booking) => String(booking._id) === _id) || null : null }),
+});
 Booking.exists = async ({ _id }) => localBookings.some((row) => String(row._id) === _id);
 ExternalCalendarEvent.exists = async ({ _id }) => importedBookings.some((row) => String(row._id) === _id);
 PnlBookingIncome.find = () => ({ lean: async () => [...dedicated.values()] });
 PnlBookingIncome.findByIdAndUpdate = async (id, update) => {
+  if (update.$setOnInsert) {
+    const record = dedicated.get(id) || { _id: id, details: {} };
+    if (!dedicated.has(id)) {
+      for (const [key, value] of Object.entries(update.$setOnInsert)) {
+        if (key.startsWith("details.")) record.details[key.slice(8)] = value;
+        else record[key] = value;
+      }
+    }
+    for (const [key, value] of Object.entries(update.$set)) {
+      if (key.startsWith("details.")) record.details[key.slice(8)] = value;
+      else record[key] = value;
+    }
+    dedicated.set(id, record);
+    return record;
+  }
   const record = { _id: id, ...update.$set };
   dedicated.set(id, record);
   return record;
@@ -321,6 +340,32 @@ test("booking income details and invoice tracking are editable without altering 
   local = rows.find((row) => row.id === localId);
   assert.deepEqual([local.amountCents, local.country, local.invoiceRequired], [12345, "Italy", null]);
   assert.equal(local.notes, "");
+});
+
+test("reviewed screenshot updates preserve existing and legacy details", async () => {
+  const booking = importedBookings[3];
+  const id = String(booking._id);
+  const key = `booking_com:${id}`;
+  const path = `/bookings/booking_com/${id}/screenshot`;
+  booking.pnlIncome = { notes: "Legacy note", checkInDesk: true, grossAmountCents: 5000 };
+  const body = { roomId, checkIn: "2026-06-02", checkOut: "2026-06-03", details: { bookingReference: "1234567890", bookingGuestName: "Example Guest" } };
+  assert.equal((await request(path, { user: ownerId, method: "PATCH", body })).status, 403);
+  assert.equal((await request(path, { method: "PATCH", body: { ...body, checkOut: "2026-06-04" } })).status, 409);
+  assert.equal((await request(path, { method: "PATCH", body: { ...body, details: { notes: "Unexpected" } } })).status, 400);
+  assert.equal((await request(path, { method: "PATCH", body: { ...body, details: { grossAmountCents: -1 } } })).status, 400);
+  assert.equal((await request(path, { method: "PATCH", body })).status, 200);
+  assert.deepEqual(dedicated.get(key).details, { notes: "Legacy note", checkInDesk: true, grossAmountCents: 5000, ...body.details });
+  const result = (await (await request("/bookings?year=2026")).json()).bookings.find((row) => row.id === id);
+  assert.equal(result.reference, "1234567890");
+  assert.equal(result.guestName, "Example Guest");
+  assert.equal(result.amountCents, 5000);
+  assert.equal(booking.externalUid, "BOOKING-4");
+  dedicated.get(key).details.notes = "Concurrent note";
+  assert.equal((await request(path, { method: "PATCH", body: { ...body, details: { guestCount: 3 } } })).status, 200);
+  assert.equal(dedicated.get(key).details.notes, "Concurrent note");
+  assert.equal(dedicated.get(key).details.bookingReference, "1234567890");
+  dedicated.delete(key);
+  delete booking.pnlIncome;
 });
 
 test("standalone income is reported, editable and prevents possible booking overlap", async () => {

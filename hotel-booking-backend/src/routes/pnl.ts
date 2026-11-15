@@ -150,9 +150,15 @@ const validDate = (value: unknown): value is string => {
 const parseBookingDetails = (body: unknown): PnlBookingDetails | null => {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const input = body as Record<string, unknown>;
-  const fields = ["country", "city", "identifier", "guestDetails", "notes", "checkInDesk", "selfCheckIn", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "invoiceDate", "touristTaxCents", "paymentMethod", "paymentStatus", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
+  const fields = ["bookingReference", "bookingGuestName", "country", "city", "identifier", "guestDetails", "notes", "checkInDesk", "selfCheckIn", "guestCount", "grossAmountCents", "netAmountCents", "unitAmountCents", "invoiceRequired", "invoiceCreated", "invoiceNumber", "invoiceDate", "touristTaxCents", "paymentMethod", "paymentStatus", "taxQuarter", "includePossibleOverlap", "excludeFromTotals"];
   if (Object.keys(input).some((key) => !fields.includes(key))) return null;
   const details: PnlBookingDetails = {};
+  for (const key of ["bookingReference", "bookingGuestName"] as const) {
+    const value = input[key];
+    if (value === undefined || value === null || value === "") continue;
+    if (typeof value !== "string" || value.trim().length > 200) return null;
+    if (value.trim()) details[key] = value.trim();
+  }
   for (const key of ["country", "city", "identifier", "guestDetails", "notes", "invoiceNumber", "paymentMethod", "taxQuarter"] as const) {
     const value = input[key];
     if (value === undefined || value === null || value === "") continue;
@@ -352,13 +358,13 @@ router.get("/bookings", async (req, res) => {
         const overrides = incomeByBooking.get(`booking_com:${String(booking._id)}`) ?? booking.pnlIncome;
         return {
         id: String(booking._id),
-        reference: booking.externalUid,
+        reference: overrides?.bookingReference || booking.externalUid,
         source: "booking_com" as const,
         roomId: String(booking.hotelId),
         checkIn: booking.startDate.toISOString().slice(0, 10),
         checkOut: booking.endDate.toISOString().slice(0, 10),
         status: "imported",
-        guestName: [booking.firstName, booking.lastName].filter(Boolean).join(" "),
+        guestName: overrides?.bookingGuestName || [booking.firstName, booking.lastName].filter(Boolean).join(" "),
         email: booking.email || "",
         phone: booking.phone || "",
         ...incomeDetails({ ...booking, pnlIncome: overrides }, booking.startDate.toISOString().slice(0, 10), booking.endDate.toISOString().slice(0, 10), overrides?.grossAmountCents !== undefined || booking.currency?.toUpperCase() === "EUR"),
@@ -467,6 +473,46 @@ router.post("/check-in-invitations", async (req, res) => {
   } catch (error) {
     logError("Failed to send check-in invitation", new Error(error instanceof Error ? error.name : "Unknown error"), { route: "pnl.check-in-invitation", bookingId: input.id });
     return res.status(500).json({ message: "Could not confirm delivery. Check sent mail before retrying." });
+  }
+});
+
+router.patch("/bookings/booking_com/:id/screenshot", async (req, res) => {
+  const input = req.body as Record<string, unknown> | null;
+  const allowed = ["bookingReference", "bookingGuestName", "guestCount", "grossAmountCents"];
+  const rawDetails = input?.details;
+  if (!input || !mongoose.isValidObjectId(req.params.id) ||
+      typeof input.roomId !== "string" || !mongoose.isValidObjectId(input.roomId) ||
+      !validDate(input.checkIn) || !validDate(input.checkOut) ||
+      !rawDetails || typeof rawDetails !== "object" || Array.isArray(rawDetails) ||
+      Object.keys(rawDetails).length === 0 || Object.keys(rawDetails).some((key) => !allowed.includes(key))) {
+    return res.status(400).json({ message: "Provide valid booking and reviewed screenshot details." });
+  }
+  const details = parseBookingDetails(rawDetails);
+  if (!details || Object.keys(details).length !== Object.keys(rawDetails).length) {
+    return res.status(400).json({ message: "Provide valid reviewed screenshot details." });
+  }
+  try {
+    const booking = await ExternalCalendarEvent.findOne({ _id: req.params.id, source: "booking_com", status: "active" })
+      .select("hotelId startDate endDate +pnlIncome").lean();
+    if (!booking) return res.status(404).json({ message: "Active Booking.com booking not found." });
+    if (String(booking.hotelId) !== input.roomId || booking.startDate.toISOString().slice(0, 10) !== input.checkIn ||
+        booking.endDate.toISOString().slice(0, 10) !== input.checkOut) {
+      return res.status(409).json({ message: "The booking has changed. Reload and review it before saving." });
+    }
+    const set: Record<string, unknown> = { updatedBy: req.userId };
+    for (const [key, value] of Object.entries(details)) set[`details.${key}`] = value;
+    const onInsert: Record<string, unknown> = { source: "booking_com", bookingId: req.params.id };
+    for (const [key, value] of Object.entries(booking.pnlIncome || {})) {
+      if (!(key in details)) onInsert[`details.${key}`] = value;
+    }
+    await PnlBookingIncome.findByIdAndUpdate(
+      `booking_com:${req.params.id}`, { $set: set, $setOnInsert: onInsert },
+      { upsert: true, runValidators: true, setDefaultsOnInsert: false }
+    );
+    return res.json({ message: "Reviewed screenshot details saved." });
+  } catch (error) {
+    logError("Failed to save reviewed screenshot details", error);
+    return res.status(500).json({ message: "Unable to save reviewed screenshot details." });
   }
 });
 

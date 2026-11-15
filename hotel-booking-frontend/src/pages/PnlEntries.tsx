@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import PnlTable, { PnlColumn } from "../components/PnlTable";
 import PnlGrid from "../components/PnlGrid";
+import PnlScreenshotImport from "../components/PnlScreenshotImport";
 import { PnlBookingMatches, possibleBookingMatches } from "../components/PnlBookingMatches";
 import * as apiClient from "../api-client";
 import { currentYear, formatMoney, moneyToCents, signedMoneyToCents, stayNights, today, validYear } from "./pnl-utils";
@@ -59,6 +60,7 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
+  const [showScreenshotImport, setShowScreenshotImport] = useState(false);
   const [error, setError] = useState("");
   const [editingBooking, setEditingBooking] = useState<apiClient.PnlBooking | null>(null);
   const [bookingForm, setBookingForm] = useState<BookingForm | null>(null);
@@ -289,12 +291,14 @@ const PnlEntries = ({ type }: { type: EntryType }) => {
         <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm font-medium text-slate-700">Year<input aria-label="Year" type="number" min="1900" max="9998" value={year} onChange={(e) => setYear(e.target.value)} className="ml-3 w-24 rounded-lg border border-slate-300 px-3 py-2" /></label>
           <Link to="/pnl" className="text-sm font-semibold text-teal-700">P&amp;L overview</Link>
+          {type === "income" && <Button variant="outline" onClick={() => setShowScreenshotImport(true)} disabled={rooms.isLoading || rooms.isError}>Import screenshot</Button>}
           <Button variant="outline" onClick={() => setShowGrid(true)} disabled={!validYear(year) || rooms.isLoading || rooms.isError || entries.isLoading || entries.isError || (type === "income" && (bookings.isLoading || bookings.isError))}>Open full-screen editor</Button>
           <Button onClick={() => { reset(); setShowForm(true); }} disabled={rooms.isLoading || rooms.isError}>Add {type}</Button>
         </div>
       </header>
 
       {error && <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</p>}
+      {type === "income" && showScreenshotImport && <PnlScreenshotImport rooms={rooms.data || []} onClose={() => setShowScreenshotImport(false)} onSaved={setYear} />}
       {showGrid && <PnlGrid type={type} year={year} bookings={bookings.data || []} entries={rows} rooms={rooms.data || []} onClose={() => setShowGrid(false)} />}
       {rooms.isError && <p role="alert" className="text-sm text-rose-700">Unable to load rooms. <button className="font-semibold underline" onClick={() => rooms.refetch()}>Retry</button></p>}
       {showForm && (

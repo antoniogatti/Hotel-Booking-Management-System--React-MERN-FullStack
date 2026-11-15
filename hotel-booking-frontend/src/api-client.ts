@@ -371,6 +371,8 @@ export type PnlEntryInput = {
 export type PnlEntry = PnlEntryInput & { _id: string };
 
 export type PnlBookingDetails = {
+  bookingReference?: string;
+  bookingGuestName?: string;
   country?: string;
   city?: string;
   identifier?: string;
@@ -462,6 +464,12 @@ export const savePnlBookingDetails = async (booking: PnlBooking, details: PnlBoo
 export const fetchPnlBookings = async (year: number): Promise<PnlBooking[]> => {
   const response = await axiosInstance.get<{ bookings: PnlBooking[] }>(`/api/pnl/bookings?year=${year}`);
   return response.data.bookings;
+};
+
+export const savePnlScreenshotDetails = async (booking: PnlBooking, details: Pick<PnlBookingDetails, "bookingReference" | "bookingGuestName" | "guestCount" | "grossAmountCents">): Promise<void> => {
+  await axiosInstance.patch(`/api/pnl/bookings/booking_com/${booking.id}/screenshot`, {
+    roomId: booking.roomId, checkIn: booking.checkIn, checkOut: booking.checkOut, details,
+  });
 };
 
 export const fetchPnlEntries = async (year: number): Promise<PnlEntry[]> => {
