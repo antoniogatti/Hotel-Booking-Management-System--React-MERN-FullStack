@@ -28,6 +28,29 @@ This frontend serves as the **user interface** for a comprehensive hotel booking
 - **📊 Analytics Dashboard**: Business insights and performance metrics
 - **📱 Mobile-First**: Responsive design optimized for all devices
 
+### Traffic Insights
+
+The admin Traffic Insights dashboard shows device page-view counts and shares,
+ranked page and country bar charts, and a full-width interactive city map.
+The date range and audience apply to all charts; summary cards still cover
+the last 24 hours. Geography covers the top 100 city/country pairs returned
+by Application Insights, so country counts are totals within that subset,
+not all traffic.
+
+Use the city selector or map markers to inspect counts, the zoom controls to
+explore, and **Reset world view** to return to the globe. The city charts
+include locations that cannot be mapped. Coordinates are approximate city
+centers resolved on the backend using the offline `cities.json` dataset;
+missing, unmatched and ambiguous city names are not guessed. Deploy the
+backend update with the frontend to enable city markers.
+
+City data is from [GeoNames](https://www.geonames.org/) via
+[cities.json](https://www.npmjs.com/package/cities.json), licensed under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/); country/city names
+are normalized for matching. No visitor locations are sent to a geocoding
+service. The lazy-loaded map requests standard map tiles from OpenStreetMap
+and displays attribution; tile access requires an internet connection.
+
 ### P&L full-screen editor
 
 Open the full-screen editor from the Income or Expenses page. Edits save when

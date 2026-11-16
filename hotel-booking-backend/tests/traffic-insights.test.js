@@ -19,6 +19,7 @@ const realFetch = global.fetch;
 const realTrackEvent = telemetry.trackTelemetryEvent;
 const queries = [];
 const events = [];
+let geoRows = [];
 let server;
 let url;
 
@@ -28,7 +29,8 @@ test.before(async () => {
     if (!String(input).startsWith("https://api.applicationinsights.io/")) return realFetch(input, options);
     const query = JSON.parse(options.body).query;
     queries.push(query);
-    const rows = query.includes("pageCount24h") ? [[0, 0, 0, 0, 0]] : [];
+    const rows = query.includes("pageCount24h") ? [[0, 0, 0, 0, 0]]
+      : query.includes("by country, city") ? geoRows : [];
     return Promise.resolve(new Response(JSON.stringify({ tables: [{ rows }] }), { status: 200 }));
   };
   server = await new Promise((resolve) => {
@@ -79,4 +81,31 @@ test("dashboard enforces category filters and rejects invalid input", async () =
   const invalid = await realFetch(`${url}/traffic-insights/dashboard?category=anything`, { headers });
   assert.equal(invalid.status, 400);
   assert.equal(queries.length, 0);
+});
+
+test("adds city centers without guessing missing or ambiguous locations", async () => {
+  const { resolveTrafficLocation } = require("../src/lib/traffic-location");
+  assert.deepEqual(resolveTrafficLocation("  FRANCE ", "paris"), { latitude: 48.85341, longitude: 2.3488 });
+  assert.deepEqual(resolveTrafficLocation("FR", "Paris"), resolveTrafficLocation("France", "Paris"));
+  assert.equal(resolveTrafficLocation("United States", "Springfield"), null);
+  assert.equal(resolveTrafficLocation("Italy", ""), null);
+  assert.equal(resolveTrafficLocation("Unknown", "Paris"), null);
+
+  geoRows = [
+    ["France", "Paris", 12, "2026-11-16T10:00:00Z"],
+    ["Italy", "", 4, null],
+    ["United States", "Springfield", 3, null],
+  ];
+  try {
+    const response = await realFetch(`${url}/traffic-insights/dashboard`, {
+      headers: { authorization: `Bearer ${jwt.sign({ userId: "admin" }, process.env.JWT_SECRET_KEY)}` },
+    });
+    assert.equal(response.status, 200);
+    const data = await response.json();
+    assert.deepEqual(data.geoTraffic.map((row) => [row.hits, row.coordinates]), [
+      [12, { latitude: 48.85341, longitude: 2.3488 }], [4, null], [3, null],
+    ]);
+  } finally {
+    geoRows = [];
+  }
 });

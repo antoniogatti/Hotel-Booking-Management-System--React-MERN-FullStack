@@ -4,6 +4,7 @@ import requireRole from "../middleware/requireRole";
 import { logError } from "../lib/logger";
 import { isTelemetryInitialized, sendTestEvent } from "../lib/telemetry";
 import { DefaultAzureCredential } from "@azure/identity";
+import { resolveTrafficLocation } from "../lib/traffic-location";
 
 const router = express.Router();
 const azureCredential = new DefaultAzureCredential();
@@ -281,6 +282,7 @@ router.get(
           city: String(row[1] || ""),
           hits: Number(row[2] || 0),
           lastSeen: row[3] ? new Date(String(row[3])).toISOString() : null,
+          coordinates: resolveTrafficLocation(String(row[0] || ""), String(row[1] || "")),
         }));
 
       const metricsRow = summaryRows[0];

@@ -849,6 +849,7 @@ export type TrafficInsightsDashboardResponse = {
     city: string;
     hits: number;
     lastSeen: string | null;
+    coordinates?: { latitude: number; longitude: number } | null;
   }>;
   lastUpdated: string;
 };
